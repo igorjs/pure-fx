@@ -255,6 +255,10 @@ const _fr: boolean = _fn('hello');
 const lazy = new Lazy(() => 42);
 const _lv: number = lazy.value;
 const _lm: Lazy<string> = lazy.map(String);
+const _lDisposed: boolean = lazy.isDisposed;
+
+// Lazy implements Disposable
+const _disposable: Disposable = lazy;
 
 const task = new Task<number, string>(async () => Ok(42));
 const _tm: Task<string, string> = task.map(String);

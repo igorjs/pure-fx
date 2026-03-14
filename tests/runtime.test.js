@@ -685,6 +685,48 @@ describe('Lazy', () => {
     lazy.value; // force evaluation
     assert.equal(lazy.toString(), 'Lazy(42)');
   });
+
+  it('[Symbol.dispose]() releases value and thunk', () => {
+    const lazy = new Lazy(() => 42);
+    lazy.value; // evaluate
+    assert.equal(lazy.isDisposed, false);
+
+    lazy[Symbol.dispose]();
+    assert.equal(lazy.isDisposed, true);
+    assert.throws(() => lazy.value, TypeError);
+    assert.equal(lazy.toString(), 'Lazy(<disposed>)');
+  });
+
+  it('[Symbol.dispose]() works on unevaluated Lazy', () => {
+    const lazy = new Lazy(() => 42);
+    assert.equal(lazy.isEvaluated, false);
+
+    lazy[Symbol.dispose]();
+    assert.equal(lazy.isDisposed, true);
+    assert.throws(() => lazy.value, TypeError);
+  });
+
+  it('disposed Lazy propagates to derived instances', () => {
+    const parent = new Lazy(() => 21);
+    const child = parent.map(n => n * 2);
+
+    parent[Symbol.dispose]();
+    // child's thunk references parent.value, which now throws
+    assert.throws(() => child.value, TypeError);
+  });
+
+  it('using declaration auto-disposes at end of scope', () => {
+    let ref;
+    {
+      using lazy = new Lazy(() => 'scoped');
+      assert.equal(lazy.value, 'scoped');
+      assert.equal(lazy.isDisposed, false);
+      ref = lazy;
+    }
+    // After the block, `using` triggered [Symbol.dispose]()
+    assert.equal(ref.isDisposed, true);
+    assert.throws(() => ref.value, TypeError);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

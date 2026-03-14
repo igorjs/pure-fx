@@ -23,17 +23,19 @@ import { Err, Ok } from './result.js';
  * config.map(c => c.port); // new Lazy, still deferred
  * ```
  */
-export class Lazy<T> {
+export class Lazy<T> implements Disposable {
   private _value: T | undefined;
   private _thunk: (() => T) | null;
   private _evaluated = false;
+  private _disposed = false;
 
   constructor(thunk: () => T) {
     this._thunk = thunk;
   }
 
-  /** Access the value, evaluating the thunk on first call. */
+  /** Access the value, evaluating the thunk on first call. Throws if disposed. */
   get value(): T {
+    if (this._disposed) throw new TypeError('Cannot access disposed Lazy');
     if (!this._evaluated) {
       this._value = this._thunk!();
       this._thunk = null; // Release closure for GC
@@ -45,6 +47,11 @@ export class Lazy<T> {
   /** Whether the lazy value has been computed. */
   get isEvaluated(): boolean {
     return this._evaluated;
+  }
+
+  /** Whether this Lazy has been disposed. */
+  get isDisposed(): boolean {
+    return this._disposed;
   }
 
   /** Transform the lazy value. Returns a new Lazy (still deferred). */
@@ -84,8 +91,27 @@ export class Lazy<T> {
     }
   }
 
+  /**
+   * Release the cached value and thunk for GC. After disposal,
+   * `.value` throws and derived Lazy instances will also fail.
+   *
+   * Enables `using` declarations for scoped expensive computations:
+   * ```ts
+   * {
+   *   using data = new Lazy(() => parseHugeDataset());
+   *   transform(data.value);
+   * } // data disposed, memory released
+   * ```
+   */
+  [Symbol.dispose](): void {
+    this._value = undefined;
+    this._thunk = null;
+    this._disposed = true;
+  }
+
   /** String representation showing evaluation state. */
   toString(): string {
+    if (this._disposed) return 'Lazy(<disposed>)';
     return this._evaluated ? `Lazy(${String(this._value)})` : 'Lazy(<pending>)';
   }
 }
