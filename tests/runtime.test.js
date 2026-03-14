@@ -16,7 +16,8 @@ const {
   match, tryCatch,
   pipe, flow, Lazy, Task,
   isImmutable,
-  TaggedError, isTaggedError,
+  ErrType,
+  Program,
 } = await import('../dist/index.js');
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -824,12 +825,12 @@ describe('deepEqual edge cases', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TaggedError
+// ErrType
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('TaggedError', () => {
-  const NotFound = TaggedError('NotFound', 'NOT_FOUND');
-  const Forbidden = TaggedError('Forbidden', 'FORBIDDEN');
+describe('ErrType', () => {
+  const NotFound = ErrType('NotFound');
+  const Forbidden = ErrType('Forbidden');
 
   it('constructor produces frozen error with correct fields', () => {
     const err = NotFound('User not found', { userId: 'u_123' });
@@ -840,6 +841,19 @@ describe('TaggedError', () => {
     assert.deepEqual(err.metadata, { userId: 'u_123' });
     assert.equal(typeof err.timestamp, 'number');
     assert.equal(Object.isFrozen(err), true);
+  });
+
+  it('auto-derives SCREAMING_SNAKE code from PascalCase tag', () => {
+    assert.equal(ErrType('RateLimited')('').code, 'RATE_LIMITED');
+    assert.equal(ErrType('Forbidden')('').code, 'FORBIDDEN');
+    assert.equal(ErrType('NotFound')('').code, 'NOT_FOUND');
+    assert.equal(ErrType('DBError')('').code, 'DB_ERROR');
+  });
+
+  it('accepts explicit code override', () => {
+    const Custom = ErrType('DbError', 'DB_ERR');
+    assert.equal(Custom.code, 'DB_ERR');
+    assert.equal(Custom('fail').code, 'DB_ERR');
   });
 
   it('tag/name/code match defined values', () => {
@@ -897,18 +911,18 @@ describe('TaggedError', () => {
     assert.equal(result.unwrapErr(), err);
   });
 
-  it('isTaggedError() returns true for instances', () => {
+  it('ErrType.is() returns true for instances', () => {
     const err = NotFound('gone');
-    assert.equal(isTaggedError(err), true);
+    assert.equal(ErrType.is(err), true);
   });
 
-  it('isTaggedError() returns false for plain objects/null/primitives', () => {
-    assert.equal(isTaggedError(null), false);
-    assert.equal(isTaggedError(undefined), false);
-    assert.equal(isTaggedError(42), false);
-    assert.equal(isTaggedError('string'), false);
-    assert.equal(isTaggedError({ tag: 'X' }), false);
-    assert.equal(isTaggedError({ tag: 'X', code: 'Y', message: 'z' }), false);
+  it('ErrType.is() returns false for plain objects/null/primitives', () => {
+    assert.equal(ErrType.is(null), false);
+    assert.equal(ErrType.is(undefined), false);
+    assert.equal(ErrType.is(42), false);
+    assert.equal(ErrType.is('string'), false);
+    assert.equal(ErrType.is({ tag: 'X' }), false);
+    assert.equal(ErrType.is({ tag: 'X', code: 'Y', message: 'z' }), false);
   });
 
   it('Constructor.is() matches specific error type', () => {
@@ -917,7 +931,7 @@ describe('TaggedError', () => {
     assert.equal(Forbidden.is(err), false);
   });
 
-  it('Constructor.is() rejects non-TaggedError values', () => {
+  it('Constructor.is() rejects non-ErrType values', () => {
     assert.equal(NotFound.is(null), false);
     assert.equal(NotFound.is({ tag: 'NotFound', code: 'NOT_FOUND' }), false);
   });
@@ -966,5 +980,81 @@ describe('tryCatch (standalone)', () => {
   it('catches and wraps', () => {
     assert.equal(tryCatch(() => 42).unwrap(), 42);
     assert.equal(tryCatch(() => { throw new Error('boom'); }, e => e.message).unwrapErr(), 'boom');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Program
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Program', () => {
+  it('execute() returns Ok result from Task', async () => {
+    const prog = Program(Task.of(42));
+    const result = await prog.execute();
+    assert.equal(result.isOk, true);
+    assert.equal(result.unwrap(), 42);
+  });
+
+  it('execute() returns Err result from Task', async () => {
+    const prog = Program(Task.fromResult(Err('fail')));
+    const result = await prog.execute();
+    assert.equal(result.isErr, true);
+    assert.equal(result.unwrapErr(), 'fail');
+  });
+
+  it('execute() accepts effect function', async () => {
+    const prog = Program(() => Task.of('hello'));
+    const result = await prog.execute();
+    assert.equal(result.unwrap(), 'hello');
+  });
+
+  it('execute() passes AbortSignal to effect', async () => {
+    const ac = new AbortController();
+    const prog = Program((signal) =>
+      new Task(async () => Ok(signal.aborted))
+    );
+
+    const before = await prog.execute(ac.signal);
+    assert.equal(before.unwrap(), false);
+
+    ac.abort();
+    const after = await prog.execute(ac.signal);
+    assert.equal(after.unwrap(), true);
+  });
+
+  it('execute() provides default signal when none given', async () => {
+    const prog = Program((signal) =>
+      new Task(async () => Ok(signal instanceof AbortSignal))
+    );
+    const result = await prog.execute();
+    assert.equal(result.unwrap(), true);
+  });
+
+  it('execute() can be called multiple times', async () => {
+    let count = 0;
+    const prog = Program(() => new Task(async () => Ok(++count)));
+    assert.equal((await prog.execute()).unwrap(), 1);
+    assert.equal((await prog.execute()).unwrap(), 2);
+  });
+
+  it('execute() works with Task pipelines', async () => {
+    const prog = Program(() =>
+      Task.of(10)
+        .map(n => n * 2)
+        .flatMap(n => n > 15 ? Task.of(n) : Task.fromResult(Err('too small')))
+    );
+    const result = await prog.execute();
+    assert.equal(result.unwrap(), 20);
+  });
+
+  it('execute() works with ErrType errors', async () => {
+    const AppError = ErrType('AppError');
+    const prog = Program(() =>
+      Task.fromResult(AppError('something broke').toResult())
+    );
+    const result = await prog.execute();
+    assert.equal(result.isErr, true);
+    assert.equal(result.unwrapErr().tag, 'AppError');
+    assert.equal(result.unwrapErr().message, 'something broke');
   });
 });

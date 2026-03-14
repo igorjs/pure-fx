@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// TaggedError
+// ErrType
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import type { Result } from './result.js';
@@ -8,7 +8,7 @@ import { deepFreezeRaw } from './internals.js';
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
-const TAGGED_ERROR_BRAND = Symbol.for('pure-fx/TaggedError');
+const ERR_TYPE_BRAND = Symbol.for('pure-fx/ErrType');
 
 /** Capture a stack trace, stripping library frames where V8 is available. */
 const captureStack = (): string | undefined => {
@@ -21,25 +21,44 @@ const captureStack = (): string | undefined => {
   return holder.stack;
 };
 
-// ── Instance type ────────────────────────────────────────────────────────────
+/** Convert PascalCase to SCREAMING_SNAKE_CASE at runtime. */
+const pascalToScreamingSnake = (s: string): string =>
+  s.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .toUpperCase();
+
+/** Structural check for any ErrType instance. */
+const isErrType = (value: unknown): value is ErrType<string, string> => {
+  if (value === null || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v['tag'] === 'string' &&
+    typeof v['code'] === 'string' &&
+    typeof v['message'] === 'string' &&
+    typeof v['metadata'] === 'object' && v['metadata'] !== null &&
+    typeof v['timestamp'] === 'number'
+  );
+};
+
+// ── Instance interface ───────────────────────────────────────────────────────
 
 /**
  * A structured, immutable error value.
  *
- * Created by calling a {@link TaggedErrorConstructor}. Every instance is
+ * Created by calling an {@link ErrTypeConstructor}. Every instance is
  * deeply frozen: mutations throw `TypeError`. Use `.tag` as the discriminant
  * in `switch`/`match` for exhaustive handling.
  *
  * @example
  * ```ts
- * const err: TaggedErrorInstance<'NotFound', 'NOT_FOUND'> = NotFound('User not found');
+ * const err: ErrType<'NotFound', 'NOT_FOUND'> = NotFound('User not found');
  * err.tag;      // 'NotFound'
  * err.code;     // 'NOT_FOUND'
  * err.message;  // 'User not found'
  * ```
  */
-export interface TaggedErrorInstance<Tag extends string, Code extends string> {
-  readonly [TAGGED_ERROR_BRAND]: true;
+interface ErrTypeInstance<Tag extends string, Code extends string> {
+  readonly [ERR_TYPE_BRAND]: true;
   readonly tag: Tag;
   readonly name: Tag;
   readonly code: Code;
@@ -49,7 +68,7 @@ export interface TaggedErrorInstance<Tag extends string, Code extends string> {
   readonly stack: string | undefined;
 
   /** Wrap this error in `Err(this)` to create a `Result`. */
-  toResult<T>(): Result<T, TaggedErrorInstance<Tag, Code>>;
+  toResult<T>(): Result<T, ErrType<Tag, Code>>;
 
   /** Serialise all fields except `stack`. */
   toJSON(): { readonly tag: Tag; readonly name: Tag; readonly code: Code; readonly message: string; readonly metadata: Readonly<Record<string, unknown>>; readonly timestamp: number };
@@ -60,8 +79,8 @@ export interface TaggedErrorInstance<Tag extends string, Code extends string> {
 
 // ── Implementation class ─────────────────────────────────────────────────────
 
-class TaggedErrorImpl<Tag extends string, Code extends string> implements TaggedErrorInstance<Tag, Code> {
-  readonly [TAGGED_ERROR_BRAND]: true;
+class ErrTypeImpl<Tag extends string, Code extends string> implements ErrTypeInstance<Tag, Code> {
+  readonly [ERR_TYPE_BRAND]: true;
   readonly tag: Tag;
   readonly name: Tag;
   readonly code: Code;
@@ -71,7 +90,7 @@ class TaggedErrorImpl<Tag extends string, Code extends string> implements Tagged
   readonly stack: string | undefined;
 
   constructor(tag: Tag, code: Code, message: string, metadata: Record<string, unknown>, stack: string | undefined) {
-    this[TAGGED_ERROR_BRAND] = true;
+    this[ERR_TYPE_BRAND] = true;
     this.tag = tag;
     this.name = tag;
     this.code = code;
@@ -83,7 +102,7 @@ class TaggedErrorImpl<Tag extends string, Code extends string> implements Tagged
     Object.freeze(this);
   }
 
-  toResult<T>(): Result<T, TaggedErrorInstance<Tag, Code>> { return Err(this); }
+  toResult<T>(): Result<T, ErrType<Tag, Code>> { return Err(this); }
 
   toJSON(): { readonly tag: Tag; readonly name: Tag; readonly code: Code; readonly message: string; readonly metadata: Readonly<Record<string, unknown>>; readonly timestamp: number } {
     return { tag: this.tag, name: this.name, code: this.code, message: this.message, metadata: this.metadata, timestamp: this.timestamp };
@@ -95,22 +114,22 @@ class TaggedErrorImpl<Tag extends string, Code extends string> implements Tagged
 // ── Constructor type ─────────────────────────────────────────────────────────
 
 /**
- * A callable constructor returned by {@link TaggedError}.
+ * A callable constructor returned by {@link ErrType}.
  *
- * Call it with `(message, metadata?)` to create a frozen {@link TaggedErrorInstance}.
+ * Call it with `(message, metadata?)` to create a frozen {@link ErrType} instance.
  * Also exposes `.tag`, `.code`, and `.is()` for introspection and narrowing.
  *
  * @example
  * ```ts
- * const NotFound = TaggedError('NotFound', 'NOT_FOUND');
+ * const NotFound = ErrType('NotFound');
  * NotFound.tag;            // 'NotFound'
  * NotFound.code;           // 'NOT_FOUND'
  * NotFound.is(someError);  // type guard
  * ```
  */
-export interface TaggedErrorConstructor<Tag extends string, Code extends string> {
+export interface ErrTypeConstructor<Tag extends string, Code extends string> {
   /** Create a new frozen error instance. */
-  (message: string, metadata?: Record<string, unknown>): TaggedErrorInstance<Tag, Code>;
+  (message: string, metadata?: Record<string, unknown>): ErrType<Tag, Code>;
 
   /** The tag literal for this error type. */
   readonly tag: Tag;
@@ -118,71 +137,74 @@ export interface TaggedErrorConstructor<Tag extends string, Code extends string>
   /** The code literal for this error type. */
   readonly code: Code;
 
-  /** Type guard: narrows `value` to `TaggedErrorInstance<Tag, Code>`. */
-  is(value: unknown): value is TaggedErrorInstance<Tag, Code>;
+  /** Type guard: narrows `value` to `ErrType<Tag, Code>`. */
+  is(value: unknown): value is ErrType<Tag, Code>;
 }
 
-// ── Factory ──────────────────────────────────────────────────────────────────
+// ── Public type (merges with const in value position) ────────────────────────
 
 /**
- * Define a reusable error type with a fixed `tag` and `code`.
+ * A structured, immutable error value with a `tag` discriminant.
  *
- * Returns a callable {@link TaggedErrorConstructor} that produces frozen,
- * immutable {@link TaggedErrorInstance} values. These compose naturally with
+ * In type position, `ErrType<Tag, Code>` describes an error instance.
+ * In value position, `ErrType(tag, code?)` is the factory that creates
+ * {@link ErrTypeConstructor} callables.
+ *
+ * @example
+ * ```ts
+ * // Value position: factory
+ * const NotFound = ErrType('NotFound');
+ *
+ * // Type position: instance type
+ * type AppError = ErrType<'NotFound', 'NOT_FOUND'> | ErrType<'Forbidden'>;
+ * ```
+ */
+export type ErrType<Tag extends string, Code extends string = string> = ErrTypeInstance<Tag, Code>;
+
+// ── Factory + namespace (const merges with type above) ───────────────────────
+
+/**
+ * Define a reusable error kind with a fixed `tag` and optional `code`.
+ *
+ * If `code` is omitted, it is auto-derived from the PascalCase `tag`
+ * as SCREAMING_SNAKE_CASE (e.g. `'NotFound'` -> `'NOT_FOUND'`).
+ *
+ * Returns a callable {@link ErrTypeConstructor} that produces frozen,
+ * immutable {@link ErrType} instances. These compose naturally with
  * `Result<T, E>` and support discriminated union narrowing via `tag`.
  *
  * @example
  * ```ts
- * const NotFound = TaggedError('NotFound', 'NOT_FOUND');
- * const Forbidden = TaggedError('Forbidden', 'FORBIDDEN');
- *
- * const err = NotFound('User not found', { userId: 'u_123' });
- * const result = err.toResult<User>();
+ * const NotFound = ErrType('NotFound');           // code: 'NOT_FOUND'
+ * const Forbidden = ErrType('Forbidden');         // code: 'FORBIDDEN'
+ * const DbError = ErrType('DbError', 'DB_ERR');  // explicit code
  *
  * type AppError =
- *   | TaggedErrorInstance<'NotFound', 'NOT_FOUND'>
- *   | TaggedErrorInstance<'Forbidden', 'FORBIDDEN'>;
+ *   | ErrType<'NotFound', 'NOT_FOUND'>
+ *   | ErrType<'Forbidden'>;
  * ```
  */
-export const TaggedError = <Tag extends string, Code extends string>(
-  tag: Tag,
-  code: Code,
-): TaggedErrorConstructor<Tag, Code> => {
-  const constructor = (message: string, metadata?: Record<string, unknown>): TaggedErrorInstance<Tag, Code> =>
-    new TaggedErrorImpl(tag, code, message, metadata ?? {}, captureStack());
+export const ErrType: {
+  <Tag extends string>(tag: Tag): ErrTypeConstructor<Tag, string>;
+  <Tag extends string, Code extends string>(tag: Tag, code: Code): ErrTypeConstructor<Tag, Code>;
+  /** Type guard: check whether `value` is any {@link ErrType} instance. */
+  is(value: unknown): value is ErrType<string, string>;
+} = Object.assign(
+  <Tag extends string, Code extends string>(tag: Tag, code?: Code): ErrTypeConstructor<Tag, Code> => {
+    const resolvedCode = (code ?? pascalToScreamingSnake(tag)) as Code;
 
-  return Object.assign(constructor, {
-    tag,
-    code,
-    is(value: unknown): value is TaggedErrorInstance<Tag, Code> {
-      return isTaggedError(value) && value.tag === tag && value.code === code;
-    },
-  } as const);
-};
+    const constructor = (message: string, metadata?: Record<string, unknown>): ErrType<Tag, Code> =>
+      new ErrTypeImpl(tag, resolvedCode, message, metadata ?? {}, captureStack());
 
-// ── Global type guard ────────────────────────────────────────────────────────
-
-/**
- * Type guard: check whether `value` is any {@link TaggedErrorInstance}.
- *
- * Validates the structural shape: `tag` (string), `code` (string),
- * `message` (string), `metadata` (object), `timestamp` (number).
- *
- * @example
- * ```ts
- * if (isTaggedError(err)) {
- *   console.log(err.tag, err.code, err.message);
- * }
- * ```
- */
-export const isTaggedError = (value: unknown): value is TaggedErrorInstance<string, string> => {
-  if (value === null || typeof value !== 'object') return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v['tag'] === 'string' &&
-    typeof v['code'] === 'string' &&
-    typeof v['message'] === 'string' &&
-    typeof v['metadata'] === 'object' && v['metadata'] !== null &&
-    typeof v['timestamp'] === 'number'
-  );
-};
+    return Object.assign(constructor, {
+      tag,
+      code: resolvedCode,
+      is(value: unknown): value is ErrType<Tag, Code> {
+        return isErrType(value) && value.tag === tag && value.code === resolvedCode;
+      },
+    } as const);
+  },
+  {
+    is: isErrType,
+  },
+);

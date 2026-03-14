@@ -13,7 +13,7 @@
  *   Lazy(() => expensive())                - deferred & cached computation
  *   Task(async () => ...)                  - composable async Result
  *   Type<'UserId', string>                 - nominal typing (zero runtime)
- *   TaggedError('NotFound', 'NOT_FOUND')     - structured error constructors
+ *   ErrType('NotFound')                      - structured error constructors
  *
  * Everything returns immutable values. Errors are values, never thrown.
  * Zero dependencies. Methods live on prototypes. GC-friendly.
@@ -51,4 +51,5 @@ export { type RecordMethods, type ImmutableRecord } from './record.js';
 export { type ListMethods, type ImmutableList } from './list.js';
 export { Record, List, isImmutable } from './constructors.js';
 export { type SchemaError, type SchemaType, Schema } from './schema.js';
-export { type TaggedErrorInstance, type TaggedErrorConstructor, TaggedError, isTaggedError } from './error.js';
+export { ErrType, type ErrTypeConstructor } from './error.js';
+export { Program } from './program.js';

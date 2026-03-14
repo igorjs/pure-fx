@@ -7,7 +7,7 @@ import {
   Record, List, Ok, Err, Some, None,
   Result, Option, match, tryCatch,
   Schema, pipe, flow, Lazy, Task,
-  TaggedError, isTaggedError
+  ErrType, Program
 } from '@igorjs/pure-fx'
 ```
 
@@ -67,9 +67,9 @@ Some(42).filter(n => n > 100)                // None
 Option.fromNullable(process.env.PORT)        // Some('3000') or None
 
 // Structured errors as values
-const NotFound = TaggedError('NotFound', 'NOT_FOUND')
+const NotFound = ErrType('NotFound')          // code auto-derived: 'NOT_FOUND'
 const err = NotFound('User not found', { userId: 'u_123' })
-err.toResult()                                // Result<never, TaggedErrorInstance<...>>
+err.toResult()                                // Result<never, ErrType<'NotFound', string>>
 
 // Schema validation -> immutable output
 const UserSchema = Schema.object({
@@ -77,6 +77,15 @@ const UserSchema = Schema.object({
   age: Schema.number.refine(n => n > 0, 'positive'),
 })
 UserSchema.parse(jsonData)                   // Result<ImmutableRecord<User>, SchemaError>
+
+// Program entrypoint: errors as values all the way to process.exit
+const main = Program((signal) =>
+  pipe(
+    loadConfig(),
+    Task.flatMap(cfg => startServer(cfg, { signal })),
+  )
+)
+main.run()                                   // Ok -> exit 0, Err -> stderr + exit 1
 ```
 
 ## API
@@ -142,23 +151,24 @@ UserSchema.parse(jsonData)                   // Result<ImmutableRecord<User>, Sc
 | `.toJSON()` | `{ tag: 'Ok', value }` or `{ tag: 'Err', error }` |
 | `.toString()` | `'Ok(42)'` or `'Err(fail)'` |
 
-### TaggedError
+### ErrType
 
 | Export | Description |
 |---|---|
-| `TaggedError(tag, code)` | Define a reusable error constructor. Returns a callable with `.tag`, `.code`, `.is()` |
+| `ErrType(tag)` | Define error constructor. Code auto-derived from PascalCase (`'NotFound'` -> `'NOT_FOUND'`) |
+| `ErrType(tag, code)` | Define error constructor with explicit code |
+| `ErrType.is(value)` | Type guard for any ErrType instance |
 | `constructor(message, metadata?)` | Create a frozen error instance with tag, code, message, metadata, timestamp, stack |
 | `.tag` / `.name` | Literal string discriminant (same value) |
-| `.code` | Literal string code |
+| `.code` | Literal string code (auto-derived or explicit) |
 | `.message` | Human-readable description |
 | `.metadata` | Deep-frozen `Record<string, unknown>` (defaults `{}`) |
 | `.timestamp` | Epoch milliseconds at construction |
 | `.stack` | Stack trace string (V8 `captureStackTrace` where available, `Error().stack` fallback) |
-| `.toResult<T>()` | Wrap in `Err(this)` -> `Result<T, TaggedErrorInstance>` |
+| `.toResult<T>()` | Wrap in `Err(this)` -> `Result<T, ErrType<Tag, Code>>` |
 | `.toJSON()` | Serialise all fields except `stack` |
 | `.toString()` | `'Tag(CODE): message'` |
 | `Constructor.is(value)` | Type guard for specific error type |
-| `isTaggedError(value)` | Type guard for any TaggedError instance |
 
 ### Option\<T\>
 
@@ -195,6 +205,15 @@ UserSchema.parse(jsonData)                   // Result<ImmutableRecord<User>, Sc
 | `.transform(fn)` | Post-parse transform |
 | `.optional()` / `.default(v)` | Nullability handling |
 | `Schema.Infer<typeof S>` | Extract TypeScript type |
+
+### Program
+
+| Method | Description |
+|---|---|
+| `Program(task)` | Create program from a Task |
+| `Program((signal) => task)` | Create program with AbortSignal wired to SIGINT/SIGTERM |
+| `.run()` | Execute with process lifecycle: signals, exit codes, stderr |
+| `.execute(signal?)` | Execute for testing: returns `Result`, no `process.exit` |
 
 ### Utilities
 
@@ -237,7 +256,7 @@ npm run check
 # Build
 npm run build
 
-# Test runtime (104 tests)
+# Test runtime
 npm test
 
 # Test types (compile-time safety suite)
