@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // ── Target ───────────────────────────────────────────────────────────
+    // ES2024: Node 22+ (V8 12.4+). Includes Array.groupBy, Promise.withResolvers,
+    // ArrayBuffer.resize, Atomics.waitAsync, well-formed Unicode strings,
+    // plus all ES2022 features (top-level await, Error.cause, Array.at).
+    "target": "es2024",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2024"],
+
+    // ── Strict - Maximum Safety ──────────────────────────────────────────
+    // TS7 enables --strict by default. We go further.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // ── Unused Code ──────────────────────────────────────────────────────
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    // ── Module Interop ───────────────────────────────────────────────────
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+
+    // ── Output ───────────────────────────────────────────────────────────
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    // ── Interop ──────────────────────────────────────────────────────────
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts"]
+}

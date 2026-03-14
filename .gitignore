@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+
+# Secrets and credentials
+.env
+.env.*
+.npmrc
+*.pem
+*.key
+
+# Test artifacts
+coverage/
+*.lcov
+
+# Editor and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db

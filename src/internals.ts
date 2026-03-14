@@ -1,0 +1,208 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// Internal Utilities
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** JavaScript primitive types (non-object, non-function). */
+export type Primitive = string | number | boolean | bigint | symbol | undefined | null;
+
+/**
+ * Recursively marks all properties as `readonly`.
+ *
+ * Handles arrays, Maps, Sets, and plain objects. Functions are left as-is
+ * since they are inherently referentially transparent in this context.
+ */
+export type DeepReadonly<T> =
+  T extends Primitive ? T
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepReadonly<U>>
+  : T extends ReadonlyMap<infer K, infer V> ? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>>
+  : T extends ReadonlySet<infer U> ? ReadonlySet<DeepReadonly<U>>
+  : T extends (...args: infer A) => infer R ? (...args: A) => R
+  : { readonly [K in keyof T]: DeepReadonly<T[K]> };
+
+/** Check whether `val` is a non-null object (excluding typed arrays). */
+export const isObjectLike = (val: unknown): val is Record<string | symbol, unknown> =>
+  val !== null && typeof val === 'object' && !ArrayBuffer.isView(val);
+
+/**
+ * Recursively freeze an object and all nested properties.
+ *
+ * Skips already-frozen objects to avoid redundant work.
+ * Handles both string-keyed and symbol-keyed properties.
+ */
+export const deepFreezeRaw = (obj: unknown): void => {
+  if (!isObjectLike(obj) || Object.isFrozen(obj)) return;
+  Object.freeze(obj);
+  const keys = Object.keys(obj);
+  for (let i = 0; i < keys.length; i++) deepFreezeRaw((obj as Record<string, unknown>)[keys[i]!]);
+  const syms = Object.getOwnPropertySymbols(obj);
+  for (let i = 0; i < syms.length; i++) deepFreezeRaw((obj as Record<symbol, unknown>)[syms[i]!]);
+};
+
+// Pooled path recorder
+let _pathBuf: string[] = [];
+let _pathRecording = false;
+const _pathHandler: ProxyHandler<object> = {
+  get(_, prop) {
+    if (typeof prop === 'string') { _pathBuf.push(prop); return _pathSentinel; }
+    return undefined;
+  },
+};
+const _pathSentinel = new Proxy(Object.create(null), _pathHandler);
+
+/**
+ * Record the property path accessed by `accessor` on a proxy.
+ *
+ * Used internally by Record.set / Record.update to resolve type-safe
+ * accessor lambdas like `u => u.address.city` into `['address', 'city']`.
+ */
+export const recordPath = <T>(accessor: (obj: T) => unknown): string[] => {
+  if (_pathRecording) return recordPathSlow(accessor);
+  _pathRecording = true;
+  _pathBuf = [];
+  accessor(_pathSentinel as T);
+  const result = _pathBuf;
+  _pathBuf = [];
+  _pathRecording = false;
+  return result;
+};
+
+const recordPathSlow = <T>(accessor: (obj: T) => unknown): string[] => {
+  const path: string[] = [];
+  const handler: ProxyHandler<object> = {
+    get(_, prop) {
+      if (typeof prop === 'string') { path.push(prop); return new Proxy({}, handler); }
+      return undefined;
+    },
+  };
+  accessor(new Proxy({}, handler) as T);
+  return path;
+};
+
+/** Traverse `obj` along `path`, returning the leaf value or `undefined`. */
+export const getByPath = (obj: unknown, path: readonly string[]): unknown => {
+  let current = obj;
+  for (let i = 0; i < path.length; i++) {
+    if (current === null || current === undefined) return undefined;
+    current = (current as Record<string, unknown>)[path[i]!];
+  }
+  return current;
+};
+
+/** Immutably set a value at a deep path, returning a structurally-shared copy. */
+export const setByPath = <T>(obj: T, path: readonly string[], value: unknown, depth = 0): T => {
+  if (depth === path.length) return value as T;
+  const key = path[depth]!;
+  const current = obj as Record<string, unknown>;
+  const child = current[key];
+  if (Array.isArray(child) && depth + 1 < path.length) {
+    const idx = Number(path[depth + 1]);
+    if (!Number.isNaN(idx)) {
+      const copy = child.slice();
+      copy[idx] = depth + 2 === path.length ? value : setByPath(copy[idx], path, value, depth + 2);
+      return { ...current, [key]: copy } as T;
+    }
+  }
+  return { ...current, [key]: setByPath(child, path, value, depth + 1) } as T;
+};
+
+// Draft proxy
+/** A single mutation captured during a `produce()` draft session. */
+export interface Mutation { readonly path: readonly string[]; readonly value: unknown; }
+
+/**
+ * Create a mutable draft proxy that records mutations as data.
+ *
+ * Property reads recurse into nested drafts. Property writes and
+ * deletes are captured as {@link Mutation} entries. No actual
+ * mutation happens to `base`.
+ */
+export const createDraft = <T extends object>(
+  base: T, mutations: Mutation[], currentPath: string[] = [],
+): T => {
+  const target = Object.isFrozen(base) ? { ...base } : base;
+  return new Proxy(target as T, {
+    get(tgt, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(tgt, prop, receiver);
+
+      // Check mutations without allocating a full path array.
+      // Compare inline: path must equal [...currentPath, prop]
+      const depth = currentPath.length;
+      for (let i = mutations.length - 1; i >= 0; i--) {
+        const m = mutations[i]!;
+        if (m.path.length === depth + 1 && m.path[depth] === prop) {
+          let match = true;
+          for (let j = 0; j < depth; j++) {
+            if (m.path[j] !== currentPath[j]) { match = false; break; }
+          }
+          if (match) return m.value;
+        }
+      }
+
+      const val = Reflect.get(tgt, prop, receiver);
+      // Only allocate the child path array when recursing into a nested object
+      if (isObjectLike(val)) {
+        const childPath = new Array<string>(depth + 1);
+        for (let j = 0; j < depth; j++) childPath[j] = currentPath[j]!;
+        childPath[depth] = prop;
+        return createDraft(val as object, mutations, childPath);
+      }
+      return val;
+    },
+    set(_, prop, value) {
+      if (typeof prop === 'string') {
+        const depth = currentPath.length;
+        const path = new Array<string>(depth + 1);
+        for (let j = 0; j < depth; j++) path[j] = currentPath[j]!;
+        path[depth] = prop;
+        mutations.push({ path, value });
+      }
+      return true;
+    },
+    deleteProperty(_, prop) {
+      if (typeof prop === 'string') {
+        const depth = currentPath.length;
+        const path = new Array<string>(depth + 1);
+        for (let j = 0; j < depth; j++) path[j] = currentPath[j]!;
+        path[depth] = prop;
+        mutations.push({ path, value: undefined });
+      }
+      return true;
+    },
+  }) as T;
+};
+
+/** Apply a list of recorded mutations to `base`, producing a new value via structural sharing. */
+export const applyMutations = <T>(base: T, mutations: readonly Mutation[]): T => {
+  let result = base;
+  for (let i = 0; i < mutations.length; i++) {
+    const m = mutations[i]!;
+    result = setByPath(result, m.path, m.value);
+  }
+  return result;
+};
+
+/**
+ * Structural deep equality for plain objects and arrays.
+ *
+ * Uses `Object.is` for primitives, recursive comparison for nested
+ * structures, and `hasOwnProperty` checks to correctly detect objects
+ * with different keys of the same count.
+ */
+export const deepEqual = (a: unknown, b: unknown): boolean => {
+  if (Object.is(a, b)) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) { if (!deepEqual(a[i], b[i])) return false; }
+    return true;
+  }
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const aKeys = Object.keys(aObj);
+  if (aKeys.length !== Object.keys(bObj).length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    const k = aKeys[i]!;
+    if (!Object.prototype.hasOwnProperty.call(bObj, k) || !deepEqual(aObj[k], bObj[k])) return false;
+  }
+  return true;
+};
