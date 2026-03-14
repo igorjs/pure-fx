@@ -1,0 +1,71 @@
+{
+  "name": "@igorjs/pure-ts",
+  "version": "0.1.0",
+  "description": "Pure - functional programming primitives for TypeScript. Immutable Record, List, Result, Option, Schema, pipe, flow, Lazy, Task. Zero dependencies. Class-based Records. GC-friendly.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "tsgo --noEmit",
+    "build": "rm -rf dist && tsgo",
+    "test": "node --test tests/runtime.test.js",
+    "test:types": "tsgo -p tsconfig.test.json",
+    "prepublishOnly": "npm run check && npm run build && npm test && npm run test:types"
+  },
+  "keywords": [
+    "immutable",
+    "record",
+    "list",
+    "result",
+    "option",
+    "monad",
+    "functional",
+    "typescript",
+    "ts7",
+    "schema",
+    "validation",
+    "pipe",
+    "flow",
+    "lazy",
+    "task",
+    "zero-dependency",
+    "type-safe",
+    "deep-freeze"
+  ],
+  "author": "igorjs <oss@mail.igorjs.io>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igorjs/pure-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/igorjs/pure-ts/issues"
+  },
+  "homepage": "https://github.com/igorjs/pure-ts#readme",
+  "devDependencies": {
+    "@typescript/native-preview": "latest"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.5.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  }
+}

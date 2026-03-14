@@ -1,0 +1,233 @@
+/**
+ * types.test.ts - Compile-time type safety suite.
+ *
+ * This file is NOT executed. It is type-checked only:
+ *   tsgo --noEmit tests/types.test.ts
+ *
+ * Every @ts-expect-error must produce exactly one error.
+ * If any @ts-expect-error becomes unused, the build fails - meaning
+ * the framework stopped catching a type error it should catch.
+ */
+
+import {
+  Record, List, Schema,
+  Ok, Err, Some, None, fromNullable, collectResults,
+  pipe, flow, Lazy, Task,
+  type Result, type Option, type Type,
+  type ImmutableRecord, type ImmutableList, type SchemaType,
+} from '../src/index.js';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record - property types
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const user = Record({
+  name: 'Alice',
+  age: 30,
+  active: true,
+  address: { city: 'Sydney', geo: { lat: -33.87, lng: 151.21 } },
+  tags: ['fp', 'ts'],
+});
+
+// Reads infer widened types
+const _name: string = user.name;
+const _age: number = user.age;
+const _active: boolean = user.active;
+const _city: string = user.address.city;
+const _lat: number = user.address.geo.lat;
+
+// Nested records have methods
+const _nestedSet: ImmutableRecord<{ city: string; geo: { lat: number; lng: number } }> =
+  user.address.set(a => a.city, 'Melbourne');
+
+// @ts-expect-error - wrong type assignment
+const _wrongType: number = user.name;
+
+// @ts-expect-error - nonexistent property
+const _nope = user.nonexistent;
+
+// @ts-expect-error - readonly
+user.name = 'X';
+
+// @ts-expect-error - nested readonly
+user.address.city = 'X';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record.set - type-safe value
+// ═══════════════════════════════════════════════════════════════════════════════
+
+user.set(u => u.name, 'New');
+user.set(u => u.age, 40);
+user.set(u => u.address.city, 'San Francisco');
+
+// @ts-expect-error - number ≠ string
+user.set(u => u.name, 42);
+
+// @ts-expect-error - string ≠ number
+user.set(u => u.age, 'old');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record.update - fn signature
+// ═══════════════════════════════════════════════════════════════════════════════
+
+user.update(u => u.name, n => n.toUpperCase());
+user.update(u => u.age, a => a + 1);
+
+// @ts-expect-error - fn returns wrong type
+user.update(u => u.name, _n => 42);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record.produce
+// ═══════════════════════════════════════════════════════════════════════════════
+
+user.produce(d => {
+  d.name = 'New';
+  d.age = 40;
+  d.address.city = 'San Francisco';
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record.merge - Partial<T>
+// ═══════════════════════════════════════════════════════════════════════════════
+
+user.merge({ name: 'New' });
+user.merge({ age: 40, name: 'New' });
+
+// @ts-expect-error - wrong type in partial
+user.merge({ age: 'old' });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record.at → Option
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const _optName: Option<string> = user.at(u => u.name);
+const _optAge: Option<number> = user.at(u => u.age);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Record.equals
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const other = Record({
+  name: 'Bob', age: 25, active: false,
+  address: { city: 'Melbourne', geo: { lat: -37.81, lng: 144.96 } },
+  tags: ['x'],
+});
+const _eq: boolean = user.equals(other);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// List - element types
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const nums = List([1, 2, 3]);
+const _n0: number = nums[0]!;
+
+// @ts-expect-error - wrong element type
+const _s0: string = nums[0]!;
+
+const _found: Option<number> = nums.find(n => n > 2);
+const _first: Option<number> = nums.first();
+
+// @ts-expect-error - wrong append type
+nums.append('x');
+
+// @ts-expect-error - wrong setAt type
+nums.setAt(0, 'x');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Result - type flow
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const res: Result<number, string> = Ok(42);
+const _mapped: Result<string, string> = res.map(String);
+const _chained: Result<boolean, string> = res.flatMap(n => n > 0 ? Ok(true) : Err('neg'));
+const _unwrapped: number = res.unwrapOr(0);
+
+// @ts-expect-error - wrong fallback type
+const _bad: number = res.unwrapOr('x');
+
+// Result.ap type flow
+const _apResult: Result<string, string> = res.ap(Ok((n: number) => String(n)));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Option - type flow
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const optN: Option<number> = Some(42);
+const _optS: Option<string> = optN.map(String);
+const _toRes: Result<number, string> = optN.toResult('missing');
+
+// @ts-expect-error - wrong unwrapOr type
+const _badOr: number = optN.unwrapOr('x');
+
+// Option.ap type flow
+const _apOption: Option<string> = optN.ap(Some((n: number) => String(n)));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Schema.Infer
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const UserSchema = Schema.object({
+  name: Schema.string,
+  age: Schema.number,
+  tags: Schema.array(Schema.string),
+  address: Schema.object({
+    city: Schema.string,
+    geo: Schema.object({ lat: Schema.number, lng: Schema.number }),
+  }),
+});
+
+type User = Schema.Infer<typeof UserSchema>;
+type _T1 = User['name'] extends string ? true : false; const _t1: _T1 = true;
+type _T2 = User['address']['geo']['lat'] extends number ? true : false; const _t2: _T2 = true;
+
+const parsed = UserSchema.parse({});
+if (parsed.isOk) {
+  const _pName: string = parsed.value.name;
+  const _pCity: string = parsed.value.address.city;
+
+  // @ts-expect-error - nonexistent field
+  parsed.value.nope;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Type<Name, Base> - nominal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+type UserId = Type<'UserId', string>;
+type PostId = Type<'PostId', string>;
+declare function getUser(id: UserId): void;
+const uid = 'u_001' as UserId;
+const pid = 'p_001' as PostId;
+getUser(uid);
+
+// @ts-expect-error - PostId ≠ UserId
+getUser(pid);
+
+// @ts-expect-error - plain string ≠ UserId
+getUser('u_001');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// pipe / flow - inference
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const _piped: string = pipe(42, (n: number) => n + 1, String);
+const _fn = flow((s: string) => s.length, (n: number) => n > 5);
+const _fr: boolean = _fn('hello');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Lazy / Task - types preserved
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const lazy = new Lazy(() => 42);
+const _lv: number = lazy.value;
+const _lm: Lazy<string> = lazy.map(String);
+
+const task = new Task<number, string>(async () => Ok(42));
+const _tm: Task<string, string> = task.map(String);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// List.clone - types preserved
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const cloned: ImmutableList<{ id: number }> = List.clone([{ id: 1 }]);
+const _clonedId: number = cloned[0]!.id;
