@@ -14,10 +14,12 @@ import {
   Ok, Err, Some, None, Result, Option,
   match, tryCatch,
   pipe, flow, Lazy, Task,
-  TaggedError, isTaggedError,
+  ErrType,
+  Program,
   type Type,
   type ImmutableRecord, type ImmutableList, type SchemaType,
-  type TaggedErrorInstance, type TaggedErrorConstructor,
+  type ErrTypeConstructor,
+  type Program as ProgramType,
 } from '../src/index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -236,14 +238,14 @@ const cloned: ImmutableList<{ id: number }> = List.clone([{ id: 1 }]);
 const _clonedId: number = cloned[0]!.id;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TaggedError - literal type narrowing
+// ErrType - literal type narrowing
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const NotFound = TaggedError('NotFound', 'NOT_FOUND');
-const Forbidden = TaggedError('Forbidden', 'FORBIDDEN');
+const NotFound = ErrType('NotFound', 'NOT_FOUND');
+const Forbidden = ErrType('Forbidden', 'FORBIDDEN');
 
 // Constructor type is inferred
-const _ctor: TaggedErrorConstructor<'NotFound', 'NOT_FOUND'> = NotFound;
+const _ctor: ErrTypeConstructor<'NotFound', 'NOT_FOUND'> = NotFound;
 
 // Instance has literal types on tag and code
 const nfErr = NotFound('gone');
@@ -262,12 +264,12 @@ const _wrongTag: 'Forbidden' = nfErr.tag;
 const _wrongCode: 'FORBIDDEN' = nfErr.code;
 
 // toResult() preserves error type
-const _nfResult: Result<string, TaggedErrorInstance<'NotFound', 'NOT_FOUND'>> = nfErr.toResult<string>();
+const _nfResult: Result<string, ErrType<'NotFound', 'NOT_FOUND'>> = nfErr.toResult<string>();
 
 // Discriminated union narrowing via switch on tag
 type AppError =
-  | TaggedErrorInstance<'NotFound', 'NOT_FOUND'>
-  | TaggedErrorInstance<'Forbidden', 'FORBIDDEN'>;
+  | ErrType<'NotFound', 'NOT_FOUND'>
+  | ErrType<'Forbidden', 'FORBIDDEN'>;
 
 const appErr: AppError = nfErr;
 switch (appErr.tag) {
@@ -288,9 +290,9 @@ if (NotFound.is(unknownErr)) {
   const _narrowedCode: 'NOT_FOUND' = unknownErr.code;
 }
 
-// isTaggedError() general guard
+// ErrType.is() general guard
 declare const mystery: unknown;
-if (isTaggedError(mystery)) {
+if (ErrType.is(mystery)) {
   const _t: string = mystery.tag;
   const _c: string = mystery.code;
   const _m: string = mystery.message;
@@ -377,3 +379,21 @@ const _matchOpt: number = match(Some(42), {
 
 // tryCatch returns Result
 const _tryRes: Result<number, string> = tryCatch(() => 42, String);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Program - type inference
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Program from Task preserves types
+const _progTask: ProgramType<number, never> = Program(Task.of(42));
+
+// Program from effect function preserves types
+const _progFn: ProgramType<string, string> = Program(
+  (_signal: AbortSignal) => new Task<string, string>(async () => Ok('done'))
+);
+
+// execute() returns Promise<Result<T, E>>
+const _execResult: Promise<Result<number, never>> = _progTask.execute();
+
+// execute() accepts optional AbortSignal
+const _execWithSignal: Promise<Result<number, never>> = _progTask.execute(new AbortController().signal);

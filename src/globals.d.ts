@@ -11,3 +11,37 @@ declare function structuredClone<T>(value: T): T;
 interface ErrorConstructor {
   captureStackTrace?(target: object, constructorOpt?: (...args: never[]) => unknown): void;
 }
+
+/**
+ * WHATWG AbortController / AbortSignal (Node 16+, all modern browsers).
+ * Not part of ECMAScript but universally available.
+ */
+declare class AbortController {
+  readonly signal: AbortSignal;
+  abort(): void;
+}
+
+declare class AbortSignal {
+  readonly aborted: boolean;
+  addEventListener(type: string, listener: () => void): void;
+  removeEventListener(type: string, listener: () => void): void;
+}
+
+/**
+ * Minimal `process` declarations for Node 22+ / Bun / Deno.
+ * Only the subset used by Program (signals + exit).
+ */
+declare const process: {
+  on(event: string, listener: () => void): void;
+  off(event: string, listener: () => void): void;
+  exit(code?: number): never;
+};
+
+/**
+ * Console API (WHATWG). Available in all JS runtimes.
+ */
+declare const console: {
+  log(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+};
