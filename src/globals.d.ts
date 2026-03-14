@@ -51,3 +51,21 @@ declare const console: {
   error(...args: unknown[]): void;
   warn(...args: unknown[]): void;
 };
+
+/**
+ * Explicit Resource Management (ECMAScript 2024).
+ * Enables `using` / `await using` declarations for deterministic cleanup.
+ * Available in Node 22+, Deno 2+, and modern browsers.
+ */
+interface SymbolConstructor {
+  readonly dispose: unique symbol;
+  readonly asyncDispose: unique symbol;
+}
+
+interface Disposable {
+  [Symbol.dispose](): void;
+}
+
+interface AsyncDisposable {
+  [Symbol.asyncDispose](): PromiseLike<void>;
+}
