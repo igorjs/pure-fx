@@ -42,6 +42,7 @@ declare const process: {
  * Not part of ECMAScript but universally available.
  */
 declare function setTimeout(callback: () => void, ms?: number): number;
+declare function clearTimeout(id: number): void;
 
 /**
  * Console API (WHATWG). Available in all JS runtimes.
