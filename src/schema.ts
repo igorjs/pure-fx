@@ -2,8 +2,6 @@
 // Schema System
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { isObjectLike } from './internals.js';
-import { createRecord, type ImmutableRecord } from './record.js';
 import type { Result } from './result.js';
 import { Err, type ErrImpl, Ok } from './result.js';
 
@@ -30,10 +28,14 @@ const schemaErr = (
 /**
  * A composable validation schema that parses unknown input into type `T`.
  *
- * Schemas are immutable and compose via `.refine()`, `.transform()`,
- * `.optional()`, and `.default()`. The `.parse()` method returns an
- * `ImmutableRecord<T>` on success, while `._parseRaw()` returns the
- * unwrapped value.
+ * Schemas are pure validators: they accept unknown input and return
+ * `Result<T, SchemaError>`. Compose via `.refine()`, `.transform()`,
+ * `.optional()`, and `.default()`.
+ *
+ * To get an immutable record from validated data, wrap explicitly:
+ * ```ts
+ * const user = Record(UserSchema.parse(input).unwrap());
+ * ```
  *
  * @example
  * ```ts
@@ -42,14 +44,12 @@ const schemaErr = (
  *   age: Schema.number.refine(n => n > 0, 'positive'),
  * });
  *
- * const result = UserSchema.parse(input); // Result<ImmutableRecord<User>, SchemaError>
+ * const result = UserSchema.parse(input); // Result<User, SchemaError>
  * ```
  */
 export interface SchemaType<T> {
-  /** Parse and wrap the result in an ImmutableRecord (for objects) or Ok (for primitives). */
-  readonly parse: (input: unknown) => Result<ImmutableRecord<T>, SchemaError>;
-  /** Parse without wrapping in ImmutableRecord. Used internally for nested schemas. */
-  readonly _parseRaw: (input: unknown) => Result<T, SchemaError>;
+  /** Validate unknown input and return the parsed value on success. */
+  readonly parse: (input: unknown) => Result<T, SchemaError>;
   /** Type guard: returns `true` if `input` parses successfully. */
   readonly is: (input: unknown) => input is T;
   /** Add a validation predicate with a descriptive `label` for error messages. */
@@ -63,15 +63,7 @@ export interface SchemaType<T> {
 }
 
 const createSchema = <T>(rawParse: (input: unknown) => Result<T, SchemaError>): SchemaType<T> => ({
-  parse: input => {
-    const r = rawParse(input);
-    if (r.isErr) return r as unknown as Result<ImmutableRecord<T>, SchemaError>;
-    const val = r.value;
-    if (isObjectLike(val))
-      return Ok(createRecord(val as object)) as unknown as Result<ImmutableRecord<T>, SchemaError>;
-    return Ok(val) as unknown as Result<ImmutableRecord<T>, SchemaError>;
-  },
-  _parseRaw: rawParse,
+  parse: rawParse,
   is: (input): input is T => rawParse(input).isOk,
   refine: (predicate, label) =>
     createSchema(input => {
@@ -118,7 +110,7 @@ const objectSchema = <T extends Record<string, SchemaType<any>>>(
     const keys = Object.keys(shape);
     for (const key of keys) {
       const fieldSchema = (shape as Record<string, SchemaType<any>>)[key]!;
-      const r = fieldSchema._parseRaw((input as Record<string, unknown>)[key]);
+      const r = fieldSchema.parse((input as Record<string, unknown>)[key]);
       if (r.isErr) return Err(prependPath((r as ErrImpl<unknown, SchemaError>).error, key));
       result[key] = r.value;
     }
@@ -133,7 +125,7 @@ const arraySchema = <T>(element: SchemaType<T>): SchemaType<readonly T[]> =>
     if (!Array.isArray(input)) return schemaErr([], 'array', input);
     const results: T[] = [];
     for (let i = 0; i < input.length; i++) {
-      const r = element._parseRaw(input[i]);
+      const r = element.parse(input[i]);
       if (r.isErr) return Err(prependPath((r as ErrImpl<unknown, SchemaError>).error, String(i)));
       results.push(r.value);
     }
@@ -149,7 +141,7 @@ const tupleSchema = <T extends readonly SchemaType<any>[]>(
       return schemaErr([], `tuple(${schemas.length})`, `array(${input.length})`);
     const results: unknown[] = [];
     for (let i = 0; i < schemas.length; i++) {
-      const r = schemas[i]!._parseRaw(input[i]);
+      const r = schemas[i]!.parse(input[i]);
       if (r.isErr) return Err(prependPath((r as ErrImpl<unknown, SchemaError>).error, String(i)));
       results.push(r.value);
     }
@@ -166,7 +158,7 @@ const recordValuesSchema = <V>(value: SchemaType<V>): SchemaType<Readonly<Record
     const result: Record<string, unknown> = {};
     const keys = Object.keys(input);
     for (const key of keys) {
-      const r = value._parseRaw((input as Record<string, unknown>)[key]);
+      const r = value.parse((input as Record<string, unknown>)[key]);
       if (r.isErr) return Err(prependPath((r as ErrImpl<unknown, SchemaError>).error, key));
       result[key] = r.value;
     }
@@ -181,7 +173,7 @@ const unionSchema = <T extends readonly SchemaType<any>[]>(
 ): SchemaType<T[number] extends SchemaType<infer U> ? U : never> =>
   createSchema(input => {
     for (const s of schemas) {
-      const r = s._parseRaw(input);
+      const r = s.parse(input);
       if (r.isOk)
         return r as unknown as Result<
           T[number] extends SchemaType<infer U> ? U : never,
@@ -194,7 +186,7 @@ const unionSchema = <T extends readonly SchemaType<any>[]>(
 /**
  * Schema namespace: composable validation primitives.
  *
- * Each schema validates unknown input and returns `Result<ImmutableRecord<T>, SchemaError>`.
+ * Each schema validates unknown input and returns `Result<T, SchemaError>`.
  * Compose with `.refine()`, `.transform()`, `.optional()`, and `.default()`.
  *
  * @example

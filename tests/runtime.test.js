@@ -95,6 +95,36 @@ describe('Record', () => {
     assert.equal(user.address.city, 'New York');
   });
 
+  it('produce() blocks mutating array methods', () => {
+    const rec = Record({ items: [1, 2, 3] });
+    const methods = [
+      'push',
+      'pop',
+      'shift',
+      'unshift',
+      'splice',
+      'sort',
+      'reverse',
+      'fill',
+      'copyWithin',
+    ];
+    for (const method of methods) {
+      assert.throws(() => rec.produce(d => d.items[method]()), {
+        name: 'TypeError',
+        message: /inside produce\(\)/,
+      });
+    }
+  });
+
+  it('produce() allows spread on nested arrays', () => {
+    const rec = Record({ items: [1, 2, 3] });
+    const updated = rec.produce(d => {
+      d.items = [...d.items, 4];
+    });
+    assert.deepEqual([...updated.items.$raw], [1, 2, 3, 4]);
+    assert.deepEqual([...rec.items.$raw], [1, 2, 3]);
+  });
+
   it('merge() shallow merges', () => {
     const merged = user.merge({ age: 99 });
     assert.equal(merged.age, 99);
@@ -984,11 +1014,11 @@ describe('Schema', () => {
     assert.equal(result.unwrap().name, 'John Doe');
   });
 
-  it('object returns ImmutableRecord', () => {
+  it('object returns validated plain object', () => {
     const S = Schema.object({ name: Schema.string });
     const result = S.parse({ name: 'John Doe' });
-    assert.equal(result.unwrap().$immutable, true);
-    assert.equal(typeof result.unwrap().set, 'function');
+    assert.equal(result.isOk, true);
+    assert.equal(result.unwrap().name, 'John Doe');
   });
 
   it('object error path', () => {
@@ -1015,7 +1045,7 @@ describe('Schema', () => {
     const S = Schema.array(Schema.number);
     const result = S.parse([1, 2, 3]);
     assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap().$raw, [1, 2, 3]);
+    assert.deepEqual(result.unwrap(), [1, 2, 3]);
     assert.equal(S.parse([1, 'x']).isErr, true);
   });
 
@@ -1064,7 +1094,7 @@ describe('Schema', () => {
     const S = Schema.tuple(Schema.string, Schema.number);
     const result = S.parse(['hello', 42]);
     assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap().$raw, ['hello', 42]);
+    assert.deepEqual(result.unwrap(), ['hello', 42]);
     assert.equal(S.parse(['hello']).isErr, true);
   });
 });
