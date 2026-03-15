@@ -18,6 +18,7 @@ import {
   applyMutations,
   createDraft,
   type DeepReadonly,
+  type Draft,
   deepEqual,
   deepFreezeRaw,
   getByPath,
@@ -42,7 +43,7 @@ export interface RecordMethods<T> {
   /** Transform a nested value in place. */
   update<R>(accessor: (obj: T) => R, fn: (current: R) => R): ImmutableRecord<T>;
   /** Batch mutations via a mutable-looking draft (Immer-style). */
-  produce(recipe: (draft: T) => void): ImmutableRecord<T>;
+  produce(recipe: (draft: Draft<T>) => void): ImmutableRecord<T>;
   /** Shallow merge top-level fields. */
   merge(partial: Partial<T>): ImmutableRecord<T>;
   /** Safe deep access returning an Option. */

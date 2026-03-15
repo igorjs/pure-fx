@@ -23,6 +23,25 @@ export type DeepReadonly<T> = T extends Primitive
           ? (...args: A) => R
           : { readonly [K in keyof T]: DeepReadonly<T[K]> };
 
+/**
+ * Draft type for `produce()` recipes.
+ *
+ * Properties are writable (for reassignment) but arrays become
+ * `ReadonlyArray` so mutating methods like `.push()` are blocked
+ * at the type level. The runtime proxy enforces the same constraint.
+ */
+export type Draft<T> = T extends Primitive
+  ? T
+  : T extends ReadonlyArray<infer U>
+    ? ReadonlyArray<Draft<U>>
+    : T extends ReadonlyMap<infer K, infer V>
+      ? ReadonlyMap<Draft<K>, Draft<V>>
+      : T extends ReadonlySet<infer U>
+        ? ReadonlySet<Draft<U>>
+        : T extends (...args: infer A) => infer R
+          ? (...args: A) => R
+          : { -readonly [K in keyof T]: Draft<T[K]> };
+
 /** Check whether `val` is a non-null object (excluding typed arrays). */
 export const isObjectLike = (val: unknown): val is Record<string | symbol, unknown> =>
   val !== null && typeof val === 'object' && !ArrayBuffer.isView(val);
@@ -127,6 +146,19 @@ export interface Mutation {
 
 const DRAFT_UNSET: unique symbol = Symbol('unset');
 
+/** Array methods that mutate in-place. These corrupt produce() because setByPath cannot replay them. */
+const MUTATING_ARRAY_METHODS: ReadonlySet<string> = new Set([
+  'push',
+  'pop',
+  'shift',
+  'unshift',
+  'splice',
+  'sort',
+  'reverse',
+  'fill',
+  'copyWithin',
+]);
+
 /** Search mutations in reverse for the most recent write to [...currentPath, prop]. */
 const findMutationValue = (
   mutations: readonly Mutation[],
@@ -170,10 +202,20 @@ export const createDraft = <T extends object>(
   mutations: Mutation[],
   currentPath: string[] = [],
 ): T => {
-  const target = Object.isFrozen(base) ? { ...base } : base;
+  const target = Object.isFrozen(base)
+    ? Array.isArray(base)
+      ? ([...base] as unknown as T)
+      : { ...base }
+    : base;
   return new Proxy(target as T, {
     get(tgt, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(tgt, prop, receiver);
+
+      if (Array.isArray(tgt) && MUTATING_ARRAY_METHODS.has(prop)) {
+        throw new TypeError(
+          `Cannot call '${prop}()' on array inside produce(). Use reassignment instead: draft.prop = [...draft.prop, value]`,
+        );
+      }
 
       const mutated = findMutationValue(mutations, currentPath, prop);
       if (mutated !== DRAFT_UNSET) return mutated;
