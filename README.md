@@ -71,12 +71,13 @@ const NotFound = ErrType('NotFound')          // code auto-derived: 'NOT_FOUND'
 const err = NotFound('User not found', { userId: 'u_123' })
 err.toResult()                                // Result<never, ErrType<'NotFound', string>>
 
-// Schema validation -> immutable output
+// Schema validation: pure validation, no coupling to Record
 const UserSchema = Schema.object({
   name: Schema.string,
   age: Schema.number.refine(n => n > 0, 'positive'),
 })
-UserSchema.parse(jsonData)                   // Result<ImmutableRecord<User>, SchemaError>
+UserSchema.parse(jsonData)                   // Result<User, SchemaError>
+const user = Record(UserSchema.parse(jsonData).unwrap()) // wrap explicitly
 
 // Program entrypoint: auto-logs start/errors, handles signals
 const main = Program('my-service', (signal) =>
@@ -101,7 +102,7 @@ main.run()
 | `.name` | Direct property read. Nested objects are also Records |
 | `.set(u => u.x, val)` | Replace nested value -> new Record |
 | `.update(u => u.x, fn)` | Transform nested value -> new Record |
-| `.produce(d => { ... })` | Batch mutations via draft -> new Record |
+| `.produce(d => { ... })` | Batch mutations via draft -> new Record. Mutating array methods (`push`, `splice`, etc.) throw `TypeError`; use spread reassignment instead |
 | `.merge({ ... })` | Shallow merge -> new Record |
 | `.at(u => u.x)` | Safe deep access -> `Option<R>` |
 | `.equals(other)` | Structural deep equality |
@@ -201,7 +202,7 @@ main.run()
 | `Schema.array(el)` / `.tuple(a, b, ...)` | Collection validators |
 | `Schema.literal(v)` / `.union(a, b, ...)` | Discriminated types |
 | `Schema.record(val)` | String-keyed map validator |
-| `.parse(unknown)` | -> `Result<ImmutableRecord<T>, SchemaError>` |
+| `.parse(unknown)` | -> `Result<T, SchemaError>` (plain validated data) |
 | `.is(unknown)` | Type guard |
 | `.refine(pred, label)` | Add validation predicate |
 | `.transform(fn)` | Post-parse transform |
