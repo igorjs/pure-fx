@@ -40,9 +40,9 @@ export interface Program<T, E> {
    *
    * - SIGINT / SIGTERM fire the `AbortSignal` passed to the effect
    * - Second signal force-exits (code 130)
+   * - Interrupted -> `process.exit(130)` (takes priority over Ok/Err)
    * - `Ok` -> `process.exit(0)`
    * - `Err` -> stderr + `process.exit(1)`
-   * - Interrupted -> `process.exit(130)`
    */
   run(): Promise<void>;
 
@@ -65,15 +65,20 @@ export interface Program<T, E> {
  *
  * `.run()` automatically logs program start, errors, and interrupts.
  *
+ * @param options.teardownTimeoutMs Max ms to wait for the effect after
+ *   interrupt before force-exiting. Without this, only a second signal
+ *   triggers force-exit.
+ *
  * @example
  * ```ts
  * const main = Program('my-service', (signal) =>
  *   pipe(
  *     loadConfig(),
  *     Task.flatMap(cfg => startServer(cfg, { signal })),
- *   )
+ *   ),
+ *   { teardownTimeoutMs: 5000 },
  * );
- * main.run();
+ * await main.run();
  * // [2026-03-16T10:00:00.000Z] [my-service] started
  * // ... on error:
  * // [2026-03-16T10:00:01.234Z] [my-service] error: NotFound(NOT_FOUND): User not found
@@ -82,22 +87,28 @@ export interface Program<T, E> {
 export function Program<T, E>(
   name: string,
   effect: Task<T, E> | ((signal: AbortSignal) => Task<T, E>),
+  options?: { readonly teardownTimeoutMs?: number },
 ): Program<T, E> {
   const toTask: (signal: AbortSignal) => Task<T, E> =
     typeof effect === 'function' ? effect : () => effect;
 
   const tag = `[${name}]`;
+  const teardownTimeoutMs = options?.teardownTimeoutMs;
 
   return {
     async run(): Promise<void> {
       const ac = new AbortController();
       let interrupted = false;
+      let teardownTimer: ReturnType<typeof setTimeout> | undefined;
 
       const onSignal = (): void => {
         if (interrupted) process.exit(130);
         interrupted = true;
         console.error(`${ts()} ${tag} interrupted`);
         ac.abort();
+        if (teardownTimeoutMs !== undefined) {
+          teardownTimer = setTimeout(() => process.exit(130), teardownTimeoutMs);
+        }
       };
 
       process.on('SIGINT', onSignal);
@@ -105,25 +116,28 @@ export function Program<T, E>(
 
       console.log(`${ts()} ${tag} started`);
 
+      let exitCode = 0;
       try {
         const result = await toTask(ac.signal).run();
 
-        if (result.isOk) {
+        if (interrupted) {
+          exitCode = 130;
+        } else if (result.isOk) {
           console.log(`${ts()} ${tag} completed`);
-          process.exit(0);
-        } else if (interrupted) {
-          process.exit(130);
         } else {
           console.error(`${ts()} ${tag} error: ${formatError(result.unwrapErr())}`);
-          process.exit(1);
+          exitCode = 1;
         }
       } catch (unhandled: unknown) {
         console.error(`${ts()} ${tag} error: ${formatError(unhandled)}`);
-        process.exit(1);
+        exitCode = 1;
       } finally {
+        if (teardownTimer) clearTimeout(teardownTimer);
         process.off('SIGINT', onSignal);
         process.off('SIGTERM', onSignal);
       }
+
+      process.exit(exitCode);
     },
 
     async execute(signal?: AbortSignal): Promise<Result<T, E>> {
