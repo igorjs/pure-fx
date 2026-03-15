@@ -116,7 +116,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
+          git add package.json package-lock.json jsr.json
           git diff --staged --quiet && echo "Already at v${VERSION}" && exit 0
           git commit -m "chore: bump version to ${VERSION} [skip ci]"
           git push origin main
