@@ -17,9 +17,9 @@
  * a SCREAMING_SNAKE code from the PascalCase tag unless overridden.
  */
 
-import { deepFreezeRaw } from "./internals.js";
-import type { Result } from "./result.js";
-import { Err } from "./result.js";
+import type { Result } from "../core/result.js";
+import { Err } from "../core/result.js";
+import { deepFreezeRaw } from "../data/internals.js";
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -55,12 +55,12 @@ const isErrType = (value: unknown): value is ErrType<string, string> => {
   if (value === null || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v["tag"] === "string" &&
-    typeof v["code"] === "string" &&
-    typeof v["message"] === "string" &&
-    typeof v["metadata"] === "object" &&
-    v["metadata"] !== null &&
-    typeof v["timestamp"] === "number"
+    typeof v["tag"] === "string"
+    && typeof v["code"] === "string"
+    && typeof v["message"] === "string"
+    && typeof v["metadata"] === "object"
+    && v["metadata"] !== null
+    && typeof v["timestamp"] === "number"
   );
 };
 
@@ -261,13 +261,16 @@ export const ErrType: {
     const ctor = (message: string, metadata?: Record<string, unknown>): ErrType<Tag, Code> =>
       new ErrTypeImpl(tag, resolvedCode, message, metadata ?? {}, captureStack());
 
-    return Object.assign(ctor, {
-      tag,
-      code: resolvedCode,
-      is(value: unknown): value is ErrType<Tag, Code> {
-        return isErrType(value) && value.tag === tag && value.code === resolvedCode;
-      },
-    } as const);
+    return Object.assign(
+      ctor,
+      {
+        tag,
+        code: resolvedCode,
+        is(value: unknown): value is ErrType<Tag, Code> {
+          return isErrType(value) && value.tag === tag && value.code === resolvedCode;
+        },
+      } as const,
+    );
   },
   {
     is: isErrType,

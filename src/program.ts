@@ -16,8 +16,8 @@
  * assert on outcomes without spawning child processes.
  */
 
-import type { Result } from "./result.js";
-import type { Task } from "./task.js";
+import type { Task } from "./async/task.js";
+import type { Result } from "./core/result.js";
 
 // ── Error formatting ────────────────────────────────────────────────────────
 

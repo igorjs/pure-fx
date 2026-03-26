@@ -16,10 +16,10 @@
  * disposal because they reference the parent's `.value` getter.
  */
 
-import type { Option } from "./option.js";
-import { None, Some } from "./option.js";
-import type { Result } from "./result.js";
-import { Err, Ok } from "./result.js";
+import type { Option } from "../core/option.js";
+import { None, Some } from "../core/option.js";
+import type { Result } from "../core/result.js";
+import { Err, Ok } from "../core/result.js";
 
 /**
  * Deferred and cached computation. Evaluates the thunk at most once on first access.
