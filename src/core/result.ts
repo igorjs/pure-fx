@@ -327,8 +327,6 @@ export const Result: {
   Err,
   tryCatch,
   collect: collectResults,
-  match: <T, E, U>(result: Result<T, E>, matcher: ResultMatcher<T, E, U>): U =>
-    result.match(matcher),
-  is: (value): value is Result<unknown, unknown> =>
-    value instanceof OkImpl || value instanceof ErrImpl,
+  match: <T, E, U>(result: Result<T, E>, matcher: ResultMatcher<T, E, U>): U => result.match(matcher),
+  is: (value): value is Result<unknown, unknown> => value instanceof OkImpl || value instanceof ErrImpl,
 };

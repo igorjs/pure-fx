@@ -9,6 +9,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./runtime/adapter/node": {
+      "types": "./dist/runtime/adapter/node.d.ts",
+      "import": "./dist/runtime/adapter/node.js"
+    },
+    "./runtime/adapter/lambda": {
+      "types": "./dist/runtime/adapter/lambda.d.ts",
+      "import": "./dist/runtime/adapter/lambda.js"
+    },
+    "./runtime/adapter/deno": {
+      "types": "./dist/runtime/adapter/deno.d.ts",
+      "import": "./dist/runtime/adapter/deno.js"
     }
   },
   "files": [
@@ -27,7 +39,7 @@
     "lint:fix": "biome check --write",
     "format": "biome format --write",
     "build": "rm -rf dist && tsgo && node scripts/strip-dist-comments.mjs",
-    "test": "node --test tests/runtime.test.js tests/integration.test.js tests/program.test.js",
+    "test": "node --test tests/runtime.test.js tests/integration.test.js tests/program.test.js tests/server.test.js",
     "test:types": "tsgo -p tsconfig.test.json",
     "version": "node scripts/sync-pkg-version.mjs && git add jsr.json",
     "prepublishOnly": "pnpm run lint && pnpm run check && pnpm run build && pnpm test && pnpm run test:types"
@@ -50,7 +62,12 @@
     "task",
     "zero-dependency",
     "type-safe",
-    "deep-freeze"
+    "deep-freeze",
+    "http",
+    "server",
+    "middleware",
+    "routing",
+    "hono"
   ],
   "author": "igorjs <oss@mail.igorjs.io>",
   "license": "Apache-2.0",

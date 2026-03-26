@@ -102,7 +102,12 @@
   },
   "overrides": [
     {
-      "includes": ["src/record.ts", "src/list.ts", "src/internals.ts", "src/schema.ts"],
+      "includes": [
+        "src/data/record.ts",
+        "src/data/list.ts",
+        "src/data/internals.ts",
+        "src/data/schema.ts"
+      ],
       "linter": {
         "rules": {
           "suspicious": {

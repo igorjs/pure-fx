@@ -19,11 +19,11 @@
  * Zero dependencies. Methods live on prototypes. GC-friendly.
  */
 
-import type { Option, OptionMatcher } from "./option.js";
-import type { Result, ResultMatcher } from "./result.js";
+import type { Option, OptionMatcher } from "./core/option.js";
+import type { Result, ResultMatcher } from "./core/result.js";
 
-export { None, Option, type OptionMatcher, Some } from "./option.js";
-export { Err, Ok, Result, type ResultMatcher, tryCatch } from "./result.js";
+export { None, Option, type OptionMatcher, Some } from "./core/option.js";
+export { Err, Ok, Result, type ResultMatcher, tryCatch } from "./core/result.js";
 
 /**
  * Universal pattern match for {@link Result} and {@link Option}.
@@ -42,14 +42,37 @@ export function match<T, U>(value: Option<T>, matcher: OptionMatcher<T, U>): U;
 export function match(value: { match(m: object): unknown }, matcher: object): unknown {
   return value.match(matcher);
 }
-export { isImmutable, List, Record } from "./constructors.js";
-export { ErrType, type ErrTypeConstructor } from "./error.js";
-export type { DeepReadonly } from "./internals.js";
-export { Lazy } from "./lazy.js";
-export type { ImmutableList, ListMethods } from "./list.js";
-export type { Type } from "./nominal.js";
-export { flow, pipe } from "./pipe.js";
+export { Lazy } from "./async/lazy.js";
+export { Task } from "./async/task.js";
+export { flow, pipe } from "./core/pipe.js";
+export { isImmutable, List, Record } from "./data/constructors.js";
+export type { DeepReadonly } from "./data/internals.js";
+export type { ImmutableList, ListMethods } from "./data/list.js";
+export type { ImmutableRecord, RecordMethods } from "./data/record.js";
+export { Schema, type SchemaError, type SchemaType } from "./data/schema.js";
 export { Program } from "./program.js";
-export type { ImmutableRecord, RecordMethods } from "./record.js";
-export { Schema, type SchemaError, type SchemaType } from "./schema.js";
-export { Task } from "./task.js";
+export {
+  BodyReadError,
+  type Context,
+  compose,
+  type ExtractParams,
+  type Handler,
+  HandlerError,
+  type HttpMethod,
+  html,
+  json,
+  type ListenOptions,
+  MethodNotAllowed,
+  type Middleware,
+  type Params,
+  type RouteDefinition,
+  RouteNotFound,
+  redirect,
+  Server,
+  type ServerAdapter,
+  type ServerBuilder,
+  type ServerError,
+  text,
+} from "./server.js";
+export { ErrType, type ErrTypeConstructor } from "./types/error.js";
+export type { Type } from "./types/nominal.js";

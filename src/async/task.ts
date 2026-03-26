@@ -16,8 +16,8 @@
  * the original thunk is released for GC, mirroring `Lazy<T>`.
  */
 
-import type { Result } from "./result.js";
-import { collectResults, Err, type ErrImpl, Ok } from "./result.js";
+import type { Result } from "../core/result.js";
+import { collectResults, Err, type ErrImpl, Ok } from "../core/result.js";
 
 /**
  * Composable async computation that produces `Result<T, E>`.
@@ -154,7 +154,7 @@ export class Task<T, E> {
       Promise.race([
         this._run(),
         new Promise<Result<T, E>>(resolve => setTimeout(() => resolve(Err(onTimeout())), ms)),
-      ]),
+      ])
     );
   }
 
