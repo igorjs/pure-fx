@@ -426,7 +426,9 @@ describe("Route.all()", () => {
 describe("listen() returns Program", () => {
   it("listen() produces an object with run and execute", () => {
     const mockAdapter = {
-      serve: async () => {},
+      serve: async () => {
+        // No-op adapter for testing that .listen() returns a Program
+      },
     };
     const app = Server("test")
       .get("/ok", () => text("ok"))
