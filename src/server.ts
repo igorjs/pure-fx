@@ -492,7 +492,7 @@ interface BuilderState {
 const normaliseHandler = (
   result: Response | Task<Response, ServerError>,
 ): Task<Response, ServerError> => {
-  if (result instanceof Task) return result;
+  if (Task.is(result)) return result;
   return Task.of(result);
 };
 
@@ -688,7 +688,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
    * Returns a Task so middleware can compose around it.
    */
   const coreHandle = (req: Request): Task<Response, ServerError> => {
-    return new Task<Response, ServerError>(async () => {
+    return Task<Response, ServerError>(async () => {
       const url = new URL(req.url, "http://localhost");
       const pathname = normalisePattern(url.pathname);
       const trie = getTrie();
@@ -860,7 +860,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
       return Program(
         state.serverName,
         (signal: AbortSignal) =>
-          new Task<void, ServerError>(async () => {
+          Task<void, ServerError>(async () => {
             try {
               await resolvedAdapter.serve(fetchHandler, {
                 port: options.port,

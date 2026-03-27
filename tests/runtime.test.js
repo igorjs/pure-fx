@@ -668,7 +668,7 @@ describe("flow", () => {
 describe("Lazy", () => {
   it("evaluates once on first access", () => {
     let count = 0;
-    const lazy = new Lazy(() => {
+    const lazy = Lazy(() => {
       count++;
       return 42;
     });
@@ -680,22 +680,22 @@ describe("Lazy", () => {
   });
 
   it("map returns new deferred Lazy", () => {
-    const lazy = new Lazy(() => 21);
+    const lazy = Lazy(() => 21);
     const doubled = lazy.map(n => n * 2);
     assert.equal(doubled.isEvaluated, false);
     assert.equal(doubled.value, 42);
   });
 
   it("flatMap chains", () => {
-    const lazy = new Lazy(() => 21).flatMap(n => new Lazy(() => n * 2));
+    const lazy = Lazy(() => 21).flatMap(n => Lazy(() => n * 2));
     assert.equal(lazy.value, 42);
   });
 
   it("toOption/toResult handle exceptions", () => {
-    const good = new Lazy(() => 42);
+    const good = Lazy(() => 42);
     assert.equal(good.toOption().unwrap(), 42);
 
-    const bad = new Lazy(() => {
+    const bad = Lazy(() => {
       throw new Error("boom");
     });
     assert.equal(bad.toOption().isNone, true);
@@ -703,21 +703,21 @@ describe("Lazy", () => {
   });
 
   it("unwrapOr handles exceptions", () => {
-    const bad = new Lazy(() => {
+    const bad = Lazy(() => {
       throw new Error();
     });
     assert.equal(bad.unwrapOr(99), 99);
   });
 
   it("toString() shows evaluation state", () => {
-    const lazy = new Lazy(() => 42);
+    const lazy = Lazy(() => 42);
     assert.equal(lazy.toString(), "Lazy(<pending>)");
     lazy.value; // force evaluation
     assert.equal(lazy.toString(), "Lazy(42)");
   });
 
   it("[Symbol.dispose]() releases value and thunk", () => {
-    const lazy = new Lazy(() => 42);
+    const lazy = Lazy(() => 42);
     lazy.value; // evaluate
     assert.equal(lazy.isDisposed, false);
 
@@ -728,7 +728,7 @@ describe("Lazy", () => {
   });
 
   it("[Symbol.dispose]() works on unevaluated Lazy", () => {
-    const lazy = new Lazy(() => 42);
+    const lazy = Lazy(() => 42);
     assert.equal(lazy.isEvaluated, false);
 
     lazy[Symbol.dispose]();
@@ -737,7 +737,7 @@ describe("Lazy", () => {
   });
 
   it("disposed Lazy propagates to derived instances", () => {
-    const parent = new Lazy(() => 21);
+    const parent = Lazy(() => 21);
     const child = parent.map(n => n * 2);
 
     parent[Symbol.dispose]();
@@ -746,7 +746,7 @@ describe("Lazy", () => {
   });
 
   it("[Symbol.dispose]() marks lazy as disposed and prevents further access", () => {
-    const lazy = new Lazy(() => "scoped");
+    const lazy = Lazy(() => "scoped");
     assert.equal(lazy.value, "scoped");
     assert.equal(lazy.isDisposed, false);
 
@@ -764,37 +764,40 @@ describe("Lazy", () => {
 
 describe("Task", () => {
   it("run() executes and returns Result", async () => {
-    const task = new Task(async () => Ok(42));
+    const task = Task(async () => Ok(42));
     const result = await task.run();
     assert.equal(result.unwrap(), 42);
   });
 
   it("map transforms success", async () => {
-    const result = await new Task(async () => Ok(21)).map(n => n * 2).run();
+    const result = await Task(async () => Ok(21))
+      .map(n => n * 2)
+      .run();
     assert.equal(result.unwrap(), 42);
   });
 
   it("mapErr transforms error", async () => {
-    const result = await new Task(async () => Err("x")).mapErr(e => e.toUpperCase()).run();
+    const result = await Task(async () => Err("x"))
+      .mapErr(e => e.toUpperCase())
+      .run();
     assert.equal(result.unwrapErr(), "X");
   });
 
   it("flatMap chains", async () => {
-    const result = await new Task(async () => Ok(21))
-      .flatMap(n => new Task(async () => Ok(n * 2)))
+    const result = await Task(async () => Ok(21))
+      .flatMap(n => Task(async () => Ok(n * 2)))
       .run();
     assert.equal(result.unwrap(), 42);
   });
 
   it("flatMap short-circuits on error", async () => {
     let ran = false;
-    const result = await new Task(async () => Err("stop"))
-      .flatMap(
-        () =>
-          new Task(async () => {
-            ran = true;
-            return Ok(99);
-          }),
+    const result = await Task(async () => Err("stop"))
+      .flatMap(() =>
+        Task(async () => {
+          ran = true;
+          return Ok(99);
+        }),
       )
       .run();
     assert.equal(result.isErr, true);
@@ -803,7 +806,7 @@ describe("Task", () => {
 
   it("tap runs side-effect on success", async () => {
     let tapped = 0;
-    await new Task(async () => Ok(42))
+    await Task(async () => Ok(42))
       .tap(v => {
         tapped = v;
       })
@@ -813,7 +816,7 @@ describe("Task", () => {
 
   it("tap does not run on error", async () => {
     let didTap = false;
-    await new Task(async () => Err("x"))
+    await Task(async () => Err("x"))
       .tap(() => {
         didTap = true;
       })
@@ -823,7 +826,7 @@ describe("Task", () => {
 
   it("tapErr runs side-effect on error", async () => {
     let tapped = "";
-    await new Task(async () => Err("fail"))
+    await Task(async () => Err("fail"))
       .tapErr(e => {
         tapped = e;
       })
@@ -833,7 +836,7 @@ describe("Task", () => {
 
   it("tapErr does not run on success", async () => {
     let didTap = false;
-    await new Task(async () => Ok(42))
+    await Task(async () => Ok(42))
       .tapErr(() => {
         didTap = true;
       })
@@ -842,16 +845,20 @@ describe("Task", () => {
   });
 
   it("unwrapOr provides fallback", async () => {
-    const okResult = await new Task(async () => Ok(42)).unwrapOr(0).run();
+    const okResult = await Task(async () => Ok(42))
+      .unwrapOr(0)
+      .run();
     assert.equal(okResult.unwrap(), 42);
 
-    const errResult = await new Task(async () => Err("x")).unwrapOr(99).run();
+    const errResult = await Task(async () => Err("x"))
+      .unwrapOr(99)
+      .run();
     assert.equal(errResult.unwrap(), 99);
   });
 
   it("runGetOr extracts value or uses fallback", async () => {
-    assert.equal(await new Task(async () => Ok(42)).runGetOr(0), 42);
-    assert.equal(await new Task(async () => Err("x")).runGetOr(99), 99);
+    assert.equal(await Task(async () => Ok(42)).runGetOr(0), 42);
+    assert.equal(await Task(async () => Err("x")).runGetOr(99), 99);
   });
 
   it("Task.of wraps value", async () => {
@@ -896,7 +903,7 @@ describe("Task", () => {
 
   it("memoize caches result", async () => {
     let count = 0;
-    const task = new Task(async () => {
+    const task = Task(async () => {
       count++;
       return Ok(42);
     }).memoize();
@@ -909,7 +916,7 @@ describe("Task", () => {
 
   it("memoize with error", async () => {
     let count = 0;
-    const task = new Task(async () => {
+    const task = Task(async () => {
       count++;
       return Err("fail");
     }).memoize();
@@ -922,7 +929,7 @@ describe("Task", () => {
 
   it("memoize concurrent runs share same promise", async () => {
     let count = 0;
-    const task = new Task(async () => {
+    const task = Task(async () => {
       count++;
       await new Promise(r => setTimeout(r, 10));
       return Ok(count);
@@ -934,13 +941,13 @@ describe("Task", () => {
   });
 
   it("timeout succeeds before deadline", async () => {
-    const task = new Task(async () => Ok("fast")).timeout(1000, () => "timeout");
+    const task = Task(async () => Ok("fast")).timeout(1000, () => "timeout");
     const result = await task.run();
     assert.equal(result.unwrap(), "fast");
   });
 
   it("timeout fires error on deadline", async () => {
-    const task = new Task(async () => {
+    const task = Task(async () => {
       await new Promise(r => setTimeout(r, 200));
       return Ok("slow");
     }).timeout(10, () => "timeout");
@@ -951,7 +958,7 @@ describe("Task", () => {
 
   it("retry succeeds on second attempt", async () => {
     let attempt = 0;
-    const task = new Task(async () => {
+    const task = Task(async () => {
       attempt++;
       return attempt < 2 ? Err("fail") : Ok("ok");
     }).retry(3);
@@ -962,7 +969,7 @@ describe("Task", () => {
 
   it("retry exhausts attempts", async () => {
     let attempt = 0;
-    const task = new Task(async () => {
+    const task = Task(async () => {
       attempt++;
       return Err(`fail-${attempt}`);
     }).retry(3);
@@ -973,11 +980,11 @@ describe("Task", () => {
   });
 
   it("Task.race first settled wins", async () => {
-    const slow = new Task(async () => {
+    const slow = Task(async () => {
       await new Promise(r => setTimeout(r, 200));
       return Ok("slow");
     });
-    const fast = new Task(async () => Ok("fast"));
+    const fast = Task(async () => Ok("fast"));
     const result = await Task.race([slow, fast]).run();
     assert.equal(result.unwrap(), "fast");
   });
@@ -1318,7 +1325,7 @@ describe("Program", () => {
 
   it("execute() passes AbortSignal to effect", async () => {
     const ac = new AbortController();
-    const prog = Program("test-signal", signal => new Task(async () => Ok(signal.aborted)));
+    const prog = Program("test-signal", signal => Task(async () => Ok(signal.aborted)));
 
     const before = await prog.execute(ac.signal);
     assert.equal(before.unwrap(), false);
@@ -1329,9 +1336,8 @@ describe("Program", () => {
   });
 
   it("execute() provides default signal when none given", async () => {
-    const prog = Program(
-      "test-default-signal",
-      signal => new Task(async () => Ok(signal instanceof AbortSignal)),
+    const prog = Program("test-default-signal", signal =>
+      Task(async () => Ok(signal instanceof AbortSignal)),
     );
     const result = await prog.execute();
     assert.equal(result.unwrap(), true);
@@ -1339,7 +1345,7 @@ describe("Program", () => {
 
   it("execute() can be called multiple times", async () => {
     let count = 0;
-    const prog = Program("test-multi", () => new Task(async () => Ok(++count)));
+    const prog = Program("test-multi", () => Task(async () => Ok(++count)));
     assert.equal((await prog.execute()).unwrap(), 1);
     assert.equal((await prog.execute()).unwrap(), 2);
   });

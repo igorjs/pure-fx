@@ -129,8 +129,8 @@ describe("ErrType -> Result -> Task error pipeline", () => {
   const NetworkError = ErrType("NetworkError");
 
   it("happy path: both Tasks succeed through flatMap chain", async () => {
-    const validate = value => new Task(async () => Ok(value));
-    const save = value => new Task(async () => Ok({ saved: true, value }));
+    const validate = value => Task(async () => Ok(value));
+    const save = value => Task(async () => Ok({ saved: true, value }));
 
     const result = await validate("data")
       .flatMap(v => save(v))
@@ -145,7 +145,7 @@ describe("ErrType -> Result -> Task error pipeline", () => {
     const validate = () =>
       Task.fromResult(ValidationError("bad input", { field: "email" }).toResult());
     const save = () =>
-      new Task(async () => {
+      Task(async () => {
         secondRan = true;
         return Ok("saved");
       });
@@ -225,7 +225,7 @@ describe("Lazy with Schema + Record", () => {
     let evalCount = 0;
     const UserSchema = Schema.object({ name: Schema.string, age: Schema.number });
 
-    const lazy = new Lazy(() => {
+    const lazy = Lazy(() => {
       evalCount++;
       return Record(UserSchema.parse({ name: "Alice", age: 30 }).unwrap());
     });
@@ -245,7 +245,7 @@ describe("Lazy with Schema + Record", () => {
   });
 
   it("Lazy.toResult converts thrown exceptions from failed parsing", () => {
-    const lazy = new Lazy(() => {
+    const lazy = Lazy(() => {
       const r = Schema.number.parse("not a number");
       return r.unwrap(); // throws on Err
     });
@@ -255,7 +255,7 @@ describe("Lazy with Schema + Record", () => {
   });
 
   it("Lazy.toOption returns None on error", () => {
-    const lazy = new Lazy(() => {
+    const lazy = Lazy(() => {
       throw new Error("boom");
     });
 
@@ -414,11 +414,11 @@ describe("Program: Order Processing Pipeline", () => {
     return Option.fromNullable(discounts[code]);
   };
 
-  const makeTaxCalculator = rate => new Lazy(() => rate);
+  const makeTaxCalculator = rate => Lazy(() => rate);
 
   // ── Async checks ──
   const checkPricing = items =>
-    new Task(async () => {
+    Task(async () => {
       for (const item of items) {
         if (item.unitPrice > 1000) {
           return PricingError(`Price too high for ${item.name}`, {
@@ -431,7 +431,7 @@ describe("Program: Order Processing Pipeline", () => {
     });
 
   const checkInventory = items =>
-    new Task(async () => {
+    Task(async () => {
       for (const item of items) {
         if (item.qty > 100) {
           return InventoryError(`Insufficient stock for ${item.name}`, {
