@@ -29,7 +29,7 @@ import { Err, Ok } from "../core/result.js";
  *
  * @example
  * ```ts
- * const config = new Lazy(() => loadExpensiveConfig());
+ * const config = Lazy(() => loadExpensiveConfig());
  *
  * config.isEvaluated;     // false
  * config.value;            // computes and caches
@@ -37,7 +37,7 @@ import { Err, Ok } from "../core/result.js";
  * config.map(c => c.port); // new Lazy, still deferred
  * ```
  */
-export class Lazy<T> implements Disposable {
+class LazyImpl<T> implements Disposable {
   private _value: T | undefined;
   private _thunk: (() => T) | null;
   private _evaluated = false;
@@ -70,12 +70,12 @@ export class Lazy<T> implements Disposable {
 
   /** Transform the lazy value. Returns a new Lazy (still deferred). */
   map<U>(fn: (value: T) => U): Lazy<U> {
-    return new Lazy(() => fn(this.value));
+    return new LazyImpl(() => fn(this.value));
   }
 
   /** Chain into another lazy computation. */
   flatMap<U>(fn: (value: T) => Lazy<U>): Lazy<U> {
-    return new Lazy(() => fn(this.value).value);
+    return new LazyImpl(() => fn(this.value).value);
   }
 
   /** Get the value, or a fallback if the thunk throws. */
@@ -112,7 +112,7 @@ export class Lazy<T> implements Disposable {
    * Enables `using` declarations for scoped expensive computations:
    * ```ts
    * {
-   *   using data = new Lazy(() => parseHugeDataset());
+   *   using data = Lazy(() => parseHugeDataset());
    *   transform(data.value);
    * } // data disposed, memory released
    * ```
@@ -129,3 +129,31 @@ export class Lazy<T> implements Disposable {
     return this._evaluated ? `Lazy(${String(this._value)})` : "Lazy(<pending>)";
   }
 }
+
+// ── Public type + callable factory (const/type merge) ────────────────────────
+
+/**
+ * Public type alias so consumers write `Lazy<T>` without seeing
+ * the internal class name.
+ */
+export type Lazy<T> = LazyImpl<T>;
+
+/**
+ * Create or inspect `Lazy` values.
+ *
+ * Callable as a factory (`Lazy(thunk)`) and as a namespace for
+ * the `is` type guard.
+ *
+ * @example
+ * ```ts
+ * const config = Lazy(() => loadExpensiveConfig());
+ * config.value; // evaluates once, caches
+ * ```
+ */
+export const Lazy: {
+  <T>(thunk: () => T): Lazy<T>;
+  readonly is: (value: unknown) => value is Lazy<unknown>;
+} = Object.assign(<T>(thunk: () => T): Lazy<T> => new LazyImpl(thunk), {
+  /** Type guard: returns true if `value` is a Lazy instance. */
+  is: (value: unknown): value is Lazy<unknown> => value instanceof LazyImpl,
+});

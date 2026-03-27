@@ -28,7 +28,7 @@ import { collectResults, Err, type ErrImpl, Ok } from "../core/result.js";
  *
  * @example
  * ```ts
- * const fetchUser = new Task<User, ApiError>(async () => {
+ * const fetchUser = Task<User, ApiError>(async () => {
  *   const res = await fetch('/api/user');
  *   if (!res.ok) return Err({ code: res.status });
  *   return Ok(await res.json());
@@ -42,7 +42,7 @@ import { collectResults, Err, type ErrImpl, Ok } from "../core/result.js";
  * const result = await pipeline.run(); // Result<string, string>
  * ```
  */
-export class Task<T, E> {
+class TaskImpl<T, E> {
   constructor(private readonly _run: () => Promise<Result<T, E>>) {}
 
   /** Execute the task. Returns a Promise of Result. */
@@ -52,7 +52,7 @@ export class Task<T, E> {
 
   /** Transform the success value. Does not execute yet. */
   map<U>(fn: (value: T) => U): Task<U, E> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const r = await this._run();
       return r.isOk ? Ok(fn(r.value)) : (r as unknown as Result<U, E>);
     });
@@ -60,7 +60,7 @@ export class Task<T, E> {
 
   /** Transform the error value. Does not execute yet. */
   mapErr<F>(fn: (error: E) => F): Task<T, F> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const r = await this._run();
       return r.isErr ? Err(fn((r as ErrImpl<T, E>).error)) : (r as unknown as Result<T, F>);
     });
@@ -68,7 +68,7 @@ export class Task<T, E> {
 
   /** Chain into another async operation on success. Short-circuits on error. */
   flatMap<U>(fn: (value: T) => Task<U, E>): Task<U, E> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const r = await this._run();
       if (r.isErr) return r as unknown as Result<U, E>;
       return fn(r.value).run();
@@ -77,7 +77,7 @@ export class Task<T, E> {
 
   /** Run a side-effect on the success value without altering the Task. */
   tap(fn: (value: T) => void): Task<T, E> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const r = await this._run();
       if (r.isOk) fn(r.value);
       return r;
@@ -86,7 +86,7 @@ export class Task<T, E> {
 
   /** Run a side-effect on the error without altering the Task. */
   tapErr(fn: (error: E) => void): Task<T, E> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const r = await this._run();
       if (r.isErr) fn((r as ErrImpl<T, E>).error);
       return r;
@@ -95,7 +95,7 @@ export class Task<T, E> {
 
   /** Provide a fallback value on error. Returns `Task<T, never>`. */
   unwrapOr(fallback: T): Task<T, never> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const r = await this._run();
       return Ok(r.isOk ? r.value : fallback);
     });
@@ -109,7 +109,7 @@ export class Task<T, E> {
 
   /** Run both tasks in parallel, combine results into a tuple. */
   zip<U>(other: Task<U, E>): Task<[T, U], E> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       const [a, b] = await Promise.all([this._run(), other._run()]);
       if (a.isErr) return a as unknown as Result<[T, U], E>;
       if (b.isErr) return b as unknown as Result<[T, U], E>;
@@ -132,7 +132,7 @@ export class Task<T, E> {
   memoize(): Task<T, E> {
     let cached: Promise<Result<T, E>> | null = null;
     let thunk: (() => Promise<Result<T, E>>) | null = this._run;
-    return new Task(() => {
+    return new TaskImpl(() => {
       if (cached !== null) return cached;
       cached = thunk!();
       thunk = null;
@@ -150,7 +150,7 @@ export class Task<T, E> {
    * ```
    */
   timeout(ms: number, onTimeout: () => E): Task<T, E> {
-    return new Task(() =>
+    return new TaskImpl(() =>
       Promise.race([
         this._run(),
         new Promise<Result<T, E>>(resolve => setTimeout(() => resolve(Err(onTimeout())), ms)),
@@ -168,7 +168,7 @@ export class Task<T, E> {
    * ```
    */
   retry(attempts: number, delay?: number): Task<T, E> {
-    return new Task(async () => {
+    return new TaskImpl(async () => {
       let last: Result<T, E> = await this._run();
       for (let i = 1; i < attempts && last.isErr; i++) {
         if (delay !== undefined && delay > 0) {
@@ -179,7 +179,45 @@ export class Task<T, E> {
       return last;
     });
   }
+}
 
+// ── Public type + callable factory (const/type merge) ────────────────────────
+
+/**
+ * Public type alias so consumers write `Task<T, E>` without seeing
+ * the internal class name. Works in both type and value position:
+ *
+ *   - Type position: `const t: Task<number, string> = ...`
+ *   - Value position: `Task(async () => Ok(42))`, `Task.of(42)`
+ */
+export type Task<T, E> = TaskImpl<T, E>;
+
+/**
+ * Create or manipulate `Task` values.
+ *
+ * Callable as a factory (`Task(thunk)`) and as a namespace for static
+ * helpers (`Task.of`, `Task.fromResult`, `Task.fromPromise`, etc.).
+ *
+ * @example
+ * ```ts
+ * const t = Task<number, string>(async () => Ok(42));
+ * const wrapped = Task.of(42);
+ * const safe = Task.fromPromise(() => fetch('/api'), String);
+ * ```
+ */
+export const Task: {
+  <T, E>(run: () => Promise<Result<T, E>>): Task<T, E>;
+  readonly of: <T>(value: T) => Task<T, never>;
+  readonly fromResult: <T, E>(result: Result<T, E>) => Task<T, E>;
+  readonly fromPromise: <T, E = unknown>(
+    promise: () => Promise<T>,
+    onError?: (e: unknown) => E,
+  ) => Task<T, E>;
+  readonly all: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly T[], E>;
+  readonly race: <T, E>(tasks: readonly Task<T, E>[]) => Task<T, E>;
+  readonly allSettled: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly Result<T, E>[], never>;
+  readonly is: (value: unknown) => value is Task<unknown, unknown>;
+} = Object.assign(<T, E>(run: () => Promise<Result<T, E>>): Task<T, E> => new TaskImpl(run), {
   /**
    * Create a Task from a plain value. Always succeeds.
    *
@@ -188,9 +226,7 @@ export class Task<T, E> {
    * const task = Task.of(42); // Task<number, never>
    * ```
    */
-  static of<T>(value: T): Task<T, never> {
-    return new Task(async () => Ok(value));
-  }
+  of: <T>(value: T): Task<T, never> => new TaskImpl(async () => Ok(value)),
 
   /**
    * Create a Task from an existing Result.
@@ -200,9 +236,7 @@ export class Task<T, E> {
    * Task.fromResult(Ok(42)).run(); // Promise<Ok(42)>
    * ```
    */
-  static fromResult<T, E>(result: Result<T, E>): Task<T, E> {
-    return new Task(async () => result);
-  }
+  fromResult: <T, E>(result: Result<T, E>): Task<T, E> => new TaskImpl(async () => result),
 
   /**
    * Create a Task from a Promise, catching rejections.
@@ -214,18 +248,17 @@ export class Task<T, E> {
    * Task.fromPromise(() => fetch('/api'), e => String(e));
    * ```
    */
-  static fromPromise<T, E = unknown>(
+  fromPromise: <T, E = unknown>(
     promise: () => Promise<T>,
     onError?: (e: unknown) => E,
-  ): Task<T, E> {
-    return new Task(async () => {
+  ): Task<T, E> =>
+    new TaskImpl(async () => {
       try {
         return Ok(await promise());
       } catch (e) {
         return Err(onError ? onError(e) : (e as E));
       }
-    });
-  }
+    }),
 
   /**
    * Run all tasks in parallel, collect results. Short-circuits on first error.
@@ -236,12 +269,11 @@ export class Task<T, E> {
    * result.unwrap(); // [1, 2]
    * ```
    */
-  static all<T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> {
-    return new Task(async () => {
+  all: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> =>
+    new TaskImpl(async () => {
       const results = await Promise.all(tasks.map(t => t.run()));
       return collectResults(results);
-    });
-  }
+    }),
 
   /**
    * Race all tasks. The first to settle wins.
@@ -251,9 +283,8 @@ export class Task<T, E> {
    * Task.race([fetchFromCache, fetchFromApi]).run();
    * ```
    */
-  static race<T, E>(tasks: readonly Task<T, E>[]): Task<T, E> {
-    return new Task(() => Promise.race(tasks.map(t => t.run())));
-  }
+  race: <T, E>(tasks: readonly Task<T, E>[]): Task<T, E> =>
+    new TaskImpl(() => Promise.race(tasks.map(t => t.run()))),
 
   /**
    * Run all tasks in parallel and collect every Result (never short-circuits).
@@ -264,7 +295,9 @@ export class Task<T, E> {
    * // -> Ok([Ok(1), Err('x')])
    * ```
    */
-  static allSettled<T, E>(tasks: readonly Task<T, E>[]): Task<readonly Result<T, E>[], never> {
-    return new Task(async () => Ok(await Promise.all(tasks.map(t => t.run()))));
-  }
-}
+  allSettled: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly Result<T, E>[], never> =>
+    new TaskImpl(async () => Ok(await Promise.all(tasks.map(t => t.run())))),
+
+  /** Type guard: returns true if `value` is a Task instance. */
+  is: (value: unknown): value is Task<unknown, unknown> => value instanceof TaskImpl,
+});

@@ -252,7 +252,7 @@ const _fr: boolean = _fn("hello");
 // Lazy / Task - types preserved
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const lazy = new Lazy(() => 42);
+const lazy = Lazy(() => 42);
 const _lv: number = lazy.value;
 const _lm: Lazy<string> = lazy.map(String);
 const _lDisposed: boolean = lazy.isDisposed;
@@ -260,7 +260,7 @@ const _lDisposed: boolean = lazy.isDisposed;
 // Lazy implements Disposable
 const _disposable: Disposable = lazy;
 
-const task = new Task<number, string>(async () => Ok(42));
+const task = Task<number, string>(async () => Ok(42));
 const _tm: Task<string, string> = task.map(String);
 
 // Task.memoize preserves types
@@ -435,9 +435,8 @@ const _tryRes: Result<number, string> = tryCatch(() => 42, String);
 const _progTask: ProgramType<number, never> = Program("test", Task.of(42));
 
 // Program from effect function preserves types
-const _progFn: ProgramType<string, string> = Program(
-  "test",
-  (_signal: AbortSignal) => new Task<string, string>(async () => Ok("done")),
+const _progFn: ProgramType<string, string> = Program("test", (_signal: AbortSignal) =>
+  Task<string, string>(async () => Ok("done")),
 );
 
 // execute() returns Promise<Result<T, E>>
