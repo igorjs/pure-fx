@@ -106,7 +106,10 @@
         "src/data/record.ts",
         "src/data/list.ts",
         "src/data/internals.ts",
-        "src/data/schema.ts"
+        "src/data/schema.ts",
+        "src/data/codec.ts",
+        "src/data/non-empty-list.ts",
+        "src/core/match.ts"
       ],
       "linter": {
         "rules": {
