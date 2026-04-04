@@ -44,6 +44,8 @@ export function match(value: { match(m: object): unknown }, matcher: object): un
 }
 export { Lazy } from "./async/lazy.js";
 export { Task } from "./async/task.js";
+export { Eq } from "./core/eq.js";
+export { Ord } from "./core/ord.js";
 export { flow, pipe } from "./core/pipe.js";
 export { isImmutable, List, Record } from "./data/constructors.js";
 export type { DeepReadonly } from "./data/internals.js";
