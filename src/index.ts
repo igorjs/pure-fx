@@ -76,5 +76,7 @@ export {
   type ServerError,
   text,
 } from "./server.js";
+export { Cron, type CronExpression } from "./types/cron.js";
+export { Duration } from "./types/duration.js";
 export { ErrType, type ErrTypeConstructor } from "./types/error.js";
 export type { Type } from "./types/nominal.js";
