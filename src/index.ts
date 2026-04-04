@@ -51,6 +51,7 @@ export { flow, pipe } from "./core/pipe.js";
 export { isImmutable, List, Record } from "./data/constructors.js";
 export type { DeepReadonly } from "./data/internals.js";
 export type { ImmutableList, ListMethods } from "./data/list.js";
+export { NonEmptyList } from "./data/non-empty-list.js";
 export type { ImmutableRecord, RecordMethods } from "./data/record.js";
 export { Schema, type SchemaError, type SchemaType } from "./data/schema.js";
 export { Program } from "./program.js";
