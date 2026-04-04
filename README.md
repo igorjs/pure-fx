@@ -1,13 +1,16 @@
 # Pure FX
 
-Immutability micro-framework for TypeScript. Functional programming primitives. Zero dependencies.
+Functional application framework for TypeScript. Zero dependencies.
+
+Errors are values, not exceptions. Data is immutable, enforced at runtime. Async is lazy and composable. The type system carries everything.
 
 ```ts
 import {
-  Record, List, Ok, Err, Some, None,
-  Result, Option, match, tryCatch,
-  Schema, pipe, flow, Lazy, Task,
-  ErrType, Program
+  Record, List, NonEmptyList, Ok, Err, Some, None,
+  Result, Option, Schema, Codec, pipe, flow, Match,
+  Eq, Ord, Lens, Prism, Traversal, Duration, Cron,
+  Task, Stream, Lazy, Retry, CircuitBreaker, ErrType,
+  Server, Program, json, text, html, redirect,
 } from '@igorjs/pure-fx'
 ```
 
@@ -25,112 +28,240 @@ npx jsr add @igorjs/pure-fx
 
 Requires Node >= 22 (LTS). Compatible with TypeScript >= 5.5 and TypeScript 7 (`tsgo`).
 
+## What's in the box
+
+| Layer | Primitives |
+|-------|------------|
+| **Core** | `Result`, `Option`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `Lens`, `Prism`, `Traversal` |
+| **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec` |
+| **Types** | `Type` (nominal branding), `ErrType`, `Duration`, `Cron` |
+| **Async** | `Task`, `Stream`, `Lazy`, `Retry`, `CircuitBreaker` |
+| **Runtime** | `Server`, `Program`, adapters for Node, Deno, Bun, Lambda |
+
 ## Why
 
-JavaScript has no immutability guarantees. `Object.freeze` is shallow. Spread-based updates are verbose and error-prone at depth. This framework gives you:
-
-- **Runtime enforcement**: mutations throw `TypeError`, always
+- **Runtime enforcement**: mutations on Records and Lists throw `TypeError`
 - **Type-level enforcement**: `readonly` all the way down, `tsc --strict` clean
-- **Zero-copy construction**: `Object.freeze` in-place, no `structuredClone`
-- **Class-per-shape Records**: V8 monomorphic inline caches, near-native read speed
-- **Real monads**: `Result` and `Option` as classes with prototype methods, not tagged bags
-- **Applicative functors**: `ap()` on both Result and Option for lifted function application
-- **Zero dependencies**: ~1650 lines (including JSDoc), ships as ESM
+- **Errors as values**: `Result<T, E>` replaces try/catch, making failure explicit
+- **Lazy async**: `Task` and `Stream` describe work without executing it
+- **Composable optics**: `Lens`, `Prism`, `Traversal` for immutable nested updates
+- **Boundary validation**: `Schema` parses unknown input into typed values
+- **Production-ready server**: trie-based routing, typed middleware, graceful shutdown
+- **Zero dependencies**: ships as ESM, ~4500 lines including JSDoc
 
-## Quick Start
+## Quick start
+
+### Immutable data
 
 ```ts
-// Immutable objects: direct property access, mutations throw
 const user = Record({ name: 'Alice', address: { city: 'Sydney' } })
 user.name                                    // 'Alice'
 user.address.city                            // 'Sydney' (also a Record)
 user.name = 'X'                              // TypeError
 
-// Structural updates: always returns new Record
-user.set(u => u.address.city, 'Melbourne')
-user.update(u => u.name, n => n.toUpperCase())
-user.produce(d => { d.name = 'Bob'; d.address.city = 'Melbourne' })
-user.merge({ name: 'Bob' })
+user.set(u => u.address.city, 'Melbourne')   // new Record
+user.produce(d => { d.name = 'Bob' })        // batch mutations via draft
 
-// Immutable arrays
 const nums = List([3, 1, 4])
-nums.append(5).sortBy((a, b) => a - b)      // List [1, 3, 4, 5]
-nums.find(n => n > 2)                        // Some(3)
-nums.at(-1)                                  // Some(4)
+nums.sortByOrd(Ord.number)                   // List [1, 3, 4]
+nums.uniqBy(Eq.number)                       // deduplicated
+nums.groupBy(n => n > 2 ? 'big' : 'small')  // { big: List[3,4], small: List[1] }
 
-// Result monad: errors as values
-Ok(42).map(n => n * 2).unwrapOr(0)           // 84
-Err('fail').map(n => n * 2).unwrapOr(0)      // 0
+const nel = NonEmptyList.of(1, 2, 3)
+nel.first()                                  // 1 (not Option, guaranteed)
+nel.reduce1((a, b) => a + b)                 // 6 (no init needed)
+```
 
-// Option monad: null safety
-Some(42).filter(n => n > 100)                // None
-Option.fromNullable(process.env.PORT)        // Some('3000') or None
+### Error handling
 
-// Structured errors as values
-const NotFound = ErrType('NotFound')          // code auto-derived: 'NOT_FOUND'
-const err = NotFound('User not found', { userId: 'u_123' })
-err.toResult()                                // Result<never, ErrType<'NotFound', string>>
+```ts
+const parseAge = (input: unknown): Result<number, string> =>
+  typeof input === 'number' && input > 0 ? Ok(input) : Err('invalid age')
 
-// Schema validation: pure validation, no coupling to Record
+parseAge(25).map(n => n + 1).unwrapOr(0)     // 26
+parseAge('x').map(n => n + 1).unwrapOr(0)    // 0
+
+// traverse: map + collect in one pass
+Result.traverse(['1', '2'], s => parseAge(Number(s)))  // Ok([1, 2])
+
+// Structured errors
+const NotFound = ErrType('NotFound')          // code: 'NOT_FOUND' (auto-derived)
+NotFound('User not found', { id: 'u_123' })
+  .toResult()                                 // Result<never, ErrType<'NotFound'>>
+
+// Exhaustive pattern matching
+Match(result)
+  .with({ tag: 'Ok' }, r => r.value)
+  .with({ tag: 'Err' }, r => r.error)
+  .exhaustive()
+```
+
+### Validation
+
+```ts
 const UserSchema = Schema.object({
   name: Schema.string,
   age: Schema.number.refine(n => n > 0, 'positive'),
+  role: Schema.discriminatedUnion('type', {
+    admin: Schema.object({ type: Schema.literal('admin'), level: Schema.number }),
+    user: Schema.object({ type: Schema.literal('user') }),
+  }),
 })
-UserSchema.parse(jsonData)                   // Result<User, SchemaError>
-const user = Record(UserSchema.parse(jsonData).unwrap()) // wrap explicitly
 
-// Program entrypoint: auto-logs start/errors, handles signals
-const main = Program('my-service', (signal) =>
-  pipe(
-    loadConfig(),
-    Task.flatMap(cfg => startServer(cfg, { signal })),
-  )
+UserSchema.parse(untrustedInput)              // Result<User, SchemaError>
+
+// Bidirectional: decode + encode
+const DateCodec = Codec.from(
+  (input: unknown) => typeof input === 'string'
+    ? Ok(new Date(input)) : Err({ path: [], expected: 'ISO string', received: typeof input }),
+  (date: Date) => date.toISOString(),
 )
-main.run()
-// [2026-03-16T10:00:00.000Z] [my-service] started
-// [2026-03-16T10:00:01.234Z] [my-service] completed
 ```
 
-## API
+### Async pipelines
+
+```ts
+const fetchUser = Task.fromPromise(
+  () => fetch('/api/user').then(r => r.json()),
+  e => String(e),
+)
+
+// Lazy: nothing executes until .run()
+const pipeline = fetchUser
+  .map(user => user.name)
+  .timeout(Duration.seconds(5), () => 'timeout')
+
+await pipeline.run()                          // Result<string, string>
+
+// Retry with exponential backoff
+const policy = Retry.policy()
+  .maxAttempts(3)
+  .exponentialBackoff(Duration.seconds(1))
+  .jitter()
+  .build()
+
+Retry.apply(policy, fetchUser)
+
+// Circuit breaker for cascading failure protection
+const breaker = CircuitBreaker.create({
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: Duration.seconds(30),
+})
+const protected = breaker.protect(fetchUser)
+```
+
+### Streams
+
+```ts
+// Lazy pull-based async sequences
+const numbers = Stream.of(1, 2, 3, 4, 5)
+const result = await numbers
+  .filter(n => n % 2 === 0)
+  .map(n => n * 10)
+  .collect()
+  .run()                                      // Ok([20, 40])
+
+// Sliding window, groupBy, scan
+Stream.interval(Duration.seconds(1))
+  .take(10)
+  .window(3)                                  // overlapping windows of 3
+  .scan((sum, w) => sum + w.length, 0)        // running total
+```
+
+### Optics
+
+```ts
+type User = { name: string; address: { city: string } }
+
+const city = Lens.prop<User>()('address')
+  .compose(Lens.prop<{ city: string }>()('city'))
+
+city.get(user)                                // 'Sydney'
+pipe(user, city.set('Melbourne'))             // new object, city changed
+pipe(user, city.modify(s => s.toUpperCase())) // new object, city uppercased
+
+// Array index access (partial: returns Option)
+const second = LensOptional.index<number>(1)
+second.getOption([10, 20, 30])                // Some(20)
+second.getOption([10])                        // None
+```
+
+### HTTP Server
+
+```ts
+import { bunAdapter } from '@igorjs/pure-fx/runtime/adapter/bun'
+
+const app = Server('api')
+  .derive(req => Task.of({ requestId: crypto.randomUUID() }))
+  .get('/health', () => json({ ok: true }))
+  .get('/users/:id', ctx => json({ id: ctx.params.id, rid: ctx.requestId }))
+  .post('/users', ctx => Task(async () => {
+    const body = await ctx.req.json()
+    return Ok(json(body, { status: 201 }))
+  }))
+  .listen({ port: 3000 }, bunAdapter)
+
+await app.run()
+// Handles SIGINT/SIGTERM, graceful shutdown, structured logging
+```
+
+Runtime adapters:
+
+```ts
+import { nodeAdapter } from '@igorjs/pure-fx/runtime/adapter/node'
+import { denoAdapter } from '@igorjs/pure-fx/runtime/adapter/deno'
+import { bunAdapter } from '@igorjs/pure-fx/runtime/adapter/bun'
+import { lambdaAdapter } from '@igorjs/pure-fx/runtime/adapter/lambda'
+```
+
+### Typed time
+
+```ts
+const timeout = Duration.seconds(30)
+const backoff = Duration.multiply(timeout, 2)
+Duration.format(backoff)                      // '1m'
+Duration.toMilliseconds(backoff)              // 60000
+Duration.ord.compare(timeout, backoff)        // -1
+
+const schedule = Cron.parse('0 9 * * 1-5')   // Result<CronExpression, SchemaError>
+if (schedule.isOk) {
+  Cron.next(schedule.value)                   // Option<Date> (next 9am weekday)
+  Cron.matches(schedule.value, new Date())    // boolean
+}
+```
+
+## API reference
 
 ### Record
 
 | Method | Description |
 |---|---|
-| `Record(obj)` | Create immutable record. Freezes in-place (caller yields ownership) |
-| `Record.clone(obj)` | Deep clone then freeze. Use at trust boundaries |
-| `.name` | Direct property read. Nested objects are also Records |
-| `.set(u => u.x, val)` | Replace nested value -> new Record |
-| `.update(u => u.x, fn)` | Transform nested value -> new Record |
-| `.produce(d => { ... })` | Batch mutations via draft -> new Record. Mutating array methods (`push`, `splice`, etc.) throw `TypeError`; use spread reassignment instead |
-| `.merge({ ... })` | Shallow merge -> new Record |
-| `.at(u => u.x)` | Safe deep access -> `Option<R>` |
+| `Record(obj)` | Create immutable record. Freezes in-place |
+| `Record.clone(obj)` | Deep clone then freeze |
+| `.set(accessor, val)` | Replace nested value |
+| `.update(accessor, fn)` | Transform nested value |
+| `.produce(draft => ...)` | Batch mutations via draft |
+| `.merge({ ... })` | Shallow merge |
+| `.at(accessor)` | Safe deep access -> `Option` |
 | `.equals(other)` | Structural deep equality |
-| `.toMutable()` | Deep clone escape hatch |
-| `.toJSON()` | Raw frozen data (JSON-safe) |
-| `.$raw` | Access underlying frozen object |
-| `.$immutable` | Brand (`true`) for runtime type checking |
 
 ### List
 
 | Method | Description |
 |---|---|
 | `List(arr)` | Create immutable list |
-| `List.clone(arr)` | Deep clone then wrap. Use at trust boundaries |
-| `[i]` | Index access. Nested objects are wrapped as Records |
-| `.append(v)` / `.prepend(v)` | Add element -> new List |
-| `.setAt(i, v)` / `.updateAt(i, fn)` | Modify element -> new List |
-| `.removeAt(i)` | Remove element -> new List |
-| `.map(fn)` / `.filter(fn)` / `.reduce(fn, init)` | FP operations |
-| `.find(fn)` / `.findIndex(fn)` | Search -> `Option` |
-| `.at(i)` / `.first()` / `.last()` | Safe access -> `Option` |
-| `.sortBy(cmp)` | Sort -> new List |
-| `.concat(other)` / `.slice(s, e)` / `.flatMap(fn)` | Collections |
+| `.append` / `.prepend` / `.setAt` / `.updateAt` / `.removeAt` | Mutations -> new List |
+| `.map` / `.filter` / `.reduce` / `.flatMap` | Transformations |
+| `.find` / `.findIndex` / `.at` / `.first` / `.last` | Queries -> `Option` |
+| `.sortBy(cmp)` / `.sortByOrd(ord)` | Sorting |
+| `.uniqBy(eq)` / `.groupBy(fn)` | Dedup and grouping |
 | `.equals(other)` | Structural deep equality |
-| `.toMutable()` | Deep clone escape hatch |
-| `.toJSON()` | Raw array (JSON-safe) |
-| `.$raw` | Access underlying frozen array |
-| `.$immutable` | Brand (`true`) for runtime type checking |
+
+### NonEmptyList
+
+Extends List. `first()`, `last()`, `head` return `T` directly (not `Option`).
+`reduce1(fn)` folds without initial value. `sortByOrd(ord)` and `uniqBy(eq)` preserve non-emptiness.
 
 ### Result\<T, E\>
 
@@ -138,104 +269,153 @@ main.run()
 |---|---|
 | `Ok(value)` / `Err(error)` | Construct |
 | `Result.tryCatch(fn, onError)` | Wrap throwing code |
-| `Result.collect([...])` | All-or-nothing collection |
-| `Result.match(result, { Ok, Err })` | Standalone pattern match |
-| `Result.is(value)` | Type guard for any Result |
-| `.map(fn)` / `.mapErr(fn)` | Transform value/error |
-| `.flatMap(fn)` | Chain fallible operations |
-| `.tap(fn)` / `.tapErr(fn)` | Side effects (no-op on wrong variant) |
+| `Result.collect` / `.sequence` | All-or-nothing collection |
+| `Result.traverse(items, fn)` | Map + collect in one pass |
+| `.map` / `.mapErr` / `.flatMap` | Transform |
+| `.tap` / `.tapErr` | Side effects |
 | `.match({ Ok, Err })` | Exhaustive pattern match |
-| `.unwrap()` | Extract or throw `TypeError` |
-| `.unwrapOr(fallback)` / `.unwrapOrElse(fn)` | Extract with fallback |
-| `.unwrapErr()` | Extract error or throw `TypeError` |
-| `.zip(other)` | Combine two Results -> `Result<[T, U], E>` |
-| `.ap(fnResult)` | Applicative apply: `Ok(x).ap(Ok(fn))` -> `Ok(fn(x))` |
-| `.toOption()` | -> `Option<T>` (drops error) |
-| `.toJSON()` | `{ tag: 'Ok', value }` or `{ tag: 'Err', error }` |
-| `.toString()` | `'Ok(42)'` or `'Err(fail)'` |
-
-### ErrType
-
-| Export | Description |
-|---|---|
-| `ErrType(tag)` | Define error constructor. Code auto-derived from PascalCase (`'NotFound'` -> `'NOT_FOUND'`) |
-| `ErrType(tag, code)` | Define error constructor with explicit code |
-| `ErrType.is(value)` | Type guard for any ErrType instance |
-| `constructor(message, metadata?)` | Create a frozen error instance with tag, code, message, metadata, timestamp, stack |
-| `.tag` / `.name` | Literal string discriminant (same value) |
-| `.code` | Literal string code (auto-derived or explicit) |
-| `.message` | Human-readable description |
-| `.metadata` | Deep-frozen `Record<string, unknown>` (defaults `{}`) |
-| `.timestamp` | Epoch milliseconds at construction |
-| `.stack` | Stack trace string (V8 `captureStackTrace` where available, `Error().stack` fallback) |
-| `.toResult<T>()` | Wrap in `Err(this)` -> `Result<T, ErrType<Tag, Code>>` |
-| `.toJSON()` | Serialise all fields except `stack` |
-| `.toString()` | `'Tag(CODE): message'` |
-| `Constructor.is(value)` | Type guard for specific error type |
+| `.unwrap` / `.unwrapOr` / `.unwrapOrElse` | Extract |
+| `.zip(other)` / `.ap(fnResult)` | Combine |
+| `.toOption()` / `.toJSON()` | Convert |
 
 ### Option\<T\>
 
 | Method | Description |
 |---|---|
 | `Some(value)` / `None` | Construct |
-| `Option.fromNullable(v)` | `null`/`undefined` -> `None`, else `Some` |
-| `Option.collect([...])` | All-or-nothing collection |
-| `Option.match(option, { Some, None })` | Standalone pattern match |
-| `Option.is(value)` | Type guard for any Option |
-| `.map(fn)` / `.flatMap(fn)` / `.filter(fn)` | Transform |
-| `.tap(fn)` | Side effect on Some (no-op on None) |
+| `Option.fromNullable(v)` | Null-safe wrapping |
+| `Option.traverse(items, fn)` | Map + collect |
+| `.map` / `.flatMap` / `.filter` | Transform |
 | `.match({ Some, None })` | Exhaustive pattern match |
-| `.unwrap()` | Extract or throw `TypeError` |
-| `.unwrapOr(v)` / `.unwrapOrElse(fn)` | Extract with fallback |
-| `.zip(other)` / `.or(other)` | Combine |
-| `.ap(fnOption)` | Applicative apply: `Some(x).ap(Some(fn))` -> `Some(fn(x))` |
-| `.toResult(error)` | -> `Result<T, E>` |
-| `.toJSON()` | `{ tag: 'Some', value }` or `{ tag: 'None' }` |
-| `.toString()` | `'Some(42)'` or `'None'` |
+| `.unwrap` / `.unwrapOr` / `.unwrapOrElse` | Extract |
+| `.zip` / `.or` / `.ap` | Combine |
+| `.toResult(error)` | Convert |
 
 ### Schema
 
 | Method | Description |
 |---|---|
-| `Schema.string` / `.number` / `.boolean` | Primitive validators |
-| `Schema.object({ ... })` | Object shape validator |
-| `Schema.array(el)` / `.tuple(a, b, ...)` | Collection validators |
-| `Schema.literal(v)` / `.union(a, b, ...)` | Discriminated types |
-| `Schema.record(val)` | String-keyed map validator |
-| `.parse(unknown)` | -> `Result<T, SchemaError>` (plain validated data) |
-| `.is(unknown)` | Type guard |
-| `.refine(pred, label)` | Add validation predicate |
-| `.transform(fn)` | Post-parse transform |
-| `.optional()` / `.default(v)` | Nullability handling |
-| `Schema.Infer<typeof S>` | Extract TypeScript type |
+| `.string` / `.number` / `.boolean` | Primitives |
+| `.object({ ... })` / `.array(el)` / `.tuple(...)` | Composite |
+| `.literal(v)` / `.union(...)` / `.discriminatedUnion(key, map)` | Sum types |
+| `.record(val)` / `.intersection(a, b)` / `.lazy(fn)` | Advanced |
+| `.parse(unknown)` -> `Result` | Validate |
+| `.refine(pred, label)` / `.transform(fn)` / `.optional()` / `.default(v)` | Compose |
+
+### Codec
+
+| Method | Description |
+|---|---|
+| `Codec.from(decode, encode)` | Custom bidirectional codec |
+| `Codec.fromSchema(schema, encode)` | Bridge from Schema |
+| `Codec.string` / `.number` / `.boolean` | Primitives |
+| `Codec.object({ ... })` / `.array(el)` / `.nullable(codec)` | Composite |
+| `.decode(input)` -> `Result` / `.encode(value)` | Transform |
+| `.pipe(other)` | Chain codecs |
+
+### Task\<T, E\>
+
+| Method | Description |
+|---|---|
+| `Task(async () => ...)` | Create lazy async computation |
+| `Task.of` / `.fromResult` / `.fromPromise` | Constructors |
+| `Task.all` / `.race` / `.allSettled` | Parallel execution |
+| `Task.traverse(items, fn)` / `.sequence(tasks)` | Collection |
+| `Task.ap(fnTask, argTask)` | Applicative |
+| `.map` / `.mapErr` / `.flatMap` / `.tap` / `.tapErr` | Transform |
+| `.timeout(ms, onTimeout)` / `.retry(n, delay?)` | Resilience |
+| `.memoize()` | Cache result |
+| `.run()` | Execute |
+
+### Stream\<T, E\>
+
+| Method | Description |
+|---|---|
+| `Stream.of(...)` / `.from(iterable)` / `.fromArray(arr)` | Create |
+| `Stream.unfold(seed, fn)` / `.interval(duration)` | Generate |
+| `.map` / `.flatMap` / `.filter` / `.take` / `.drop` / `.takeWhile` | Transform |
+| `.chunk(size)` / `.window(size)` / `.scan(fn, init)` | Batch |
+| `.mapErr` / `.tap` / `.concat` / `.zip` | Combine |
+| `.collect()` / `.forEach(fn)` / `.reduce(fn, init)` / `.first()` / `.groupBy(fn)` | Collect -> Task |
+
+### Optics
+
+| Export | Description |
+|---|---|
+| `Lens.prop<S>()(key)` | Total lens for a property |
+| `Lens.from(get, set)` | Custom lens |
+| `LensOptional.index<T>(i)` | Array index (partial) |
+| `LensOptional.fromNullable<S>()(key)` | Nullable field |
+| `Prism.from(getOption, reverseGet)` | Sum type variant |
+| `Traversal.fromArray<T>()` | All array elements |
+| `.compose(other)` | Compose optics |
+| `.get` / `.set(v)(s)` / `.modify(fn)(s)` | Access and update |
+
+### Resilience
+
+| Export | Description |
+|---|---|
+| `Retry.policy()` | Builder: `.maxAttempts`, `.exponentialBackoff`, `.jitter`, `.maxDelay`, `.shouldRetry` |
+| `Retry.apply(policy, task)` | Apply policy to a Task |
+| `CircuitBreaker.create(policy)` | Create breaker: `failureThreshold`, `successThreshold`, `timeout` |
+| `breaker.protect(task)` | Wrap Task with circuit protection |
+| `breaker.state()` | `'closed'` / `'open'` / `'half-open'` |
+
+### Time
+
+| Export | Description |
+|---|---|
+| `Duration.seconds(n)` / `.minutes` / `.hours` / `.days` / `.milliseconds` | Create |
+| `Duration.add` / `.subtract` / `.multiply` | Arithmetic |
+| `Duration.toMilliseconds` / `.toSeconds` / `.toMinutes` / `.toHours` | Convert |
+| `Duration.format(d)` | Human-readable: `'2h 30m 15s'` |
+| `Duration.eq` / `.ord` | Typeclass instances |
+| `Cron.parse(expr)` -> `Result` | Validate 5-field cron |
+| `Cron.next(expr, after?)` -> `Option<Date>` | Next occurrence |
+| `Cron.matches(expr, date)` | Check match |
+
+### Typeclasses
+
+| Export | Description |
+|---|---|
+| `Eq(fn)` / `Eq.string` / `.number` / `.boolean` / `.date` | Equality |
+| `Eq.struct({ ... })` / `Eq.contramap(eq, fn)` | Compose |
+| `Ord(fn)` / `Ord.string` / `.number` / `.date` | Ordering |
+| `Ord.reverse` / `.contramap` / `.min` / `.max` / `.clamp` / `.between` | Compose |
+
+### Server
+
+| Method | Description |
+|---|---|
+| `Server(name)` | Create builder |
+| `.get` / `.post` / `.put` / `.patch` / `.delete` / `.head` / `.options` / `.all` | Routes |
+| `.use(...middlewares)` | Untyped middleware |
+| `.middleware(typedMw)` | Typed context-extending middleware |
+| `.derive(resolver)` | Sequential context derivation |
+| `.onError(handler)` | Custom error handler |
+| `.fetch(request)` | WHATWG fetch handler |
+| `.listen(options, adapter?)` | Start with Program lifecycle |
+| `json` / `text` / `html` / `redirect` | Response helpers |
 
 ### Program
 
 | Method | Description |
 |---|---|
-| `Program(name, task)` | Create named program from a Task |
-| `Program(name, (signal) => task)` | Create named program with AbortSignal wired to SIGINT/SIGTERM |
-| `.run()` | Execute with process lifecycle: auto-logs start/errors, signals, exit codes |
-| `.execute(signal?)` | Execute for testing: returns `Result`, no logging or `process.exit` |
+| `Program(name, (signal) => task)` | Create named program |
+| `.run()` | Execute: logging, signals, exit codes |
+| `.execute(signal?)` | Execute for testing: raw Result |
 
 ### Utilities
 
 | Export | Description |
 |---|---|
-| `pipe(val, f1, f2, ...)` | Data-first left-to-right transformation (1-9 stages) |
-| `flow(f1, f2, ...)` | Point-free function composition (1-6 stages) |
-| `Lazy(() => expr)` | Deferred and cached computation. `.value` triggers evaluation |
-| `Task(async () => ...)` | Composable async Result. `.run()` executes. Supports `map`, `flatMap`, `tap`, `tapErr`, `unwrapOr`, `zip` |
-| `Task.of(v)` / `Task.fromResult(r)` / `Task.fromPromise(fn)` | Task constructors |
-| `Task.all([...])` | Run tasks in parallel, collect results. Short-circuits on first error |
-| `Task.race([...])` | First settled task wins |
-| `Task.allSettled([...])` | Run all tasks, collect every `Result` (never short-circuits) |
-| `.memoize()` | Cache result of first `.run()`. Concurrent calls share the same Promise |
-| `.timeout(ms, onTimeout)` | Race against a deadline. Returns `Err(onTimeout())` if exceeded |
-| `.retry(attempts, delay?)` | Retry on error up to N times with optional delay between attempts |
-| `Type<'Name', Base>` | Nominal typing, zero runtime. `type UserId = Type<'UserId', string>` |
-| `match(value, arms)` | Standalone pattern match for Result or Option |
-| `tryCatch(fn, onError)` | Standalone alias for `Result.tryCatch` |
+| `pipe(val, f1, f2, ...)` | Left-to-right transformation (1-9 stages) |
+| `flow(f1, f2, ...)` | Point-free composition (1-6 stages) |
+| `Match(value).with(...).exhaustive()` | Exhaustive pattern matching |
+| `match(result, { Ok, Err })` | Two-arm match for Result/Option |
+| `ErrType(tag)` | Structured error constructor |
+| `Type<'Name', Base>` | Nominal typing (zero runtime) |
+| `Lazy(() => expr)` | Deferred cached computation |
 | `isImmutable(val)` | Type guard for Records and Lists |
 | `DeepReadonly<T>` | Recursive readonly type utility |
 
@@ -258,20 +438,11 @@ Memory per Record instance: ~410 bytes (vs ~376 bytes plain object = 1.09x overh
 ## Building
 
 ```bash
-# Type check (TS7)
-npm run check
-
-# Build
-npm run build
-
-# Test runtime
-npm test
-
-# Test types (compile-time safety suite)
-npm run test:types
-
-# Full prepublish pipeline
-npm run prepublishOnly
+npm run check          # Type check (TS7)
+npm run build          # Build
+npm test               # Test runtime
+npm run test:types     # Test types (compile-time safety suite)
+npm run prepublishOnly # Full prepublish pipeline
 ```
 
 ## License
