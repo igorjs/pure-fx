@@ -1,22 +1,29 @@
 /**
  * @module @igorjs/pure-ts
  *
- * Pure TS: immutability micro-framework for TypeScript.
+ * Pure TS: a functional application framework for TypeScript.
+ * Zero dependencies. Errors as values. Immutability enforced at runtime.
  *
- *   Record({ name: 'John Doe', age: 21 })  - immutable objects
- *   List([1, 2, 3])                        - immutable arrays
- *   Ok(value) / Err(error)                 - Result monad
- *   Some(value) / None                     - Option monad
- *   Schema.object({ ... })                 - boundary validation → immutable
- *   pipe(value, fn1, fn2)                  - left-to-right data transformation
- *   flow(fn1, fn2, fn3)                    - point-free function composition
- *   Lazy(() => expensive())                - deferred & cached computation
- *   Task(async () => ...)                  - composable async Result
- *   Type<'UserId', string>                 - nominal typing (zero runtime)
- *   ErrType('NotFound')                      - structured error constructors
+ * Core:
+ *   Result<T, E>  / Option<T>         - monads for errors and optionality
+ *   pipe / flow / Match               - composition and pattern matching
+ *   Eq<T> / Ord<T>                    - composable equality and ordering
+ *   Lens / Prism / Traversal          - optics for immutable updates
  *
- * Everything returns immutable values. Errors are values, never thrown.
- * Zero dependencies. Methods live on prototypes. GC-friendly.
+ * Data:
+ *   Record / List / NonEmptyList      - immutable data structures
+ *   Schema / Codec                    - validation and bidirectional encoding
+ *   Type<Name, Base> / ErrType        - nominal types and structured errors
+ *   Duration / Cron                   - typed time primitives
+ *
+ * Async:
+ *   Task<T, E> / Stream<T, E>        - lazy async computation and sequences
+ *   Lazy<T>                           - deferred and cached evaluation
+ *   Retry / CircuitBreaker            - resilience policies
+ *
+ * Runtime:
+ *   Server / Program                  - HTTP server with typed middleware
+ *   node / deno / bun / lambda        - runtime adapters
  */
 
 import type { Option, OptionMatcher } from "./core/option.js";
