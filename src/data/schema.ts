@@ -341,6 +341,66 @@ export const Schema = {
       if (rb.isErr) return castErr(rb);
       return Ok({ ...ra.value, ...rb.value } as A & B);
     }),
+  // ── Common refinements ────────────────────────────────────────────────────
+
+  /** String that matches the given regex. */
+  regex: (pattern: RegExp, label?: string): SchemaType<string> =>
+    stringSchema.refine(s => pattern.test(s), label ?? `regex(${pattern.source})`),
+
+  /** Non-empty string (trims first). */
+  nonEmpty: stringSchema.refine(s => s.trim().length > 0, "non-empty string"),
+
+  /** String with a minimum length. */
+  minLength: (n: number): SchemaType<string> =>
+    stringSchema.refine(s => s.length >= n, `minLength(${n})`),
+
+  /** String with a maximum length. */
+  maxLength: (n: number): SchemaType<string> =>
+    stringSchema.refine(s => s.length <= n, `maxLength(${n})`),
+
+  /** Email address (simplified RFC 5322 pattern). */
+  email: stringSchema.refine(s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s), "email"),
+
+  /** URL (uses URL constructor for validation). */
+  url: stringSchema.refine(s => {
+    try {
+      new URL(s);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "url"),
+
+  /** UUID v4 format. */
+  uuid: stringSchema.refine(
+    s => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s),
+    "uuid",
+  ),
+
+  /** ISO 8601 date string (validates via Date constructor). */
+  isoDate: stringSchema.refine(s => {
+    const d = new Date(s);
+    return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s.slice(0, 10));
+  }, "ISO date"),
+
+  /** Integer (no decimal part). */
+  int: numberSchema.refine(n => Number.isInteger(n), "integer"),
+
+  /** Number with a minimum value (inclusive). */
+  min: (n: number): SchemaType<number> => numberSchema.refine(v => v >= n, `min(${n})`),
+
+  /** Number with a maximum value (inclusive). */
+  max: (n: number): SchemaType<number> => numberSchema.refine(v => v <= n, `max(${n})`),
+
+  /** Number within a range (inclusive). */
+  range: (lo: number, hi: number): SchemaType<number> =>
+    numberSchema.refine(v => v >= lo && v <= hi, `range(${lo}, ${hi})`),
+
+  /** Positive number (> 0). */
+  positive: numberSchema.refine(n => n > 0, "positive"),
+
+  /** Non-negative number (>= 0). */
+  nonNegative: numberSchema.refine(n => n >= 0, "non-negative"),
 } as const;
 
 export namespace Schema {
