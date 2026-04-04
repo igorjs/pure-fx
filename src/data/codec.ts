@@ -100,9 +100,7 @@ const createCodec = <I, O>(
       createCodec(
         (input: I) => {
           const r = decode(input);
-          // Why: r is Result<O, SchemaError>, need Result<O2, SchemaError>.
-          // Error type unchanged; only the Ok payload differs in the pipeline.
-          if (r.isErr) return r as unknown as Result<O2, SchemaError>;
+          if (r.isErr) return castErr(r);
           return other.decode(r.value);
         },
         (o2: O2) => encode(other.encode(o2)),

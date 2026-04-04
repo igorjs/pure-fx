@@ -34,12 +34,16 @@ export type Duration = Type<"Duration", number>;
 
 /**
  * Brand a raw number as Duration.
- * One of only two places where a nominal cast occurs.
+ * Duration = number & { [__brand]: 'Duration' }, so number overlaps
+ * with Duration and a single assertion is sufficient.
  */
-const brand = (ms: number): Duration => ms as unknown as Duration;
+const brand = (ms: number): Duration => ms as Duration;
 
-/** Extract the raw millisecond value from a Duration. */
-const unbrand = (d: Duration): number => unbrand(d);
+/**
+ * Extract the raw millisecond value from a Duration.
+ * No cast needed: Duration extends number, so the assignment is safe.
+ */
+const unbrand = (d: Duration): number => d;
 
 // ── Factories ───────────────────────────────────────────────────────────────
 
