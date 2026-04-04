@@ -315,11 +315,39 @@ export const tryCatch = <T, E = unknown>(
  * Result.is(someValue)
  * ```
  */
+/**
+ * Map each element through a fallible function, collecting successes.
+ * Short-circuits on the first Err.
+ *
+ * @example
+ * ```ts
+ * Result.traverse([1, 2, 3], n => n > 0 ? Ok(n * 2) : Err('negative'));
+ * // Ok([2, 4, 6])
+ * ```
+ */
+const traverseResults = <A, T, E>(
+  items: readonly A[],
+  fn: (item: A) => Result<T, E>,
+): Result<readonly T[], E> => {
+  const values: T[] = [];
+  for (const item of items) {
+    const r = fn(item);
+    if (r.isErr) return r as unknown as Result<readonly T[], E>;
+    values.push((r as OkImpl<T, E>).value);
+  }
+  return Ok(values);
+};
+
 export const Result: {
   readonly Ok: <T>(value: T) => Result<T, never>;
   readonly Err: <E>(error: E) => Result<never, E>;
   readonly tryCatch: <T, E = unknown>(fn: () => T, onError?: (e: unknown) => E) => Result<T, E>;
   readonly collect: <T, E>(results: readonly Result<T, E>[]) => Result<readonly T[], E>;
+  readonly sequence: <T, E>(results: readonly Result<T, E>[]) => Result<readonly T[], E>;
+  readonly traverse: <A, T, E>(
+    items: readonly A[],
+    fn: (item: A) => Result<T, E>,
+  ) => Result<readonly T[], E>;
   readonly match: <T, E, U>(result: Result<T, E>, matcher: ResultMatcher<T, E, U>) => U;
   readonly is: (value: unknown) => value is Result<unknown, unknown>;
 } = {
@@ -327,6 +355,8 @@ export const Result: {
   Err,
   tryCatch,
   collect: collectResults,
+  sequence: collectResults,
+  traverse: traverseResults,
   match: <T, E, U>(result: Result<T, E>, matcher: ResultMatcher<T, E, U>): U =>
     result.match(matcher),
   is: (value): value is Result<unknown, unknown> =>

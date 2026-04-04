@@ -216,6 +216,12 @@ export const Task: {
   readonly all: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly T[], E>;
   readonly race: <T, E>(tasks: readonly Task<T, E>[]) => Task<T, E>;
   readonly allSettled: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly Result<T, E>[], never>;
+  readonly traverse: <A, T, E>(
+    items: readonly A[],
+    fn: (item: A) => Task<T, E>,
+  ) => Task<readonly T[], E>;
+  readonly sequence: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly T[], E>;
+  readonly ap: <A, B, E>(fnTask: Task<(a: A) => B, E>, argTask: Task<A, E>) => Task<B, E>;
   readonly is: (value: unknown) => value is Task<unknown, unknown>;
 } = Object.assign(<T, E>(run: () => Promise<Result<T, E>>): Task<T, E> => new TaskImpl(run), {
   /**
@@ -297,6 +303,40 @@ export const Task: {
    */
   allSettled: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly Result<T, E>[], never> =>
     new TaskImpl(async () => Ok(await Promise.all(tasks.map(t => t.run())))),
+
+  /**
+   * Map each element through an async fallible function, collecting in parallel.
+   * Short-circuits on the first Err.
+   */
+  traverse: <A, T, E>(items: readonly A[], fn: (item: A) => Task<T, E>): Task<readonly T[], E> =>
+    new TaskImpl(async () => {
+      const results = await Promise.all(items.map(item => fn(item).run()));
+      return collectResults(results);
+    }),
+
+  /** Alias for `Task.all`. Runs all tasks in parallel and collects results. */
+  sequence: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> =>
+    new TaskImpl(async () => {
+      const results = await Promise.all(tasks.map(t => t.run()));
+      return collectResults(results);
+    }),
+
+  /**
+   * Applicative apply: run both tasks in parallel, apply the function result to the value.
+   *
+   * @example
+   * ```ts
+   * Task.ap(Task.of((n: number) => n * 2), Task.of(21)).run();
+   * // Ok(42)
+   * ```
+   */
+  ap: <A, B, E>(fnTask: Task<(a: A) => B, E>, argTask: Task<A, E>): Task<B, E> =>
+    new TaskImpl(async () => {
+      const [fnResult, argResult] = await Promise.all([fnTask.run(), argTask.run()]);
+      if (fnResult.isErr) return fnResult as unknown as Result<B, E>;
+      if (argResult.isErr) return argResult as unknown as Result<B, E>;
+      return Ok(fnResult.value(argResult.value));
+    }),
 
   /** Type guard: returns true if `value` is a Task instance. */
   is: (value: unknown): value is Task<unknown, unknown> => value instanceof TaskImpl,

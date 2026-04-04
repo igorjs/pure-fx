@@ -283,11 +283,33 @@ export const collectOptions = <T>(options: readonly Option<T>[]): Option<readonl
  * Option.is(someValue)
  * ```
  */
+/**
+ * Map each element through an optional function, collecting present values.
+ * Short-circuits on the first None.
+ */
+const traverseOptions = <A, T>(
+  items: readonly A[],
+  fn: (item: A) => Option<T>,
+): Option<readonly T[]> => {
+  const values: T[] = [];
+  for (const item of items) {
+    const o = fn(item);
+    if (o.isNone) return None;
+    values.push((o as SomeImpl<T>).value);
+  }
+  return Some(values);
+};
+
 export const Option: {
   readonly Some: <T>(value: T) => Option<T>;
   readonly None: Option<never>;
   readonly fromNullable: <T>(value: T | null | undefined) => Option<T>;
   readonly collect: <T>(options: readonly Option<T>[]) => Option<readonly T[]>;
+  readonly sequence: <T>(options: readonly Option<T>[]) => Option<readonly T[]>;
+  readonly traverse: <A, T>(
+    items: readonly A[],
+    fn: (item: A) => Option<T>,
+  ) => Option<readonly T[]>;
   readonly match: <T, U>(option: Option<T>, matcher: OptionMatcher<T, U>) => U;
   readonly is: (value: unknown) => value is Option<unknown>;
 } = {
@@ -295,6 +317,8 @@ export const Option: {
   None,
   fromNullable,
   collect: collectOptions,
+  sequence: collectOptions,
+  traverse: traverseOptions,
   match: <T, U>(option: Option<T>, matcher: OptionMatcher<T, U>): U => option.match(matcher),
   is: (value): value is Option<unknown> => value instanceof SomeImpl || value instanceof NoneImpl,
 };
