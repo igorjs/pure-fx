@@ -17,7 +17,7 @@
 import type { Option } from "../core/option.js";
 import { None, Some } from "../core/option.js";
 import type { Result } from "../core/result.js";
-import { Err, Ok } from "../core/result.js";
+import { castErr, Err, Ok } from "../core/result.js";
 import type { SchemaError } from "../data/schema.js";
 import type { Type } from "./nominal.js";
 
@@ -120,9 +120,7 @@ const parseCron = (expr: string): Result<readonly CronField[], SchemaError> => {
   for (let i = 0; i < 5; i++) {
     const [min, max] = FIELD_RANGES[i]!;
     const result = parseField(parts[i]!, min, max, FIELD_NAMES[i]!);
-    // Why: Result<CronField, SchemaError> needs to become Result<CronField[], SchemaError>.
-    // The error type is unchanged; only the Ok payload type differs.
-    if (result.isErr) return result as unknown as Result<never, SchemaError>;
+    if (result.isErr) return castErr(result);
     fields.push(result.value);
   }
 
@@ -134,8 +132,8 @@ const parseCron = (expr: string): Result<readonly CronField[], SchemaError> => {
 const PARSED_CACHE = new Map<string, readonly CronField[]>();
 
 const getCachedFields = (expr: CronExpression): readonly CronField[] => {
-  // Why: CronExpression is a branded string. Unbrand to use as Map key.
-  const key = expr as unknown as string;
+  // CronExpression extends string, so no cast needed for Map key.
+  const key: string = expr;
   let fields = PARSED_CACHE.get(key);
   if (fields === undefined) {
     const result = parseCron(key);
@@ -254,13 +252,11 @@ export const Cron: {
 } = {
   parse: (expr: string): Result<CronExpression, SchemaError> => {
     const result = parseCron(expr);
-    // Why: parseCron returns Result<CronField[], SchemaError>.
-    // Widen to Result<never, SchemaError> so it fits Result<CronExpression, SchemaError>.
-    if (result.isErr) return result as unknown as Result<never, SchemaError>;
+    if (result.isErr) return castErr(result);
     // Cache the parsed fields
     PARSED_CACHE.set(expr, result.value);
-    // Why: Brand the validated string as CronExpression (nominal type boundary).
-    return Ok(expr as unknown as CronExpression);
+    // CronExpression extends string, so single assertion is sufficient.
+    return Ok(expr as CronExpression);
   },
   next: nextOccurrence,
   matches: matchesCron,
