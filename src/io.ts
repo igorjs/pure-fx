@@ -106,29 +106,29 @@ const getFsPromises = async (): Promise<Result<FsPromises, ErrType<"FileError">>
  *
  * @example
  * ```ts
- * const content = await File.readText('./config.json').run();
+ * const content = await File.read('./config.json').run();
  * // Result<string, ErrType<'FileError'>>
  *
  * const parsed = content.flatMap(text => Json.parse(text));
  *
- * await File.writeText('./output.json', '{"ok":true}').run();
+ * await File.write('./output.json', '{"ok":true}').run();
  * ```
  */
 export const File: {
   /** Read a file as UTF-8 text. */
-  readonly readText: (path: string) => TaskLike<string, ErrType<"FileError">>;
+  readonly read: (path: string) => TaskLike<string, ErrType<"FileError">>;
   /** Write UTF-8 text to a file (creates or overwrites). */
-  readonly writeText: (path: string, content: string) => TaskLike<void, ErrType<"FileError">>;
+  readonly write: (path: string, content: string) => TaskLike<void, ErrType<"FileError">>;
   /** Check if a path exists and is a file. */
   readonly exists: (path: string) => TaskLike<boolean, ErrType<"FileError">>;
-  /** Create a directory (recursive). */
-  readonly mkdir: (path: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Create a directory recursively. */
+  readonly makeDir: (path: string) => TaskLike<void, ErrType<"FileError">>;
   /** Delete a file. */
   readonly remove: (path: string) => TaskLike<void, ErrType<"FileError">>;
-  /** List files in a directory. */
-  readonly readDir: (path: string) => TaskLike<readonly string[], ErrType<"FileError">>;
+  /** List entries in a directory. */
+  readonly list: (path: string) => TaskLike<readonly string[], ErrType<"FileError">>;
 } = {
-  readText: (path: string) =>
+  read: (path: string) =>
     mkTask(async () => {
       const fsResult = await getFsPromises();
       if (fsResult.isErr) return castErr(fsResult);
@@ -139,7 +139,7 @@ export const File: {
       }
     }),
 
-  writeText: (path: string, content: string) =>
+  write: (path: string, content: string) =>
     mkTask(async () => {
       const fsResult = await getFsPromises();
       if (fsResult.isErr) return castErr(fsResult);
@@ -163,7 +163,7 @@ export const File: {
       }
     }),
 
-  mkdir: (path: string) =>
+  makeDir: (path: string) =>
     mkTask(async () => {
       const fsResult = await getFsPromises();
       if (fsResult.isErr) return castErr(fsResult);
@@ -187,7 +187,7 @@ export const File: {
       }
     }),
 
-  readDir: (path: string) =>
+  list: (path: string) =>
     mkTask(async () => {
       const fsResult = await getFsPromises();
       if (fsResult.isErr) return castErr(fsResult);
