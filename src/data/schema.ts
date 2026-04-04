@@ -249,6 +249,89 @@ export const Schema = {
   literal: literalSchema,
   /** Validates that input matches at least one of the given schemas. */
   union: unionSchema,
+
+  /**
+   * Validates a tagged union using a discriminant field.
+   *
+   * More efficient than `union()` because it reads the discriminant first,
+   * then validates only the matching branch. Produces better error messages.
+   *
+   * @example
+   * ```ts
+   * const Shape = Schema.discriminatedUnion('type', {
+   *   circle: Schema.object({ type: Schema.literal('circle'), radius: Schema.number }),
+   *   rect: Schema.object({ type: Schema.literal('rect'), width: Schema.number, height: Schema.number }),
+   * });
+   * ```
+   */
+  discriminatedUnion: <D extends string, M extends Record<string, SchemaType<any>>>(
+    discriminant: D,
+    mapping: M,
+  ): SchemaType<M[keyof M] extends SchemaType<infer U> ? U : never> =>
+    createSchema(input => {
+      if (input === null || typeof input !== "object" || Array.isArray(input)) {
+        return schemaErr([], "object with discriminant", input);
+      }
+      const tag = (input as Record<string, unknown>)[discriminant];
+      if (typeof tag !== "string") {
+        return schemaErr([discriminant], "string discriminant", tag);
+      }
+      const schema = (mapping as Record<string, SchemaType<any>>)[tag];
+      if (schema === undefined) {
+        const expected = Object.keys(mapping).join(" | ");
+        return schemaErr([discriminant], expected, tag);
+      }
+      return schema.parse(input) as Result<
+        M[keyof M] extends SchemaType<infer U> ? U : never,
+        SchemaError
+      >;
+    }),
+
+  /**
+   * Deferred schema for recursive or circular data structures.
+   *
+   * The factory function is called lazily on first parse, allowing
+   * schemas to reference themselves.
+   *
+   * @example
+   * ```ts
+   * type Tree = { value: number; children: readonly Tree[] };
+   * const TreeSchema: SchemaType<Tree> = Schema.object({
+   *   value: Schema.number,
+   *   children: Schema.array(Schema.lazy(() => TreeSchema)),
+   * });
+   * ```
+   */
+  lazy: <T>(factory: () => SchemaType<T>): SchemaType<T> => {
+    let cached: SchemaType<T> | null = null;
+    const getSchema = (): SchemaType<T> => {
+      if (cached === null) cached = factory();
+      return cached;
+    };
+    return createSchema<T>(input => getSchema().parse(input));
+  },
+
+  /**
+   * Validates that input matches all given schemas (intersection).
+   *
+   * Parses through each schema in order; all must succeed.
+   * The result is the merged value from all schemas.
+   *
+   * @example
+   * ```ts
+   * const Named = Schema.object({ name: Schema.string });
+   * const Aged = Schema.object({ age: Schema.number });
+   * const Person = Schema.intersection(Named, Aged);
+   * ```
+   */
+  intersection: <A, B>(a: SchemaType<A>, b: SchemaType<B>): SchemaType<A & B> =>
+    createSchema<A & B>(input => {
+      const ra = a.parse(input);
+      if (ra.isErr) return ra as unknown as Result<A & B, SchemaError>;
+      const rb = b.parse(input);
+      if (rb.isErr) return rb as unknown as Result<A & B, SchemaError>;
+      return Ok({ ...ra.value, ...rb.value } as A & B);
+    }),
 } as const;
 
 export namespace Schema {
