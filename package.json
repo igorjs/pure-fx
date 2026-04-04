@@ -21,6 +21,10 @@
     "./runtime/adapter/deno": {
       "types": "./dist/runtime/adapter/deno.d.ts",
       "import": "./dist/runtime/adapter/deno.js"
+    },
+    "./runtime/adapter/bun": {
+      "types": "./dist/runtime/adapter/bun.d.ts",
+      "import": "./dist/runtime/adapter/bun.js"
     }
   },
   "files": [
