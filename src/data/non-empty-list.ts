@@ -211,6 +211,10 @@ const createNonEmptyList = <T>(raw: readonly T[]): NonEmptyList<T> => {
       }
       return Reflect.get(target, prop, receiver);
     },
+    has(target, prop) {
+      if (typeof prop === "string" && prop in methods) return true;
+      return Reflect.has(target, prop);
+    },
     // Why: The Proxy wraps ImmutableList with overridden methods.
     // The resulting object satisfies NonEmptyList<T> structurally,
     // but TS can't prove Proxy<ImmutableList> equals NonEmptyList.
