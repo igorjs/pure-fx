@@ -125,6 +125,7 @@ export { ErrType, type ErrTypeConstructor } from "./types/error.js";
 export type { Type } from "./types/nominal.js";
 export { Config } from "./runtime/config.js";
 export { Logger } from "./runtime/logger.js";
+export { Eol, Path, Platform } from "./runtime/platform.js";
 export {
   WebSocket,
   type WebSocketConnection,

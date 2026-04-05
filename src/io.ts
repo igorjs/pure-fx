@@ -12,6 +12,7 @@
 
 import type { Result } from "./core/result.js";
 import { castErr, Err, Ok } from "./core/result.js";
+import { Eol } from "./runtime/platform.js";
 import { ErrType, type ErrTypeConstructor } from "./types/error.js";
 
 // ── Error types ─────────────────────────────────────────────────────────────
@@ -133,7 +134,9 @@ export const File: {
       const fsResult = await getFsPromises();
       if (fsResult.isErr) return castErr(fsResult);
       try {
-        return Ok(await fsResult.value.readFile(path, "utf-8"));
+        // Normalise \r\n to \n so downstream code doesn't need to handle both.
+        const raw = await fsResult.value.readFile(path, "utf-8");
+        return Ok(Eol.normalise(raw));
       } catch (e) {
         return Err(FileError(e instanceof Error ? e.message : String(e), { path }));
       }
