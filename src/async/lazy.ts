@@ -6,7 +6,7 @@
  * **Why Lazy instead of a plain closure?**
  * A closure evaluates every time it's called. `Lazy` evaluates once, caches
  * the result, and drops the closure reference so the captured scope can be
- * garbage collected. This matters for expensive initialisations (config
+ * garbage collected. This matters for expensive initializations (config
  * parsing, large dataset loading) that should compute at most once.
  *
  * **How disposal works:**

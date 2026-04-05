@@ -7,7 +7,7 @@
  * `Error` subclasses are mutable, lack a machine-readable discriminant, and
  * encourage `instanceof` checks that break across realms. `ErrType` produces
  * frozen value objects with a literal `tag` discriminant, making them safe for
- * `switch`/`match` exhaustiveness checks and serialisation. They compose
+ * `switch`/`match` exhaustiveness checks and serialization. They compose
  * naturally with `Result<T, E>` via `.toResult()`.
  *
  * **How the factory/type merge works:**
@@ -94,7 +94,7 @@ interface ErrTypeInstance<Tag extends string, Code extends string> {
   /** Wrap this error in `Err(this)` to create a `Result`. */
   toResult<T>(): Result<T, ErrType<Tag, Code>>;
 
-  /** Serialise all fields except `stack`. */
+  /** Serialize all fields except `stack`. */
   toJSON(): {
     readonly tag: Tag;
     readonly name: Tag;

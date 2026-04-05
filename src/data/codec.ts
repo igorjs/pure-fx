@@ -5,7 +5,7 @@
  *
  * **Why Codec in addition to Schema?**
  * Schema only decodes: it parses `unknown` into `T`. Codec adds the reverse
- * direction: encoding `T` back to `unknown` for serialisation (API responses,
+ * direction: encoding `T` back to `unknown` for serialization (API responses,
  * storage, wire formats). A Codec is a Schema with an encode function,
  * keeping decode/encode paired so they cannot drift apart.
  *
@@ -40,7 +40,7 @@ import type { SchemaError, SchemaType } from "./schema.js";
 export interface CodecType<I, O> {
   /** Parse input into the output type. */
   readonly decode: (input: I) => Result<O, SchemaError>;
-  /** Serialise the output type back to the input form. */
+  /** Serialize the output type back to the input form. */
   readonly encode: (output: O) => I;
   /** Extract the decode-only schema for places that only need validation. */
   readonly schema: SchemaType<O>;

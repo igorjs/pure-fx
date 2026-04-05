@@ -35,12 +35,12 @@ const PLATFORM: PlatformId = detectPlatform();
 // ── EOL ─────────────────────────────────────────────────────────────────────
 
 /**
- * Line ending constants and normalisation.
+ * Line ending constants and normalization.
  *
  * @example
  * ```ts
  * Eol.native            // '\r\n' on Windows, '\n' elsewhere
- * Eol.normalise(text)   // replace all \r\n with \n
+ * Eol.normalize(text)   // replace all \r\n with \n
  * Eol.split(text)       // split on \r\n or \n
  * ```
  */
@@ -51,15 +51,15 @@ export const Eol: {
   readonly crlf: "\r\n";
   /** The native line ending for the current platform. */
   readonly native: string;
-  /** Normalise all line endings to \n. */
-  readonly normalise: (text: string) => string;
+  /** Normalize all line endings to \n. */
+  readonly normalize: (text: string) => string;
   /** Split text into lines, handling both \r\n and \n. */
   readonly split: (text: string) => readonly string[];
 } = {
   lf: "\n",
   crlf: "\r\n",
   native: PLATFORM === "windows" ? "\r\n" : "\n",
-  normalise: (text: string): string => text.replace(/\r\n/g, "\n"),
+  normalize: (text: string): string => text.replace(/\r\n/g, "\n"),
   split: (text: string): readonly string[] => text.split(/\r?\n/),
 };
 
@@ -79,7 +79,7 @@ const WIN_SEP = "\\";
  * ```ts
  * Path.join('src', 'core', 'result.ts')  // 'src/core/result.ts' (POSIX)
  *                                        // 'src\\core\\result.ts' (Windows)
- * Path.normalise('src\\core//result.ts') // 'src/core/result.ts' (POSIX)
+ * Path.normalize('src\\core//result.ts') // 'src/core/result.ts' (POSIX)
  * Path.basename('/home/user/file.ts')    // 'file.ts'
  * Path.dirname('/home/user/file.ts')     // '/home/user'
  * Path.extname('file.test.ts')           // '.ts'
@@ -90,8 +90,8 @@ export const Path: {
   readonly separator: string;
   /** Join path segments using the native separator. */
   readonly join: (...segments: readonly string[]) => string;
-  /** Normalise separators and remove redundant slashes. */
-  readonly normalise: (path: string) => string;
+  /** Normalize separators and remove redundant slashes. */
+  readonly normalize: (path: string) => string;
   /** Extract the file name from a path (last segment). */
   readonly basename: (path: string) => string;
   /** Extract the directory portion of a path. */
@@ -106,26 +106,26 @@ export const Path: {
   join: (...segments: readonly string[]): string => {
     const sep = PLATFORM === "windows" ? WIN_SEP : POSIX_SEP;
     const joined = segments.filter(s => s.length > 0).join(sep);
-    return normaliseSlashes(joined, sep);
+    return normalizeSlashes(joined, sep);
   },
 
-  normalise: (path: string): string => {
+  normalize: (path: string): string => {
     const sep = PLATFORM === "windows" ? WIN_SEP : POSIX_SEP;
-    return normaliseSlashes(path, sep);
+    return normalizeSlashes(path, sep);
   },
 
   basename: (path: string): string => {
-    const normalised = toForwardSlash(path);
-    const lastSlash = normalised.lastIndexOf("/");
-    return lastSlash === -1 ? normalised : normalised.slice(lastSlash + 1);
+    const normalized = toForwardSlash(path);
+    const lastSlash = normalized.lastIndexOf("/");
+    return lastSlash === -1 ? normalized : normalized.slice(lastSlash + 1);
   },
 
   dirname: (path: string): string => {
-    const normalised = toForwardSlash(path);
-    const lastSlash = normalised.lastIndexOf("/");
+    const normalized = toForwardSlash(path);
+    const lastSlash = normalized.lastIndexOf("/");
     if (lastSlash === -1) return ".";
     if (lastSlash === 0) return "/";
-    const dir = normalised.slice(0, lastSlash);
+    const dir = normalized.slice(0, lastSlash);
     return PLATFORM === "windows" ? dir.replace(/\//g, WIN_SEP) : dir;
   },
 
@@ -144,8 +144,8 @@ export const Path: {
 /** Replace all backslashes with forward slashes. */
 const toForwardSlash = (path: string): string => path.replace(/\\/g, "/");
 
-/** Normalise a path: unify separators, collapse runs, remove trailing. */
-const normaliseSlashes = (path: string, sep: string): string => {
+/** Normalize a path: unify separators, collapse runs, remove trailing. */
+const normalizeSlashes = (path: string, sep: string): string => {
   // Unify both separators to forward slash for processing
   let result = toForwardSlash(path);
   // Collapse multiple consecutive slashes

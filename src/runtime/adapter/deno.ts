@@ -81,7 +81,7 @@ export const denoAdapter: ServerAdapter = {
     if (denoGlobal.Deno?.serve === undefined) {
       throw new Error(
         "Deno.serve is not available. The denoAdapter requires Deno 2+. " +
-          "For Node.js, use nodeAdapter or the default .listen() behaviour.",
+          "For Node.js, use nodeAdapter or the default .listen() behavior.",
       );
     }
 

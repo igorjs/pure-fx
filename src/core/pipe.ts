@@ -95,7 +95,7 @@ export function pipe(initial: unknown, ...fns: ((arg: unknown) => unknown)[]): u
  *
  * @example
  * ```ts
- * const processUser = flow(parseUser, normalise, validate);
+ * const processUser = flow(parseUser, normalize, validate);
  * processUser(rawInput);
  * ```
  */
