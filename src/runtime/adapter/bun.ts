@@ -79,7 +79,7 @@ export const bunAdapter: ServerAdapter = {
     if (bunGlobal.Bun?.serve === undefined) {
       throw new Error(
         "Bun.serve is not available. The bunAdapter requires Bun. " +
-          "For Node.js, use nodeAdapter or the default .listen() behaviour. " +
+          "For Node.js, use nodeAdapter or the default .listen() behavior. " +
           "For Deno, use denoAdapter.",
       );
     }

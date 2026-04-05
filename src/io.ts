@@ -134,9 +134,9 @@ export const File: {
       const fsResult = await getFsPromises();
       if (fsResult.isErr) return castErr(fsResult);
       try {
-        // Normalise \r\n to \n so downstream code doesn't need to handle both.
+        // Normalize \r\n to \n so downstream code doesn't need to handle both.
         const raw = await fsResult.value.readFile(path, "utf-8");
-        return Ok(Eol.normalise(raw));
+        return Ok(Eol.normalize(raw));
       } catch (e) {
         return Err(FileError(e instanceof Error ? e.message : String(e), { path }));
       }

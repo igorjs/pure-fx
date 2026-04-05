@@ -21,7 +21,7 @@ import type { Eq } from "./eq.js";
  * Ordering comparison for values of type T.
  *
  * Extends {@link Eq} so any Ord can be used where Eq is expected.
- * The `compare` function returns `-1`, `0`, or `1` (normalised).
+ * The `compare` function returns `-1`, `0`, or `1` (normalized).
  *
  * @example
  * ```ts
@@ -35,7 +35,7 @@ export interface Ord<T> extends Eq<T> {
 
 // ── Internal helpers ────────────────────────────────────────────────────────
 
-/** Normalise a numeric comparison result to -1, 0, or 1. */
+/** Normalize a numeric comparison result to -1, 0, or 1. */
 const sign = (n: number): -1 | 0 | 1 => (n < 0 ? -1 : n > 0 ? 1 : 0);
 
 const fromCompare = <T>(compare: (a: T, b: T) => number): Ord<T> =>

@@ -95,7 +95,7 @@ export type NonEmptyList<T> = ListBase<T> & NonEmptyListMethods<T>;
 // ── Implementation ──────────────────────────────────────────────────────────
 
 const createNonEmptyList = <T>(raw: readonly T[]): NonEmptyList<T> => {
-  // Delegate to the regular list proxy for base array behaviour
+  // Delegate to the regular list proxy for base array behavior
   const inner = createListProxy(raw);
 
   const methods: NonEmptyListMethods<T> = {

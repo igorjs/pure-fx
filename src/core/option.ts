@@ -132,7 +132,7 @@ export class SomeImpl<T> implements OptionMethods<T> {
   or(_other: Option<T>): Option<T> {
     return this;
   }
-  /** Serialise as `{ tag: 'Some', value: T }`. */
+  /** Serialize as `{ tag: 'Some', value: T }`. */
   toJSON(): { tag: "Some"; value: T } {
     return { tag: "Some", value: this.value };
   }
@@ -207,7 +207,7 @@ export class NoneImpl<T> implements OptionMethods<T> {
   or(other: Option<T>): Option<T> {
     return other;
   }
-  /** Serialise as `{ tag: 'None' }`. */
+  /** Serialize as `{ tag: 'None' }`. */
   toJSON(): { tag: "None" } {
     return { tag: "None" };
   }

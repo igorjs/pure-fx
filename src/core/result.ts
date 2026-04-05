@@ -142,7 +142,7 @@ export class OkImpl<T, E> implements ResultMethods<T, E> {
     return fnResult.isOk ? new OkImpl(fnResult.value(this.value)) : castErr(fnResult);
   }
 
-  /** Serialise as `{ tag: 'Ok', value: T }`. */
+  /** Serialize as `{ tag: 'Ok', value: T }`. */
   toJSON(): { tag: "Ok"; value: T } {
     return { tag: "Ok", value: this.value };
   }
@@ -223,7 +223,7 @@ export class ErrImpl<T, E> implements ResultMethods<T, E> {
   ap<U>(_fnResult: Result<(value: T) => U, E>): Result<U, E> {
     return castErr(this);
   }
-  /** Serialise as `{ tag: 'Err', error: E }`. */
+  /** Serialize as `{ tag: 'Err', error: E }`. */
   toJSON(): { tag: "Err"; error: E } {
     return { tag: "Err", error: this.error };
   }

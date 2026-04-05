@@ -33,7 +33,7 @@ import { ErrType, type ErrTypeConstructor } from "./types/error.js";
 /**
  * Extract parameter names from a route pattern literal.
  *
- * Recognises `:param` segments and trailing `*` wildcards so that
+ * Recognizes `:param` segments and trailing `*` wildcards so that
  * `Context<"/users/:id/posts/:postId">` has typed params `{ id, postId }`.
  */
 export type ExtractParams<T extends string> = T extends `${string}:${infer Param}/${infer Rest}`
@@ -529,10 +529,10 @@ interface BuilderState {
 }
 
 /**
- * Normalise a handler return value: if it is a plain Response, wrap in Task.of.
+ * Normalize a handler return value: if it is a plain Response, wrap in Task.of.
  * If it is already a Task, return as-is.
  */
-const normaliseHandler = (
+const normalizeHandler = (
   result: Response | Task<Response, ServerError>,
 ): Task<Response, ServerError> => {
   if (Task.is(result)) return result;
@@ -543,7 +543,7 @@ const normaliseHandler = (
  * Strip trailing slashes from a pattern for consistent matching.
  * Preserves "/" itself (the root route).
  */
-const normalisePattern = (pattern: string): string => {
+const normalizePattern = (pattern: string): string => {
   if (pattern === "/") return pattern;
   return pattern.endsWith("/") ? pattern.slice(0, -1) : pattern;
 };
@@ -567,13 +567,13 @@ const runDerivers = async (
 };
 
 /**
- * Execute a matched handler, normalising sync Response to Task.
+ * Execute a matched handler, normalizing sync Response to Task.
  * Catches synchronous handler throws and wraps them as HandlerError.
  */
 const executeHandler = (handler: Handler, ctx: Context): Task<Response, ServerError> => {
   try {
     const result = handler(ctx);
-    return normaliseHandler(result);
+    return normalizeHandler(result);
   } catch (thrown: unknown) {
     const message = thrown instanceof Error ? thrown.message : String(thrown);
     return Task.fromResult(Err(HandlerError(message)));
@@ -721,7 +721,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
       ...state,
       routes: [
         ...state.routes,
-        { method, pattern: normalisePattern(pattern), handler: erasedHandler },
+        { method, pattern: normalizePattern(pattern), handler: erasedHandler },
       ],
     });
   };
@@ -733,7 +733,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
   const coreHandle = (req: Request): Task<Response, ServerError> => {
     return Task<Response, ServerError>(async () => {
       const url = new URL(req.url, "http://localhost");
-      const pathname = normalisePattern(url.pathname);
+      const pathname = normalizePattern(url.pathname);
       const trie = getTrie();
 
       const matchResult = matchRoute(trie, req.method, pathname);
