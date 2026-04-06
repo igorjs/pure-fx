@@ -406,7 +406,9 @@ describe("Stream", () => {
     it("runs side effect on each value", async () => {
       const values = [];
       const result = await Stream.of(1, 2, 3)
-        .forEach(v => values.push(v))
+        .forEach(v => {
+          values.push(v);
+        })
         .run();
       assert.equal(result.isOk, true);
       assert.deepEqual(values, [1, 2, 3]);
@@ -419,7 +421,11 @@ describe("Stream", () => {
         yield Err("stop");
         yield Ok(3);
       });
-      const result = await s.forEach(v => values.push(v)).run();
+      const result = await s
+        .forEach(v => {
+          values.push(v);
+        })
+        .run();
       assert.equal(result.isErr, true);
       assert.deepEqual(values, [1]);
     });

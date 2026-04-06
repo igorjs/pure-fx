@@ -78,7 +78,7 @@ const createRateLimiter = (policy: RateLimiterPolicy): RateLimiterInstance => {
     if (elapsed >= intervalMs) {
       const intervals = Math.floor(elapsed / intervalMs);
       tokens = Math.min(policy.capacity, tokens + intervals * policy.refillRate);
-      lastRefill = lastRefill + intervals * intervalMs;
+      lastRefill += intervals * intervalMs;
     }
   };
 

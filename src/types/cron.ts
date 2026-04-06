@@ -56,6 +56,7 @@ const parseField = (
   min: number,
   max: number,
   fieldName: string,
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: cron field parsing has inherent branching (wildcards, ranges, steps, lists)
 ): Result<CronField, SchemaError> => {
   const values = new Set<number>();
 

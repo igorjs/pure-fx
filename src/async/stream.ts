@@ -249,6 +249,7 @@ const createStream = <T, E>(source: () => AsyncIterable<Result<T, E>>): Stream<T
 
   zip: <U>(other: Stream<U, E>): Stream<[T, U], E> =>
     createStream(
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: zip handles two iterators and error paths
       gen<[T, U], E>(async function* () {
         const iterA = source()[Symbol.asyncIterator]();
         const iterB = other.run()[Symbol.asyncIterator]();

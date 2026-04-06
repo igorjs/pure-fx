@@ -53,29 +53,29 @@ export { Cache, type CacheInstance, type CacheOptions } from "./async/cache.js";
 export { Channel } from "./async/channel.js";
 export {
   CircuitBreaker,
-  CircuitOpen,
   type CircuitBreakerInstance,
   type CircuitBreakerPolicy,
+  CircuitOpen,
   type CircuitState,
 } from "./async/circuit-breaker.js";
 export { Env } from "./async/env.js";
 export { Lazy } from "./async/lazy.js";
 export {
-  RateLimiter,
   RateLimited,
+  RateLimiter,
   type RateLimiterInstance,
   type RateLimiterPolicy,
 } from "./async/rate-limiter.js";
 export { Retry, type RetryPolicy } from "./async/retry.js";
-export { Semaphore, Mutex, type SemaphoreInstance, type MutexInstance } from "./async/semaphore.js";
+export { Mutex, type MutexInstance, Semaphore, type SemaphoreInstance } from "./async/semaphore.js";
 export { Stream } from "./async/stream.js";
 export { Task } from "./async/task.js";
 export {
   Client,
+  type ClientError,
   type ClientInstance,
   type ClientOptions,
   type ClientResponse,
-  type ClientError,
   HttpError,
   NetworkError,
   ParseError,
@@ -86,15 +86,18 @@ export { Match } from "./core/match.js";
 export { Ord } from "./core/ord.js";
 export { flow, pipe } from "./core/pipe.js";
 export { State } from "./core/state.js";
+export { Codec, type CodecType } from "./data/codec.js";
 export { isImmutable, List, Record } from "./data/constructors.js";
 export type { DeepReadonly } from "./data/internals.js";
-export { Codec, type CodecType } from "./data/codec.js";
-export { Json, File, JsonError, FileError } from "./io.js";
 export type { ImmutableList, ListMethods } from "./data/list.js";
 export { NonEmptyList } from "./data/non-empty-list.js";
 export type { ImmutableRecord, RecordMethods } from "./data/record.js";
 export { Schema, type SchemaError, type SchemaType } from "./data/schema.js";
+export { File, FileError, Json, JsonError } from "./io.js";
 export { Program } from "./program.js";
+export { Config } from "./runtime/config.js";
+export { Logger } from "./runtime/logger.js";
+export { Eol, Path, Platform } from "./runtime/platform.js";
 export {
   BodyReadError,
   type Context,
@@ -108,7 +111,6 @@ export {
   type ListenOptions,
   MethodNotAllowed,
   type Middleware,
-  type TypedMiddleware,
   type Params,
   type RouteDefinition,
   RouteNotFound,
@@ -117,15 +119,13 @@ export {
   type ServerAdapter,
   type ServerBuilder,
   type ServerError,
+  type TypedMiddleware,
   text,
 } from "./server.js";
 export { Cron, type CronExpression } from "./types/cron.js";
 export { Duration } from "./types/duration.js";
 export { ErrType, type ErrTypeConstructor } from "./types/error.js";
 export type { Type } from "./types/nominal.js";
-export { Config } from "./runtime/config.js";
-export { Logger } from "./runtime/logger.js";
-export { Eol, Path, Platform } from "./runtime/platform.js";
 export {
   WebSocket,
   type WebSocketConnection,
