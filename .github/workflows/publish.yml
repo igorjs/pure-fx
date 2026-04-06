@@ -54,6 +54,9 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     environment: npm
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 
@@ -69,7 +72,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - run: pnpm publish --provenance --access public --no-git-checks
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
 
   publish-gpr:
     needs: verify
