@@ -490,6 +490,26 @@ export interface ServerBuilder<Ctx extends Record<string, unknown> = Record<stri
   /** Convert a Request to a Task of Response (typed error channel). */
   readonly handle: (request: Request) => Task<Response, ServerError>;
 
+  /**
+   * Start serving, returning a Task for composable concurrency.
+   *
+   * Unlike `.listen()`, this returns a Task that can be composed with
+   * `Task.all` inside a single Program. The caller provides the
+   * AbortSignal and manages lifecycle.
+   *
+   * @example
+   * ```ts
+   * Program('platform', signal => Task.all([
+   *   publicApi.serve({ port: 3000, signal }),
+   *   adminApi.serve({ port: 3001, signal }),
+   * ])).run();
+   * ```
+   */
+  serve(
+    options: { readonly port: number; readonly hostname?: string; readonly signal: AbortSignal },
+    adapter?: ServerAdapter,
+  ): Task<void, ServerError>;
+
   /** Start listening, returning a Program for lifecycle management. */
   listen(options: ListenOptions, adapter?: ServerAdapter): Program<void, ServerError>;
 
@@ -694,6 +714,55 @@ const writeResponseToNode = (response: Response, nodeRes: NodeResponse): void =>
   pump();
 };
 
+/** Resolve a ServerAdapter, falling back to the built-in Node.js adapter. */
+const resolveAdapter = (adapter?: ServerAdapter): ServerAdapter =>
+  adapter ?? {
+    async serve(handler, opts) {
+      // Dynamic import with structural typing to avoid @types/node dependency
+      const http: NodeHttpModule = await (Function(
+        "return import('node:http')",
+      )() as Promise<NodeHttpModule>);
+
+      await new Promise<void>((resolve, reject) => {
+        const hostname = opts.hostname ?? "localhost";
+
+        const server = http.createServer((nodeReq, nodeRes) => {
+          const chunks: Uint8Array[] = [];
+          nodeReq.on("data", (chunk: Uint8Array) => {
+            chunks.push(chunk);
+          });
+          nodeReq.on("end", () => {
+            const request = buildRequestFromNode(nodeReq, hostname, opts.port, chunks);
+            void handler(request).then(
+              response => writeResponseToNode(response, nodeRes),
+              () => {
+                nodeRes.writeHead(500, { "content-type": "text/plain" });
+                nodeRes.end("Internal Server Error");
+              },
+            );
+          });
+        });
+
+        const onAbort = (): void => {
+          server.close(err => {
+            if (err) reject(err);
+            else resolve();
+          });
+        };
+
+        if (opts.signal.aborted) {
+          resolve();
+          return;
+        }
+
+        opts.signal.addEventListener("abort", onAbort);
+        server.listen(opts.port, opts.hostname, () => {
+          // Server is listening
+        });
+      });
+    },
+  };
+
 /** Create the builder closure. Lazily compiles the trie on first request. */
 const createBuilder = <Ctx extends Record<string, unknown>>(
   state: BuilderState,
@@ -868,63 +937,33 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
       return state.errorHandler(result.unwrapErr(), request);
     },
 
-    listen(options: ListenOptions, adapter?: ServerAdapter): Program<void, ServerError> {
+    serve(
+      serveOpts: {
+        readonly port: number;
+        readonly hostname?: string;
+        readonly signal: AbortSignal;
+      },
+      adapter?: ServerAdapter,
+    ): Task<void, ServerError> {
       const fetchHandler = builder.fetch;
+      const resolvedAdapter = resolveAdapter(adapter);
 
-      const resolvedAdapter: ServerAdapter = adapter ?? {
-        async serve(
-          handler: (request: Request) => Promise<Response>,
-          opts: {
-            readonly port: number;
-            readonly hostname?: string | undefined;
-            readonly signal: AbortSignal;
-          },
-        ): Promise<void> {
-          // Dynamic import with structural typing to avoid @types/node dependency
-          const http: NodeHttpModule = await (Function(
-            "return import('node:http')",
-          )() as Promise<NodeHttpModule>);
-
-          await new Promise<void>((resolve, reject) => {
-            const hostname = opts.hostname ?? "localhost";
-
-            const server = http.createServer((nodeReq, nodeRes) => {
-              const chunks: Uint8Array[] = [];
-              nodeReq.on("data", (chunk: Uint8Array) => {
-                chunks.push(chunk);
-              });
-              nodeReq.on("end", () => {
-                const request = buildRequestFromNode(nodeReq, hostname, opts.port, chunks);
-                void handler(request).then(
-                  response => writeResponseToNode(response, nodeRes),
-                  () => {
-                    nodeRes.writeHead(500, { "content-type": "text/plain" });
-                    nodeRes.end("Internal Server Error");
-                  },
-                );
-              });
-            });
-
-            const onAbort = (): void => {
-              server.close(err => {
-                if (err) reject(err);
-                else resolve();
-              });
-            };
-
-            if (opts.signal.aborted) {
-              resolve();
-              return;
-            }
-
-            opts.signal.addEventListener("abort", onAbort);
-            server.listen(opts.port, opts.hostname, () => {
-              // Server is listening
-            });
+      return Task<void, ServerError>(async () => {
+        try {
+          await resolvedAdapter.serve(fetchHandler, {
+            port: serveOpts.port,
+            hostname: serveOpts.hostname,
+            signal: serveOpts.signal,
           });
-        },
-      };
+          return Ok(undefined);
+        } catch (thrown: unknown) {
+          const message = thrown instanceof Error ? thrown.message : String(thrown);
+          return Err(HandlerError(message));
+        }
+      });
+    },
 
+    listen(options: ListenOptions, adapter?: ServerAdapter): Program<void, ServerError> {
       const programOptions: { readonly teardownTimeoutMs?: number } =
         options.teardownTimeoutMs !== undefined
           ? { teardownTimeoutMs: options.teardownTimeoutMs }
@@ -932,20 +971,17 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
 
       return Program(
         state.serverName,
-        (signal: AbortSignal) =>
-          Task<void, ServerError>(async () => {
-            try {
-              await resolvedAdapter.serve(fetchHandler, {
-                port: options.port,
-                hostname: options.hostname,
-                signal,
-              });
-              return Ok(undefined);
-            } catch (thrown: unknown) {
-              const message = thrown instanceof Error ? thrown.message : String(thrown);
-              return Err(HandlerError(message));
-            }
-          }),
+        (signal: AbortSignal) => {
+          const serveOpts: {
+            readonly port: number;
+            readonly hostname?: string;
+            readonly signal: AbortSignal;
+          } = { port: options.port, signal };
+          if (options.hostname !== undefined) {
+            (serveOpts as { hostname: string }).hostname = options.hostname;
+          }
+          return builder.serve(serveOpts, adapter);
+        },
         programOptions,
       );
     },

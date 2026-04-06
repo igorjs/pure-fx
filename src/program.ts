@@ -16,9 +16,8 @@
  * assert on outcomes without spawning child processes.
  */
 
-import { Task } from "./async/task.js";
+import type { Task } from "./async/task.js";
 import type { Result } from "./core/result.js";
-import { Err, Ok } from "./core/result.js";
 
 // ── Error formatting ────────────────────────────────────────────────────────
 
@@ -160,71 +159,3 @@ export function Program<T, E>(
     },
   };
 }
-
-// ── Named effect type for Program.all ───────────────────────────────────────
-
-/** A named effect for use with {@link Program.all}. */
-interface NamedEffect<E> {
-  readonly name: string;
-  readonly effect: (signal: AbortSignal) => Task<unknown, E>;
-}
-
-/**
- * Run multiple named effects concurrently under a single Program lifecycle.
- *
- * All effects share one AbortSignal (SIGINT/SIGTERM aborts all). Each effect
- * gets its own log tag. If any effect fails, the error is logged and the
- * Program exits with code 1. All effects must complete for a clean exit.
- *
- * @example
- * ```ts
- * Program.all('app', [
- *   { name: 'api', effect: signal => httpServer(signal) },
- *   { name: 'worker', effect: signal => processQueue(signal) },
- *   { name: 'metrics', effect: signal => metricsServer(signal) },
- * ]).run();
- *
- * // [2026-04-06T10:00:00.000Z] [app] started
- * // [2026-04-06T10:00:00.001Z] [app/api] started
- * // [2026-04-06T10:00:00.001Z] [app/worker] started
- * // [2026-04-06T10:00:00.001Z] [app/metrics] started
- * // ^C
- * // [2026-04-06T10:05:00.000Z] [app] interrupted
- * ```
- */
-Program.all = <E>(
-  name: string,
-  effects: readonly NamedEffect<E>[],
-  options?: { readonly teardownTimeoutMs?: number },
-): Program<void, E> => {
-  const composedEffect = (signal: AbortSignal): Task<void, E> =>
-    Task<void, E>(async (): Promise<Result<void, E>> => {
-      const promises = effects.map(async ({ name: childName, effect }) => {
-        const childTag = `[${name}/${childName}]`;
-        // biome-ignore lint/suspicious/noConsole: program lifecycle logging
-        console.log(`${ts()} ${childTag} started`);
-
-        const result = await effect(signal).run();
-
-        if (result.isOk) {
-          // biome-ignore lint/suspicious/noConsole: program lifecycle logging
-          console.log(`${ts()} ${childTag} completed`);
-        } else {
-          // biome-ignore lint/suspicious/noConsole: program lifecycle logging
-          console.error(`${ts()} ${childTag} error: ${formatError(result.unwrapErr())}`);
-        }
-
-        return result;
-      });
-
-      const results = await Promise.all(promises);
-
-      // Return the first error, or Ok if all succeeded
-      for (const result of results) {
-        if (result.isErr) return Err(result.unwrapErr());
-      }
-      return Ok(undefined);
-    });
-
-  return Program(name, composedEffect, options);
-};
