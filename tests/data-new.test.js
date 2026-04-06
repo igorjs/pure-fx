@@ -8,10 +8,10 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, it } from "node:test";
 
 const {
   NonEmptyList,
@@ -435,7 +435,7 @@ describe("Codec", () => {
         input => {
           if (typeof input === "string") {
             const d = new Date(input);
-            return !isNaN(d.getTime())
+            return !Number.isNaN(d.getTime())
               ? Ok(d)
               : Err({ path: [], expected: "ISO date", received: typeof input });
           }
@@ -473,7 +473,9 @@ describe("Codec", () => {
           if (typeof input !== "string")
             return Err({ path: [], expected: "string", received: typeof input });
           const n = Number(input);
-          return isNaN(n) ? Err({ path: [], expected: "numeric string", received: input }) : Ok(n);
+          return Number.isNaN(n)
+            ? Err({ path: [], expected: "numeric string", received: input })
+            : Ok(n);
         },
         n => String(n),
       );
@@ -1368,7 +1370,7 @@ describe("Client", () => {
   // Mock fetch factory
   const mockFetch =
     (status, body, headers = {}) =>
-    async (url, init) => ({
+    async (_url, _init) => ({
       ok: status >= 200 && status < 300,
       status,
       statusText: status === 200 ? "OK" : "Error",
@@ -1442,7 +1444,7 @@ describe("Client", () => {
     let capturedHeaders;
     const api = Client.create({
       headers: { Authorization: "Bearer token" },
-      fetch: async (url, init) => {
+      fetch: async (_url, init) => {
         capturedHeaders = init.headers;
         return {
           ok: true,
@@ -1493,7 +1495,11 @@ describe("WebSocket", () => {
   });
 
   it("route: adds route", () => {
-    const handler = { onOpen: () => {} };
+    const handler = {
+      onOpen: () => {
+        /* noop */
+      },
+    };
     const ws = WebSocket.router().route("/chat", handler);
     assert.equal(ws.routes.length, 1);
     assert.equal(ws.routes[0].pattern, "/chat");
@@ -1502,27 +1508,51 @@ describe("WebSocket", () => {
 
   it("route: chaining adds multiple routes", () => {
     const ws = WebSocket.router()
-      .route("/chat", { onOpen: () => {} })
-      .route("/notifications", { onMessage: () => {} });
+      .route("/chat", {
+        onOpen: () => {
+          /* noop */
+        },
+      })
+      .route("/notifications", {
+        onMessage: () => {
+          /* noop */
+        },
+      });
     assert.equal(ws.routes.length, 2);
   });
 
   it("match: finds handler by exact path", () => {
-    const handler = { onOpen: () => {} };
+    const handler = {
+      onOpen: () => {
+        /* noop */
+      },
+    };
     const ws = WebSocket.router().route("/chat", handler);
     const found = ws.match("/chat");
     assert.equal(found, handler);
   });
 
   it("match: returns undefined for unmatched path", () => {
-    const ws = WebSocket.router().route("/chat", { onOpen: () => {} });
+    const ws = WebSocket.router().route("/chat", {
+      onOpen: () => {
+        /* noop */
+      },
+    });
     assert.equal(ws.match("/other"), undefined);
   });
 
   it("routes: lists all registered routes", () => {
     const ws = WebSocket.router()
-      .route("/a", { onOpen: () => {} })
-      .route("/b", { onMessage: () => {} });
+      .route("/a", {
+        onOpen: () => {
+          /* noop */
+        },
+      })
+      .route("/b", {
+        onMessage: () => {
+          /* noop */
+        },
+      });
 
     const patterns = ws.routes.map(r => r.pattern);
     assert.deepEqual(patterns, ["/a", "/b"]);
@@ -1530,7 +1560,11 @@ describe("WebSocket", () => {
 
   it("router is immutable: route returns new router", () => {
     const ws1 = WebSocket.router();
-    const ws2 = ws1.route("/chat", { onOpen: () => {} });
+    const ws2 = ws1.route("/chat", {
+      onOpen: () => {
+        /* noop */
+      },
+    });
     assert.equal(ws1.routes.length, 0);
     assert.equal(ws2.routes.length, 1);
   });

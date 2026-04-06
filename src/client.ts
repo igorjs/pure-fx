@@ -154,6 +154,7 @@ const createClient = (config: ClientOptions = {}): ClientInstance => {
     path: string,
     options?: ClientRequestOptions,
   ): TaskLike<ClientResponse, ClientError> =>
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: request builder handles headers, body, signal, and error mapping
     mkTask(async (): Promise<Result<ClientResponse, ClientError>> => {
       const url = baseUrl + path;
       const headers = { ...baseHeaders, ...options?.headers };
