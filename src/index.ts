@@ -30,11 +30,13 @@
  *   Compression / Url                 - web standard compression and URL parsing
  *   Client                            - HTTP client on Task with typed errors
  *   WebSocket                         - typed handler routing
+ *   Command                           - cross-runtime subprocess execution
  *
  * Runtime:
  *   Server / Program                  - HTTP server with typed middleware
  *   Logger / Config                   - structured logging and env validation
  *   Path / Eol / Platform             - cross-platform IO
+ *   Os / Process                      - cross-runtime OS and process info
  *   node / deno / bun / lambda        - runtime adapters
  */
 
@@ -112,11 +114,14 @@ export { Crypto, CryptoError } from "./io/crypto.js";
 export { Encoding, EncodingError } from "./io/encoding.js";
 export { File, FileError } from "./io/file.js";
 export { Json, JsonError } from "./io/json.js";
+export { Command, CommandError, type CommandResult } from "./io/subprocess.js";
 export { Url, UrlError } from "./io/url.js";
 export { Program } from "./program.js";
 export { Config } from "./runtime/config.js";
 export { Logger } from "./runtime/logger.js";
-export { Eol, Path, Platform } from "./runtime/platform.js";
+export { Os } from "./runtime/os.js";
+export { Eol, Path, type PathParts, Platform } from "./runtime/platform.js";
+export { Process, ProcessError } from "./runtime/process.js";
 export {
   BodyReadError,
   type Context,

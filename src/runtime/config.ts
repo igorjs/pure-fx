@@ -94,18 +94,26 @@ export const Config: {
   from: <T extends ConfigShape>(shape: T) =>
     Object.freeze({
       load: (): Result<InferConfig<T>, SchemaError> => {
-        // globalThis.process may not exist in all runtimes
+        // Try process.env first (Node/Bun)
         const processEnv = (
           globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }
         ).process?.env;
-        if (processEnv === undefined) {
-          return Err({
-            path: [],
-            expected: "process.env",
-            received: "unavailable (no process global)",
-          });
-        }
-        return loadConfig(shape, processEnv);
+        if (processEnv !== undefined) return loadConfig(shape, processEnv);
+
+        // Try Deno.env (Deno)
+        const denoEnv = (
+          globalThis as unknown as {
+            Deno?: { env?: { toObject?(): Record<string, string> } };
+          }
+        ).Deno?.env?.toObject?.();
+        if (denoEnv !== undefined) return loadConfig(shape, denoEnv);
+
+        // No env available
+        return Err({
+          path: [],
+          expected: "environment variables",
+          received: "unavailable (no process or Deno.env global)",
+        });
       },
       loadFrom: (env: Record<string, string | undefined>): Result<InferConfig<T>, SchemaError> =>
         loadConfig(shape, env),
