@@ -67,6 +67,9 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
       - name: Set version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
@@ -75,8 +78,6 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-gpr:
     needs: verify
