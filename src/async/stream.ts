@@ -367,6 +367,8 @@ export const Stream: {
   readonly empty: <T = never, E = never>() => Stream<T, E>;
   readonly unfold: <T, S>(seed: S, fn: (state: S) => Option<[T, S]>) => Stream<T, never>;
   readonly interval: (period: Duration) => Stream<number, never>;
+  /** Bridge a web standard ReadableStream into a pull-based Stream. */
+  readonly fromReadable: <E = never>(readable: ReadableStream<Uint8Array>) => Stream<Uint8Array, E>;
 } = Object.assign(
   <T, E>(source: () => AsyncIterable<Result<T, E>>): Stream<T, E> => createStream(source),
   {
@@ -427,6 +429,22 @@ export const Stream: {
             yield Ok(i);
             i++;
             await sleep(ms);
+          }
+        }),
+      ),
+
+    fromReadable: <E = never>(readable: ReadableStream<Uint8Array>): Stream<Uint8Array, E> =>
+      createStream(
+        gen<Uint8Array, E>(async function* () {
+          const reader = readable.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              yield Ok(value);
+            }
+          } finally {
+            reader.releaseLock();
           }
         }),
       ),

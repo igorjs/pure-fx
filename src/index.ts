@@ -17,7 +17,7 @@
  *   Duration / Cron                   - typed time primitives
  *
  * Async:
- *   Task<T, E> / Stream<T, E>        - lazy async computation and sequences
+ *   Task<T, E> / Stream<T, E>        - lazy async computation, sequences, ReadableStream bridge
  *   Lazy<T> / Env<R, T, E>           - deferred evaluation and dependency injection
  *   Retry / CircuitBreaker            - resilience policies
  *   Semaphore / Mutex / RateLimiter   - concurrency control
@@ -31,6 +31,7 @@
  *   Client                            - HTTP client on Task with typed errors
  *   WebSocket                         - typed handler routing
  *   Command                           - cross-runtime subprocess execution
+ *   Dns / Net                         - cross-runtime DNS resolution and TCP client
  *
  * Runtime:
  *   Server / Program                  - HTTP server with typed middleware
@@ -111,9 +112,11 @@ export { Schema, type SchemaError, type SchemaType } from "./data/schema.js";
 export { Clone, CloneError } from "./io/clone.js";
 export { Compression, CompressionError } from "./io/compression.js";
 export { Crypto, CryptoError } from "./io/crypto.js";
+export { Dns, DnsError, type DnsRecord } from "./io/dns.js";
 export { Encoding, EncodingError } from "./io/encoding.js";
 export { File, FileError } from "./io/file.js";
 export { Json, JsonError } from "./io/json.js";
+export { Net, NetError, type TcpConnection } from "./io/net.js";
 export { Command, CommandError, type CommandResult } from "./io/subprocess.js";
 export { Url, UrlError } from "./io/url.js";
 export { Program } from "./program.js";
