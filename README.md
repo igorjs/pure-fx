@@ -14,13 +14,14 @@ import {
   // Types
   ErrType, Duration, Cron,
   // Async
-  Task, Stream, Lazy, Env, Retry, CircuitBreaker,
+  Task, Stream, Lazy, Env, Timer, Retry, CircuitBreaker,
   Semaphore, Mutex, RateLimiter, Cache, Channel,
   // IO
-  Json, File, Client,
+  Json, File, Crypto, Url, Encoding, Clone, Compression,
+  Client, WebSocket, Command, Dns, Net,
   // Runtime
-  Server, Program, Logger, Config, WebSocket,
-  Path, Eol, Platform,
+  Server, Program, Logger, Config,
+  Path, Eol, Platform, Os, Process,
 } from '@igorjs/pure-fx'
 ```
 
@@ -45,9 +46,9 @@ Requires Node >= 22 (LTS). Compatible with TypeScript >= 5.5 and TypeScript 7 (`
 | **Core** | `Result`, `Option`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Prism`, `Traversal` |
 | **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec` |
 | **Types** | `Type` (nominal branding), `ErrType`, `Duration`, `Cron` |
-| **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel` |
-| **IO** | `Json`, `File`, `Client` (HTTP), `WebSocket` |
-| **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Path`, `Eol`, `Platform`, adapters for Node, Deno, Bun, Lambda |
+| **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel` |
+| **IO** | `Json`, `File`, `Crypto`, `Url`, `Encoding`, `Clone`, `Compression`, `Client`, `WebSocket`, `Command`, `Dns`, `Net` |
+| **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Path`, `Eol`, `Platform`, `Os`, `Process`, adapters for Node, Deno, Bun, Lambda |
 
 ## Why
 
@@ -252,11 +253,33 @@ Json.parse('{"name":"Alice"}')              // Ok({ name: 'Alice' })
 Json.parse('not json')                      // Err(JsonError('...'))
 Json.stringify(data)                        // Ok('{"name":"Alice"}')
 
-// File: returns Task, never throws
+// File: multi-runtime (Deno + Node + Bun), returns Task
 const content = await File.read('./config.json').run()
 await File.write('./out.json', data).run()
-await File.makeDir('./logs').run()
-File.exists('./config.json')                // Task<boolean, FileError>
+await File.stat('./file.txt').run()         // Ok({ isFile, isDirectory, size })
+File.copy('./a.txt', './b.txt')             // Task<void, FileError>
+
+// Crypto: web standard (all runtimes including browsers)
+Crypto.uuid()                               // 'a1b2c3d4-...'
+await Crypto.hash('SHA-256', 'hello').run() // Ok(Uint8Array)
+Crypto.timingSafeEqual(a, b)                // boolean
+
+// URL: returns Result instead of throwing
+Url.parse('https://example.com?q=1')        // Ok(URL)
+Url.parse('not a url')                      // Err(UrlError)
+
+// Encoding: base64, hex, utf8
+Encoding.base64.encode(bytes)               // 'SGVsbG8='
+Encoding.base64.decode('SGVsbG8=')          // Ok(Uint8Array)
+Encoding.hex.encode(bytes)                  // 'deadbeef'
+
+// Compression: web standard streams
+await Compression.gzip(data).run()          // Ok(Uint8Array)
+await Compression.gunzip(compressed).run()  // roundtrip
+
+// Clone: safe structuredClone
+Clone.deep({ nested: [1, 2] })              // Ok(deepCopy)
+Clone.deep({ fn: () => {} })                // Err(CloneError)
 ```
 
 ### HTTP Client
@@ -272,6 +295,36 @@ const result = await api.get('/users').run()
 
 if (result.isOk) {
   const users = await result.value.json()   // Result<T, ParseError>
+}
+```
+
+### Subprocess
+
+```ts
+const result = await Command.exec('git', ['status']).run()
+// Ok({ exitCode: 0, stdout: '...', stderr: '' })
+// Works across Node, Deno, and Bun
+```
+
+### Timers
+
+```ts
+await Timer.sleep(Duration.seconds(1)).run()    // Task<void, never>
+Timer.interval(Duration.seconds(1))             // Stream<number, never>
+await Timer.deadline(Duration.seconds(5), task) // Err(TimeoutError) if slow
+```
+
+### DNS and TCP
+
+```ts
+await Dns.lookup('example.com').run()           // Ok({ address, family })
+await Dns.resolve('example.com', 'MX').run()    // Ok(['mx1.example.com', ...])
+
+const conn = await Net.connect({ host: '127.0.0.1', port: 8080 }).run()
+if (conn.isOk) {
+  await conn.value.send('hello').run()
+  const data = await conn.value.receive().run() // Ok(Uint8Array)
+  conn.value.close()
 }
 ```
 
@@ -537,12 +590,33 @@ Extends List. `first()`, `last()`, `head` return `T` directly (not `Option`).
 |---|---|
 | `Json.parse(str)` | `Result<T, JsonError>`, never throws |
 | `Json.stringify(value)` | `Result<string, JsonError>`, handles circular refs |
-| `File.read(path)` | `Task<string, FileError>`, auto-normalizes line endings |
-| `File.write(path, content)` | `Task<void, FileError>` |
-| `File.exists(path)` / `.makeDir(path)` / `.remove(path)` / `.list(path)` | File system operations as Task |
+| `File.read` / `.write` / `.exists` / `.stat` / `.copy` / `.rename` | Multi-runtime file ops as Task |
+| `File.makeDir` / `.remove` / `.list` / `.tempDir` | Directory operations as Task |
+| `Crypto.uuid()` | Random UUID v4 (web standard) |
+| `Crypto.randomBytes(n)` / `.hash(algo, data)` | Crypto ops returning Result/Task |
+| `Crypto.timingSafeEqual(a, b)` | Constant-time byte comparison |
+| `Url.parse(input)` | `Result<URL, UrlError>`, wraps `new URL()` |
+| `Url.searchParams(obj)` / `.parseSearchParams(str)` | Query string utilities |
+| `Encoding.base64` / `.hex` / `.utf8` | `.encode()` / `.decode()` with Result |
+| `Compression.gzip` / `.gunzip` / `.deflate` / `.inflate` | Web standard CompressionStream as Task |
+| `Clone.deep(value)` | `Result<T, CloneError>`, wraps `structuredClone` |
 | `Client.create(options?)` | HTTP client: `baseUrl`, `headers`, custom `fetch` |
 | `client.get` / `.post` / `.put` / `.patch` / `.delete` | Returns `Task<ClientResponse, ClientError>` |
 | `WebSocket.router()` | WebSocket route builder: `.route(path, handler)`, `.match(path)` |
+| `Command.exec(cmd, args?)` | Multi-runtime subprocess: `Task<CommandResult, CommandError>` |
+| `Dns.lookup(host)` / `.resolve(host, type?)` | DNS resolution as Task |
+| `Net.connect({ host, port })` | TCP client: `Task<TcpConnection, NetError>` |
+| `Stream.fromReadable(stream)` | Bridge web ReadableStream to `Stream<Uint8Array>` |
+
+### Timer
+
+| Export | Description |
+|---|---|
+| `Timer.sleep(duration)` | `Task<void, never>` |
+| `Timer.interval(period)` | `Stream<number, never>` |
+| `Timer.delay(duration, task)` | Run task after delay |
+| `Timer.deadline(duration, task)` | Race task against timeout |
+| `Timer.now()` | `performance.now()` wrapper |
 
 ### Time
 
@@ -612,10 +686,16 @@ Extends List. `first()`, `last()`, `head` return `T` directly (not `Option`).
 | Export | Description |
 |---|---|
 | `Path.join` / `.normalize` / `.basename` / `.dirname` / `.extname` | OS-aware path operations |
+| `Path.resolve` / `.relative` / `.isAbsolute` / `.parse` | Advanced path operations |
 | `Path.toPosix(path)` | Convert to forward slashes |
 | `Eol.normalize(text)` | Replace `\r\n` with `\n` |
 | `Eol.split(text)` | Split on `\r?\n` |
 | `Platform.os` / `.isWindows` | Runtime detection |
+| `Os.hostname` / `.arch` / `.platform` / `.cpuCount` | System info as `Option` |
+| `Os.totalMemory` / `.freeMemory` / `.tmpDir` / `.homeDir` | Resource info |
+| `Process.cwd()` | `Result<string, ProcessError>` |
+| `Process.pid` / `.uptime` / `.memoryUsage` | Process info as `Option` |
+| `Process.argv()` / `.parseArgs(schema)` | Argument parsing with Schema validation |
 
 ### Utilities
 
@@ -630,6 +710,57 @@ Extends List. `first()`, `last()`, `head` return `T` directly (not `Option`).
 | `Lazy(() => expr)` | Deferred cached computation |
 | `isImmutable(val)` | Type guard for Records and Lists |
 | `DeepReadonly<T>` | Recursive readonly type utility |
+
+## Runtime compatibility
+
+Every module is classified by its runtime requirements. Web standard modules work everywhere. Multi-runtime modules detect Deno/Bun/Node via `globalThis`. Server-only modules gracefully return `Err` or `None` in unsupported runtimes.
+
+| Module | API | Node 22+ | Deno 2+ | Bun | CF Workers | Browser |
+|--------|-----|:---:|:---:|:---:|:---:|:---:|
+| **Result** | pure | Y | Y | Y | Y | Y |
+| **Option** | pure | Y | Y | Y | Y | Y |
+| **pipe / flow** | pure | Y | Y | Y | Y | Y |
+| **Match** | pure | Y | Y | Y | Y | Y |
+| **Eq / Ord** | pure | Y | Y | Y | Y | Y |
+| **State** | pure | Y | Y | Y | Y | Y |
+| **Lens / Prism / Traversal** | pure | Y | Y | Y | Y | Y |
+| **Record / List / NonEmptyList** | pure | Y | Y | Y | Y | Y |
+| **Schema / Codec** | pure | Y | Y | Y | Y | Y |
+| **ErrType / Type** | pure | Y | Y | Y | Y | Y |
+| **Duration / Cron** | pure | Y | Y | Y | Y | Y |
+| **Task / Stream / Lazy** | pure | Y | Y | Y | Y | Y |
+| **Env / Channel / Cache** | pure | Y | Y | Y | Y | Y |
+| **Semaphore / Mutex** | pure | Y | Y | Y | Y | Y |
+| **Json** | web | Y | Y | Y | Y | Y |
+| **Clone** | web | Y | Y | Y | Y | Y |
+| **Crypto** | web | Y | Y | Y | Y | Y |
+| **Url** | web | Y | Y | Y | Y | Y |
+| **Encoding** | web | Y | Y | Y | Y | Y |
+| **Compression** | web | Y | Y | Y | Y | Y |
+| **Timer** | web | Y | Y | Y | Y | Y |
+| **Client** | web (fetch) | Y | Y | Y | Y | Y |
+| **Path / Eol** | web | Y | Y | Y | Y | Y |
+| **Platform** | web | Y | Y | Y | Y | Y |
+| **Server.fetch** | web | Y | Y | Y | Y | Y |
+| **Stream.fromReadable** | web | Y | Y | Y | Y | Y |
+| **File** | multi-runtime | Y | Y | Y | - | - |
+| **Command** | multi-runtime | Y | Y | Y | - | - |
+| **Os** | multi-runtime | Y | Y | Y | - | - |
+| **Process** | multi-runtime | Y | Y | Y | - | - |
+| **Config** | multi-runtime | Y | Y | Y | - | - |
+| **Logger** | multi-runtime | Y | Y | Y | - | - |
+| **Server.serve/.listen** | multi-runtime | Y | Y | Y | - | - |
+| **Program** | multi-runtime | Y | Y | Y | - | - |
+| **Dns** | multi-runtime | Y | Y | Y | - | - |
+| **Net** | multi-runtime | Y | Y | Y | - | - |
+| **WebSocket** | router only | Y | Y | Y | Y | Y |
+| **Retry / CircuitBreaker** | pure | Y | Y | Y | Y | Y |
+| **RateLimiter** | pure | Y | Y | Y | Y | Y |
+
+**Legend:**
+- **pure**: No runtime APIs used. Pure TypeScript logic.
+- **web**: Uses web standard APIs (`crypto.subtle`, `URL`, `TextEncoder`, `CompressionStream`, `fetch`, `setTimeout`, `performance`). Available in all modern runtimes.
+- **multi-runtime**: Detects Deno/Bun/Node via `globalThis` and dispatches to the appropriate API. Returns `Err`/`None` in runtimes without the capability.
 
 ## Performance
 
