@@ -4,7 +4,7 @@
 [![JSR](https://jsr.io/badges/@igorjs/pure-ts)](https://jsr.io/@igorjs/pure-ts)
 [![JSR Score](https://jsr.io/badges/@igorjs/pure-ts/score)](https://jsr.io/@igorjs/pure-ts)
 [![License](https://img.shields.io/npm/l/@igorjs/pure-ts)](https://github.com/igorjs/pure-ts/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-986_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-994_passing-brightgreen)]()
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
 
 Functional application framework for TypeScript. Zero dependencies.
@@ -55,14 +55,16 @@ Requires Node >= 22 (LTS). Compatible with TypeScript >= 5.5 and TypeScript 7 (`
 
 ## What's in the box
 
-| Layer | Primitives |
-|-------|------------|
-| **Core** | `Result`, `Option`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Prism`, `Traversal` |
-| **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec` |
-| **Types** | `Type` (nominal branding), `ErrType`, `Duration`, `Cron` |
-| **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel` |
-| **IO** | `Json`, `File`, `Crypto`, `Url`, `Encoding`, `Clone`, `Compression`, `Client`, `WebSocket`, `Command`, `Dns`, `Net` |
-| **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Path`, `Eol`, `Platform`, `Os`, `Process`, adapters for Node, Deno, Bun, Lambda |
+| Layer | Primitives | Docs |
+|-------|------------|------|
+| **Core** | `Result`, `Option`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Iso` | [core](docs/core.md) |
+| **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec`, `ADT` | [data](docs/data.md) |
+| **Types** | `Type` (nominal branding), `ErrType`, `Duration`, `Cron` | [types](docs/types.md) |
+| **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel`, `StateMachine` | [async](docs/async.md) |
+| **IO** | `Json`, `File`, `Crypto`, `Url`, `Encoding`, `Clone`, `Compression`, `Client`, `WebSocket`, `Command`, `Dns`, `Net` | [io](docs/io.md) |
+| **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Path`, `Eol`, `Platform`, `Os`, `Process`, adapters for Node, Deno, Bun, Lambda | [runtime](docs/runtime.md) |
+
+See the [full documentation](docs/index.md) for API details and examples.
 
 ## Why
 
