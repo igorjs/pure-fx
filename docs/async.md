@@ -142,3 +142,100 @@ const msg = await ch.receive(); // 'hello'
 ## StateMachine
 
 See [state-machine.md](state-machine.md) for the full guide.
+
+## EventEmitter
+
+Type-safe event emitter with per-event typed handlers.
+
+```ts
+import { EventEmitter } from '@igorjs/pure-ts'
+
+type Events = {
+  userCreated: { id: string; name: string };
+  error: { message: string };
+  shutdown: void;
+};
+
+const emitter = EventEmitter.create<Events>();
+
+emitter.on('userCreated', user => console.log(user.name));
+emitter.once('shutdown', () => console.log('bye'));
+emitter.emit('userCreated', { id: 'u1', name: 'Alice' });
+
+emitter.listenerCount('userCreated'); // 1
+emitter.off('userCreated', handler);
+emitter.removeAll('userCreated');
+```
+
+## Pool
+
+Generic resource pool for connections, handles, or any reusable resource.
+
+```ts
+import { Pool } from '@igorjs/pure-ts'
+
+const pool = Pool.create({
+  create: () => connectToDb(),
+  destroy: conn => conn.close(),
+  validate: conn => conn.isAlive(),
+  maxSize: 10,
+  idleTimeout: 30_000,
+});
+
+// Auto-release with use()
+const result = await pool.use(async conn => {
+  return conn.query('SELECT 1');
+}).run();
+
+pool.size();   // total resources
+pool.idle();   // available
+pool.active(); // in use
+await pool.drain(); // destroy all
+```
+
+## Queue
+
+Async job queue with concurrency control and priorities.
+
+```ts
+import { Queue } from '@igorjs/pure-ts'
+
+const queue = Queue.create({
+  concurrency: 3,
+  handler: async job => {
+    await sendEmail(job.data.userId);
+  },
+  onError: (err, job) => console.log(`Job ${job.id} failed`),
+});
+
+queue.push({ userId: 'u1' });
+queue.push({ userId: 'u2' }, { priority: 0 }); // higher priority
+
+queue.size();      // pending
+queue.active();    // processing
+queue.processed(); // completed
+await queue.drain();
+
+queue.pause();
+queue.resume();
+```
+
+## CronRunner
+
+Execute async tasks on cron schedules.
+
+```ts
+import { CronRunner } from '@igorjs/pure-ts'
+
+const runner = CronRunner.create({
+  schedule: '*/5 * * * *', // every 5 minutes
+  handler: async () => {
+    await cleanupExpiredSessions();
+  },
+  runImmediately: true,
+});
+
+runner.start();
+runner.isRunning(); // true
+runner.stop();
+```
