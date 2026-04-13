@@ -21,7 +21,9 @@
  *   Lazy<T> / Env<R, T, E>           - deferred evaluation and dependency injection
  *   Retry / CircuitBreaker            - resilience policies
  *   Semaphore / Mutex / RateLimiter   - concurrency control
+ *   Queue<T> / CronRunner             - job queue and cron-scheduled tasks
  *   Cache<K, V> / Channel<T>         - caching and async communication
+ *   Pool<T>                           - generic resource pool with idle timeout and health checks
  *   Timer                             - sleep, interval, delay, deadline
  *
  * IO:
@@ -73,8 +75,22 @@ export {
   CircuitOpen,
   type CircuitState,
 } from "./async/circuit-breaker.js";
+export {
+  CronRunner,
+  type CronRunnerInstance,
+  type CronRunnerOptions,
+} from "./async/cron-runner.js";
 export { Env } from "./async/env.js";
+export { EventEmitter, type EventEmitterInstance } from "./async/event-emitter.js";
 export { Lazy } from "./async/lazy.js";
+export {
+  Pool,
+  PoolError,
+  type PooledResource,
+  type PoolInstance,
+  type PoolOptions,
+} from "./async/pool.js";
+export { type Job, Queue, type QueueInstance, type QueueOptions } from "./async/queue.js";
 export {
   RateLimited,
   RateLimiter,

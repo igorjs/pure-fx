@@ -7,8 +7,18 @@ export {
   CircuitOpen,
   type CircuitState,
 } from "./circuit-breaker.js";
+export { CronRunner, type CronRunnerInstance, type CronRunnerOptions } from "./cron-runner.js";
 export { Env } from "./env.js";
+export { EventEmitter, type EventEmitterInstance } from "./event-emitter.js";
 export { Lazy } from "./lazy.js";
+export {
+  Pool,
+  PoolError,
+  type PooledResource,
+  type PoolInstance,
+  type PoolOptions,
+} from "./pool.js";
+export { type Job, Queue, type QueueInstance, type QueueOptions } from "./queue.js";
 export {
   RateLimited,
   RateLimiter,

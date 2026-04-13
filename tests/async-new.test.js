@@ -1,6 +1,6 @@
 /**
  * async-new.test.js - Tests for new async modules: Stream, Retry, CircuitBreaker,
- * Semaphore, Mutex, RateLimiter, Cache, Channel, Env.
+ * Semaphore, Mutex, RateLimiter, Cache, Channel, Env, EventEmitter.
  *
  * Uses Node.js built-in test runner (node --test). Zero dependencies.
  * Tests the compiled dist/ output, not the source.
@@ -29,6 +29,12 @@ const {
   Task,
   StateMachine,
   InvalidTransition,
+  EventEmitter,
+  Pool,
+  PoolError,
+  Queue,
+  CronRunner,
+  Cron,
 } = await import("../dist/index.js");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1847,5 +1853,756 @@ describe("StateMachine with guards and actions", () => {
     });
     m.send("a", undefined, "GO");
     assert.deepEqual(log, ["exit-a", "action", "enter-b"]);
+  });
+});
+
+// =============================================================================
+// EventEmitter
+// =============================================================================
+
+describe("EventEmitter", () => {
+  it("on + emit: handler receives typed payload", () => {
+    const emitter = EventEmitter.create();
+    const received = [];
+    emitter.on("data", payload => {
+      received.push(payload);
+    });
+    emitter.emit("data", { id: "u1", name: "Alice" });
+    assert.deepEqual(received, [{ id: "u1", name: "Alice" }]);
+  });
+
+  it("multiple handlers on same event", () => {
+    const emitter = EventEmitter.create();
+    const log = [];
+    emitter.on("ping", () => {
+      log.push("a");
+    });
+    emitter.on("ping", () => {
+      log.push("b");
+    });
+    emitter.emit("ping", undefined);
+    assert.deepEqual(log, ["a", "b"]);
+  });
+
+  it("off removes specific handler", () => {
+    const emitter = EventEmitter.create();
+    const log = [];
+    const handlerA = () => {
+      log.push("a");
+    };
+    const handlerB = () => {
+      log.push("b");
+    };
+    emitter.on("evt", handlerA);
+    emitter.on("evt", handlerB);
+    emitter.off("evt", handlerA);
+    emitter.emit("evt", undefined);
+    assert.deepEqual(log, ["b"]);
+  });
+
+  it("once fires handler only once", () => {
+    const emitter = EventEmitter.create();
+    let count = 0;
+    emitter.once("tick", () => {
+      count++;
+    });
+    emitter.emit("tick", undefined);
+    emitter.emit("tick", undefined);
+    emitter.emit("tick", undefined);
+    assert.equal(count, 1);
+  });
+
+  it("emit with no handlers does not throw", () => {
+    const emitter = EventEmitter.create();
+    assert.doesNotThrow(() => {
+      emitter.emit("nope", undefined);
+    });
+  });
+
+  it("removeAll clears all handlers for event", () => {
+    const emitter = EventEmitter.create();
+    let count = 0;
+    emitter.on("x", () => {
+      count++;
+    });
+    emitter.on("x", () => {
+      count++;
+    });
+    emitter.removeAll("x");
+    emitter.emit("x", undefined);
+    assert.equal(count, 0);
+    assert.equal(emitter.listenerCount("x"), 0);
+  });
+
+  it("listenerCount returns correct count", () => {
+    const emitter = EventEmitter.create();
+    assert.equal(emitter.listenerCount("e"), 0);
+    const h1 = () => {
+      /* noop listener */
+    };
+    const h2 = () => {
+      /* noop listener */
+    };
+    emitter.on("e", h1);
+    assert.equal(emitter.listenerCount("e"), 1);
+    emitter.on("e", h2);
+    assert.equal(emitter.listenerCount("e"), 2);
+    emitter.off("e", h1);
+    assert.equal(emitter.listenerCount("e"), 1);
+  });
+
+  it("different events are independent", () => {
+    const emitter = EventEmitter.create();
+    const aLog = [];
+    const bLog = [];
+    emitter.on("a", v => {
+      aLog.push(v);
+    });
+    emitter.on("b", v => {
+      bLog.push(v);
+    });
+    emitter.emit("a", 1);
+    emitter.emit("b", 2);
+    emitter.emit("a", 3);
+    assert.deepEqual(aLog, [1, 3]);
+    assert.deepEqual(bLog, [2]);
+  });
+
+  it("returned instance is frozen", () => {
+    const emitter = EventEmitter.create();
+    assert.equal(Object.isFrozen(emitter), true);
+  });
+});
+
+// =============================================================================
+// Pool
+// =============================================================================
+
+describe("Pool", () => {
+  it("acquire returns a resource", async () => {
+    const pool = Pool.create({
+      create: async () => ({ id: 1 }),
+      maxSize: 2,
+    });
+    const result = await pool.acquire().run();
+    assert.equal(result.isOk, true);
+    assert.ok(result.value);
+    result.value.release();
+    await pool.drain();
+  });
+
+  it("release returns resource to pool", async () => {
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        return { id: created };
+      },
+      maxSize: 2,
+    });
+    const r1 = await pool.acquire().run();
+    assert.equal(r1.isOk, true);
+    r1.value.release();
+    // Acquiring again should reuse the released resource, not create a new one
+    const r2 = await pool.acquire().run();
+    assert.equal(r2.isOk, true);
+    assert.equal(created, 1);
+    r2.value.release();
+    await pool.drain();
+  });
+
+  it("acquired resource.value is the created object", async () => {
+    const obj = { x: 42 };
+    const pool = Pool.create({
+      create: async () => obj,
+      maxSize: 1,
+    });
+    const result = await pool.acquire().run();
+    assert.equal(result.isOk, true);
+    assert.equal(result.value.value, obj);
+    result.value.release();
+    await pool.drain();
+  });
+
+  it("use() auto-releases after fn completes", async () => {
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        return { id: created };
+      },
+      maxSize: 1,
+    });
+    const result = await pool
+      .use(async resource => {
+        return resource.id;
+      })
+      .run();
+    assert.equal(result.isOk, true);
+    assert.equal(result.value, 1);
+    // Pool should have 1 idle resource after use()
+    assert.equal(pool.idle(), 1);
+    assert.equal(pool.active(), 0);
+    await pool.drain();
+  });
+
+  it("use() auto-releases on fn error", async () => {
+    const pool = Pool.create({
+      create: async () => ({ id: 1 }),
+      maxSize: 1,
+    });
+    const result = await pool
+      .use(async () => {
+        throw new Error("boom");
+      })
+      .run();
+    assert.equal(result.isErr, true);
+    assert.equal(result.error.tag, "PoolError");
+    assert.ok(result.error.message.includes("boom"));
+    // Resource should be back in the pool
+    assert.equal(pool.idle(), 1);
+    assert.equal(pool.active(), 0);
+    await pool.drain();
+  });
+
+  it("maxSize limits concurrent resources", async () => {
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        return { id: created };
+      },
+      maxSize: 2,
+    });
+    const r1 = await pool.acquire().run();
+    const r2 = await pool.acquire().run();
+    assert.equal(r1.isOk, true);
+    assert.equal(r2.isOk, true);
+    assert.equal(created, 2);
+    assert.equal(pool.active(), 2);
+
+    // Third acquire should block until one is released
+    let r3resolved = false;
+    const r3promise = pool
+      .acquire()
+      .run()
+      .then(r => {
+        r3resolved = true;
+        return r;
+      });
+
+    // Give the microtask queue a tick
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(r3resolved, false);
+
+    // Release one resource to unblock
+    r1.value.release();
+    const r3 = await r3promise;
+    assert.equal(r3resolved, true);
+    assert.equal(r3.isOk, true);
+
+    // Should have reused, not created a third
+    assert.equal(created, 2);
+    r2.value.release();
+    r3.value.release();
+    await pool.drain();
+  });
+
+  it("size/idle/active return correct counts", async () => {
+    const pool = Pool.create({
+      create: async () => ({ id: 1 }),
+      maxSize: 5,
+    });
+    assert.equal(pool.size(), 0);
+    assert.equal(pool.idle(), 0);
+    assert.equal(pool.active(), 0);
+
+    const r1 = await pool.acquire().run();
+    assert.equal(pool.size(), 1);
+    assert.equal(pool.idle(), 0);
+    assert.equal(pool.active(), 1);
+
+    const r2 = await pool.acquire().run();
+    assert.equal(pool.size(), 2);
+    assert.equal(pool.idle(), 0);
+    assert.equal(pool.active(), 2);
+
+    r1.value.release();
+    assert.equal(pool.size(), 2);
+    assert.equal(pool.idle(), 1);
+    assert.equal(pool.active(), 1);
+
+    r2.value.release();
+    assert.equal(pool.size(), 2);
+    assert.equal(pool.idle(), 2);
+    assert.equal(pool.active(), 0);
+
+    await pool.drain();
+  });
+
+  it("drain destroys all resources", async () => {
+    const destroyed = [];
+    const pool = Pool.create({
+      create: async () => ({ id: destroyed.length + 1 }),
+      destroy: async resource => {
+        destroyed.push(resource.id);
+      },
+      maxSize: 3,
+    });
+    const r1 = await pool.acquire().run();
+    const r2 = await pool.acquire().run();
+    r1.value.release();
+    // r1 is idle, r2 is active
+    assert.equal(pool.idle(), 1);
+    assert.equal(pool.active(), 1);
+
+    const drainPromise = pool.drain();
+    // The idle resource should be destroyed immediately
+    // Release active resource so drain can finish
+    r2.value.release();
+    await drainPromise;
+    assert.equal(destroyed.length, 2);
+    assert.equal(pool.size(), 0);
+  });
+
+  it("validate rejects unhealthy resources and creates new one", async () => {
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        return { id: created };
+      },
+      validate: resource => resource.id !== 1,
+      maxSize: 2,
+    });
+    // First acquire creates resource with id 1
+    const r1 = await pool.acquire().run();
+    assert.equal(r1.isOk, true);
+    assert.equal(r1.value.value.id, 1);
+    r1.value.release();
+
+    // Second acquire finds id=1 idle, validates it (fails), creates new
+    const r2 = await pool.acquire().run();
+    assert.equal(r2.isOk, true);
+    assert.equal(r2.value.value.id, 2);
+    assert.equal(created, 2);
+    r2.value.release();
+    await pool.drain();
+  });
+
+  it("PoolError has correct tag", () => {
+    const err = PoolError("test message");
+    assert.equal(err.tag, "PoolError");
+    assert.equal(err.code, "POOL_ERROR");
+    assert.equal(err.message, "test message");
+  });
+
+  it("returned instance is frozen", () => {
+    const pool = Pool.create({
+      create: async () => ({}),
+      maxSize: 1,
+    });
+    assert.equal(Object.isFrozen(pool), true);
+  });
+
+  it("acquire after drain returns error", async () => {
+    const pool = Pool.create({
+      create: async () => ({}),
+      maxSize: 1,
+    });
+    await pool.drain();
+    const result = await pool.acquire().run();
+    assert.equal(result.isErr, true);
+    assert.equal(result.error.tag, "PoolError");
+    assert.ok(result.error.message.includes("draining"));
+  });
+
+  it("double release is safe (no-op)", async () => {
+    const pool = Pool.create({
+      create: async () => ({ id: 1 }),
+      maxSize: 2,
+    });
+    const result = await pool.acquire().run();
+    assert.equal(result.isOk, true);
+    result.value.release();
+    result.value.release(); // should not throw or double-return
+    assert.equal(pool.idle(), 1);
+    await pool.drain();
+  });
+});
+
+// =============================================================================
+// Queue
+// =============================================================================
+
+describe("Queue", () => {
+  it("push and process a job", async () => {
+    const processed = [];
+    const queue = Queue.create({
+      handler: async (job) => {
+        processed.push(job.data);
+      },
+    });
+
+    queue.push("hello");
+    await queue.drain();
+
+    assert.deepEqual(processed, ["hello"]);
+    assert.equal(queue.processed(), 1);
+  });
+
+  it("concurrency limits parallel execution", async () => {
+    let maxConcurrent = 0;
+    let currentConcurrent = 0;
+
+    const queue = Queue.create({
+      concurrency: 2,
+      handler: async () => {
+        currentConcurrent++;
+        if (currentConcurrent > maxConcurrent) {
+          maxConcurrent = currentConcurrent;
+        }
+        await sleep(50);
+        currentConcurrent--;
+      },
+    });
+
+    queue.push("a");
+    queue.push("b");
+    queue.push("c");
+    queue.push("d");
+
+    await queue.drain();
+
+    assert.equal(maxConcurrent, 2);
+    assert.equal(queue.processed(), 4);
+  });
+
+  it("priority ordering (lower priority number runs first)", async () => {
+    const order = [];
+    let gate;
+    const gatePromise = new Promise(resolve => {
+      gate = resolve;
+    });
+
+    const queue = Queue.create({
+      concurrency: 1,
+      handler: async (job) => {
+        if (order.length === 0) {
+          // First job blocks until gate opens, allowing others to queue
+          await gatePromise;
+        }
+        order.push(job.data);
+      },
+    });
+
+    // Push the blocker first (default priority 10)
+    queue.push("blocker");
+    // Wait a tick for the blocker to start processing
+    await sleep(5);
+
+    // Now push jobs with different priorities while blocker is active
+    queue.push("low", { priority: 10 });
+    queue.push("high", { priority: 0 });
+    queue.push("medium", { priority: 5 });
+
+    // Release the blocker
+    gate();
+    await queue.drain();
+
+    // After blocker, jobs should process in priority order: high(0), medium(5), low(10)
+    assert.deepEqual(order, ["blocker", "high", "medium", "low"]);
+  });
+
+  it("drain waits for all jobs", async () => {
+    const results = [];
+
+    const queue = Queue.create({
+      concurrency: 2,
+      handler: async (job) => {
+        await sleep(20);
+        results.push(job.data);
+      },
+    });
+
+    queue.push(1);
+    queue.push(2);
+    queue.push(3);
+
+    // Before drain, not all jobs are done
+    assert.ok(results.length < 3);
+
+    await queue.drain();
+
+    // After drain, all jobs are done
+    assert.equal(results.length, 3);
+    assert.equal(queue.size(), 0);
+    assert.equal(queue.active(), 0);
+  });
+
+  it("drain resolves immediately when queue is empty", async () => {
+    const queue = Queue.create({
+      handler: async () => {},
+    });
+
+    // Should resolve immediately with no jobs
+    await queue.drain();
+    assert.equal(queue.size(), 0);
+  });
+
+  it("pause/resume lifecycle", async () => {
+    const processed = [];
+
+    const queue = Queue.create({
+      handler: async (job) => {
+        processed.push(job.data);
+      },
+    });
+
+    queue.pause();
+    queue.push("a");
+    queue.push("b");
+
+    // Jobs are pending but not processing
+    assert.equal(queue.size(), 2);
+    assert.equal(queue.active(), 0);
+    await sleep(20);
+    assert.deepEqual(processed, []);
+
+    // Resume starts processing
+    queue.resume();
+    await queue.drain();
+
+    assert.deepEqual(processed, ["a", "b"]);
+  });
+
+  it("onError callback fires on handler failure", async () => {
+    const errors = [];
+
+    const queue = Queue.create({
+      handler: async (job) => {
+        throw new Error(`fail-${job.data}`);
+      },
+      onError: (error, job) => {
+        errors.push({ msg: error.message, data: job.data });
+      },
+    });
+
+    queue.push("x");
+    await queue.drain();
+
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].msg, "fail-x");
+    assert.equal(errors[0].data, "x");
+    // Failed jobs still count as processed
+    assert.equal(queue.processed(), 1);
+  });
+
+  it("size/active/processed counts", async () => {
+    let resolveFirst;
+    const firstJobPromise = new Promise(resolve => {
+      resolveFirst = resolve;
+    });
+
+    const queue = Queue.create({
+      concurrency: 1,
+      handler: async (job) => {
+        if (job.data === "first") {
+          await firstJobPromise;
+        }
+      },
+    });
+
+    assert.equal(queue.size(), 0);
+    assert.equal(queue.active(), 0);
+    assert.equal(queue.processed(), 0);
+
+    queue.push("first");
+    await sleep(5);
+
+    // First job is active, none pending
+    assert.equal(queue.active(), 1);
+    assert.equal(queue.size(), 0);
+    assert.equal(queue.processed(), 0);
+
+    queue.push("second");
+    queue.push("third");
+
+    // Two pending, one active
+    assert.equal(queue.size(), 2);
+    assert.equal(queue.active(), 1);
+
+    resolveFirst();
+    await queue.drain();
+
+    assert.equal(queue.size(), 0);
+    assert.equal(queue.active(), 0);
+    assert.equal(queue.processed(), 3);
+  });
+
+  it("returned instance is frozen", () => {
+    const queue = Queue.create({
+      handler: async () => {},
+    });
+
+    assert.ok(Object.isFrozen(queue));
+  });
+
+  it("jobs have unique ids", async () => {
+    const ids = [];
+
+    const queue = Queue.create({
+      handler: async (job) => {
+        ids.push(job.id);
+      },
+    });
+
+    queue.push("a");
+    queue.push("b");
+    queue.push("c");
+    await queue.drain();
+
+    assert.equal(ids.length, 3);
+    assert.equal(new Set(ids).size, 3);
+  });
+});
+
+// =============================================================================
+// CronRunner
+// =============================================================================
+
+describe("CronRunner", () => {
+  it("create with valid cron expression", () => {
+    const runner = CronRunner.create({
+      schedule: "* * * * *",
+      handler: async () => {},
+    });
+
+    assert.ok(runner);
+    assert.equal(typeof runner.start, "function");
+    assert.equal(typeof runner.stop, "function");
+    assert.equal(typeof runner.isRunning, "function");
+    assert.equal(typeof runner.nextRun, "function");
+  });
+
+  it("throws on invalid cron expression", () => {
+    assert.throws(
+      () =>
+        CronRunner.create({
+          schedule: "not a cron",
+          handler: async () => {},
+        }),
+      /Invalid cron expression/,
+    );
+  });
+
+  it("start/stop lifecycle", () => {
+    const runner = CronRunner.create({
+      schedule: "0 * * * *",
+      handler: async () => {},
+    });
+
+    assert.equal(runner.isRunning(), false);
+    runner.start();
+    assert.equal(runner.isRunning(), true);
+    runner.stop();
+    assert.equal(runner.isRunning(), false);
+  });
+
+  it("isRunning returns correct state", () => {
+    const runner = CronRunner.create({
+      schedule: "0 9 * * *",
+      handler: async () => {},
+    });
+
+    assert.equal(runner.isRunning(), false);
+    runner.start();
+    assert.equal(runner.isRunning(), true);
+    runner.start(); // double start is a no-op
+    assert.equal(runner.isRunning(), true);
+    runner.stop();
+    assert.equal(runner.isRunning(), false);
+    runner.stop(); // double stop is a no-op
+    assert.equal(runner.isRunning(), false);
+  });
+
+  it("runImmediately executes handler on start", async () => {
+    let called = false;
+
+    const runner = CronRunner.create({
+      schedule: "0 0 1 1 *", // once a year, won't fire naturally
+      handler: async () => {
+        called = true;
+      },
+      runImmediately: true,
+    });
+
+    runner.start();
+    // Give the handler a tick to execute
+    await sleep(10);
+    runner.stop();
+
+    assert.equal(called, true);
+  });
+
+  it("stop prevents further executions", () => {
+    const runner = CronRunner.create({
+      schedule: "* * * * *",
+      handler: async () => {},
+    });
+
+    runner.start();
+    runner.stop();
+
+    assert.equal(runner.isRunning(), false);
+    // nextRun returns undefined when stopped
+    assert.equal(runner.nextRun(), undefined);
+  });
+
+  it("nextRun returns a Date when running", () => {
+    const runner = CronRunner.create({
+      schedule: "* * * * *", // every minute
+      handler: async () => {},
+    });
+
+    // Not running: nextRun is undefined
+    assert.equal(runner.nextRun(), undefined);
+
+    runner.start();
+    const next = runner.nextRun();
+    assert.ok(next instanceof Date);
+    assert.ok(next.getTime() > Date.now());
+    runner.stop();
+  });
+
+  it("onError callback fires on handler failure", async () => {
+    let capturedError;
+
+    const runner = CronRunner.create({
+      schedule: "0 0 1 1 *",
+      handler: async () => {
+        throw new Error("cron-fail");
+      },
+      onError: (error) => {
+        capturedError = error;
+      },
+      runImmediately: true,
+    });
+
+    runner.start();
+    await sleep(10);
+    runner.stop();
+
+    assert.ok(capturedError);
+    assert.equal(capturedError.message, "cron-fail");
+  });
+
+  it("returned instance is frozen", () => {
+    const runner = CronRunner.create({
+      schedule: "* * * * *",
+      handler: async () => {},
+    });
+
+    assert.ok(Object.isFrozen(runner));
   });
 });

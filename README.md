@@ -4,7 +4,7 @@
 [![JSR](https://jsr.io/badges/@igorjs/pure-fx)](https://jsr.io/@igorjs/pure-fx)
 [![JSR Score](https://jsr.io/badges/@igorjs/pure-fx/score)](https://jsr.io/@igorjs/pure-fx)
 [![License](https://img.shields.io/npm/l/@igorjs/pure-fx)](https://github.com/igorjs/pure-fx/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-994_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1016_passing-brightgreen)]()
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
 
 Functional application framework for TypeScript. Zero dependencies.
@@ -60,7 +60,7 @@ Requires Node >= 22 (LTS). Compatible with TypeScript >= 5.5 and TypeScript 7 (`
 | **Core** | `Result`, `Option`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Iso` | [core](docs/core.md) |
 | **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec`, `ADT` | [data](docs/data.md) |
 | **Types** | `Type` (nominal branding), `ErrType`, `Duration`, `Cron` | [types](docs/types.md) |
-| **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel`, `StateMachine` | [async](docs/async.md) |
+| **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel`, `StateMachine`, `EventEmitter`, `Pool`, `Queue`, `CronRunner` | [async](docs/async.md) |
 | **IO** | `Json`, `File`, `Crypto`, `Url`, `Encoding`, `Clone`, `Compression`, `Client`, `WebSocket`, `Command`, `Dns`, `Net` | [io](docs/io.md) |
 | **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Path`, `Eol`, `Platform`, `Os`, `Process`, adapters for Node, Deno, Bun, Lambda | [runtime](docs/runtime.md) |
 
