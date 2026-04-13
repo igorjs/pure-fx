@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 const {
+  ADT,
   NonEmptyList,
   Codec,
   Schema,
@@ -36,6 +37,7 @@ const {
   Err,
   Some,
   None,
+  Match,
 } = await import("../dist/index.js");
 
 // =============================================================================
@@ -1618,5 +1620,90 @@ describe("WebSocket", () => {
     });
     assert.equal(ws1.routes.length, 0);
     assert.equal(ws2.routes.length, 1);
+  });
+});
+
+// =============================================================================
+// ADT
+// =============================================================================
+
+describe("ADT", () => {
+  const Color = ADT({
+    Red: null,
+    Green: null,
+    Blue: intensity => ({ intensity }),
+  });
+
+  it("unit variant: returns frozen tagged object", () => {
+    const r = Color.Red();
+    assert.equal(r.tag, "Red");
+    assert.throws(() => {
+      r.tag = "x";
+    }, TypeError);
+  });
+
+  it("unit variant: returns same singleton", () => {
+    assert.equal(Color.Red(), Color.Red());
+    assert.equal(Color.Green(), Color.Green());
+  });
+
+  it("payload variant: returns frozen tagged object with payload", () => {
+    const b = Color.Blue(0.8);
+    assert.equal(b.tag, "Blue");
+    assert.equal(b.intensity, 0.8);
+    assert.throws(() => {
+      b.intensity = 0.5;
+    }, TypeError);
+  });
+
+  it("payload variant: each call creates new instance", () => {
+    assert.notEqual(Color.Blue(0.5), Color.Blue(0.5));
+  });
+
+  it("is guard: returns true for matching variant", () => {
+    assert.equal(Color.is.Red(Color.Red()), true);
+    assert.equal(Color.is.Blue(Color.Blue(0.5)), true);
+  });
+
+  it("is guard: returns false for non-matching variant", () => {
+    assert.equal(Color.is.Red(Color.Blue(0.5)), false);
+    assert.equal(Color.is.Blue(Color.Red()), false);
+  });
+
+  it("is guard: returns false for non-objects", () => {
+    assert.equal(Color.is.Red(null), false);
+    assert.equal(Color.is.Red(undefined), false);
+    assert.equal(Color.is.Red(42), false);
+    assert.equal(Color.is.Red("Red"), false);
+  });
+
+  it("ADT object itself is frozen", () => {
+    assert.throws(() => {
+      Color.Red = null;
+    }, TypeError);
+    assert.throws(() => {
+      Color.is.Red = null;
+    }, TypeError);
+  });
+
+  it("works with Match for exhaustive matching", () => {
+    const c = Color.Blue(0.8);
+    const result = Match(c)
+      .with({ tag: "Red" }, () => "red")
+      .with({ tag: "Green" }, () => "green")
+      .with({ tag: "Blue" }, b => `blue:${b.intensity}`)
+      .exhaustive();
+    assert.equal(result, "blue:0.8");
+  });
+
+  it("multiple payload fields", () => {
+    const Shape = ADT({
+      Circle: radius => ({ radius }),
+      Rect: (width, height) => ({ width, height }),
+    });
+    const r = Shape.Rect(3, 4);
+    assert.equal(r.tag, "Rect");
+    assert.equal(r.width, 3);
+    assert.equal(r.height, 4);
   });
 });

@@ -1,3 +1,4 @@
+export { ADT } from "./adt.js";
 export { Codec, type CodecType } from "./codec.js";
 export { isImmutable, List, Record } from "./constructors.js";
 export type { DeepReadonly } from "./internals.js";
