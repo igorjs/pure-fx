@@ -100,8 +100,11 @@ const createSemaphore = (permits: number): SemaphoreInstance => {
  * Equivalent to `Semaphore.create(1)`.
  */
 export interface MutexInstance {
+  /** Acquire the lock. Resolves when the lock is available. */
   readonly acquire: () => Promise<Release>;
+  /** Wrap a task: acquires before run, releases after completion. */
   readonly wrap: <T, E>(task: TaskLike<T, E>) => TaskLike<T, E>;
+  /** Whether the mutex is currently held. */
   readonly isLocked: () => boolean;
 }
 

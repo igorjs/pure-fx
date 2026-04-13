@@ -1,3 +1,18 @@
+/**
+ * @module async
+ *
+ * Lazy async computation, sequences, resilience, concurrency, and scheduling.
+ *
+ * Task, Stream, Retry, CircuitBreaker, Semaphore, Mutex, RateLimiter,
+ * Cache, Channel, StateMachine, EventEmitter, Pool, Queue, CronRunner.
+ *
+ * @example
+ * ```ts
+ * import { Task, Stream, Retry } from '@igorjs/pure-ts/async'
+ *
+ * const result = await Task.of(42).map(n => n * 2).run();
+ * ```
+ */
 export { Cache, type CacheInstance, type CacheOptions } from "./cache.js";
 export { Channel } from "./channel.js";
 export {

@@ -71,12 +71,16 @@ export type ServerError =
 
 // ── Public types ────────────────────────────────────────────────────────────
 
+/** Supported HTTP methods for route registration. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
 
 /** Request context passed to route handlers. */
 export interface Context<P extends string = string> {
+  /** The incoming HTTP request. */
   readonly req: Request;
+  /** Parsed URL of the request. */
   readonly url: URL;
+  /** Extracted route parameters. */
   readonly params: Params<P>;
 }
 
@@ -121,6 +125,7 @@ export type TypedMiddleware<
 
 /** Adapter interface for plugging in different HTTP server runtimes. */
 export interface ServerAdapter {
+  /** Start serving requests with the given handler and options. */
   readonly serve: (
     handler: (request: Request) => Promise<Response>,
     options: {
@@ -133,15 +138,21 @@ export interface ServerAdapter {
 
 /** Options for starting the server with `.listen()`. */
 export interface ListenOptions {
+  /** Port number to listen on. */
   readonly port: number;
+  /** Hostname to bind to. */
   readonly hostname?: string | undefined;
+  /** Max ms to wait for graceful shutdown before force-exiting. */
   readonly teardownTimeoutMs?: number | undefined;
 }
 
 /** A single route definition stored in the builder. */
 export interface RouteDefinition<P extends string = string> {
+  /** The HTTP method or "ALL" for catch-all. */
   readonly method: HttpMethod | "ALL";
+  /** The URL pattern with optional :param and * segments. */
   readonly pattern: P;
+  /** The handler function for this route. */
   readonly handler: Handler<P>;
 }
 

@@ -26,6 +26,7 @@
  * ```
  */
 export interface Eq<T> {
+  /** Returns true if a and b are considered equal. */
   readonly equals: (a: T, b: T) => boolean;
 }
 
@@ -79,15 +80,23 @@ const contramapEq = <A, B>(eq: Eq<A>, f: (b: B) => A): Eq<B> =>
  * ```
  */
 export const Eq: {
+  /** Create an Eq from an equality function. */
   <T>(equals: (a: T, b: T) => boolean): Eq<T>;
+  /** Create an Eq from an equality function. */
   readonly fromEquals: <T>(equals: (a: T, b: T) => boolean) => Eq<T>;
+  /** String equality via ===. */
   readonly string: Eq<string>;
+  /** Number equality via ===. */
   readonly number: Eq<number>;
+  /** Boolean equality via ===. */
   readonly boolean: Eq<boolean>;
+  /** Date equality via getTime(). */
   readonly date: Eq<Date>;
+  /** Combine per-field Eq instances into an Eq for the whole object. */
   readonly struct: <T extends Record<string, unknown>>(
     eqs: { readonly [K in keyof T]: Eq<T[K]> },
   ) => Eq<T>;
+  /** Derive an Eq for B from an Eq for A via a projection function. */
   readonly contramap: <A, B>(eq: Eq<A>, f: (b: B) => A) => Eq<B>;
 } = Object.assign(<T>(equals: (a: T, b: T) => boolean): Eq<T> => fromEquals(equals), {
   fromEquals,

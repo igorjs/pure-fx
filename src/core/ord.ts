@@ -30,6 +30,7 @@ import type { Eq } from "./eq.js";
  * ```
  */
 export interface Ord<T> extends Eq<T> {
+  /** Compare two values, returning -1, 0, or 1. */
   readonly compare: (a: T, b: T) => -1 | 0 | 1;
 }
 
@@ -95,16 +96,27 @@ const betweenOrd =
  * ```
  */
 export const Ord: {
+  /** Create an Ord from a comparison function. */
   <T>(compare: (a: T, b: T) => number): Ord<T>;
+  /** Create an Ord from a comparison function. */
   readonly fromCompare: <T>(compare: (a: T, b: T) => number) => Ord<T>;
+  /** String ordering via locale-independent comparison. */
   readonly string: Ord<string>;
+  /** Numeric ordering via subtraction. */
   readonly number: Ord<number>;
+  /** Date ordering via getTime() comparison. */
   readonly date: Ord<Date>;
+  /** Reverse the ordering direction. */
   readonly reverse: <T>(ord: Ord<T>) => Ord<T>;
+  /** Derive an Ord for B from an Ord for A via a projection function. */
   readonly contramap: <A, B>(ord: Ord<A>, f: (b: B) => A) => Ord<B>;
+  /** Return the smaller of two values. */
   readonly min: <T>(ord: Ord<T>) => (a: T, b: T) => T;
+  /** Return the larger of two values. */
   readonly max: <T>(ord: Ord<T>) => (a: T, b: T) => T;
+  /** Clamp a value between low and high bounds. */
   readonly clamp: <T>(ord: Ord<T>, low: T, high: T) => (value: T) => T;
+  /** Check whether a value falls within the inclusive range [low, high]. */
   readonly between: <T>(ord: Ord<T>, low: T, high: T) => (value: T) => boolean;
 } = Object.assign(<T>(compare: (a: T, b: T) => number): Ord<T> => fromCompare(compare), {
   fromCompare,

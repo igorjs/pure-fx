@@ -39,20 +39,35 @@ const mkTask = <T, E>(run: () => Promise<Result<T, E>>): TaskLike<T, E> => ({ ru
  * computations that execute the pipeline.
  */
 export interface Stream<T, E> {
+  /** Transform each value in the stream. */
   readonly map: <U>(fn: (value: T) => U) => Stream<U, E>;
+  /** Map each value to a sub-stream and flatten the results. */
   readonly flatMap: <U>(fn: (value: T) => Stream<U, E>) => Stream<U, E>;
+  /** Keep only values that satisfy the predicate. */
   readonly filter: (predicate: (value: T) => boolean) => Stream<T, E>;
+  /** Take the first n Ok values, then stop. */
   readonly take: (n: number) => Stream<T, E>;
+  /** Skip the first n Ok values. */
   readonly drop: (n: number) => Stream<T, E>;
+  /** Take values while the predicate holds, then stop. */
   readonly takeWhile: (predicate: (value: T) => boolean) => Stream<T, E>;
+  /** Collect values into fixed-size arrays. */
   readonly chunk: (size: number) => Stream<readonly T[], E>;
+  /** Transform the error channel. */
   readonly mapErr: <F>(fn: (error: E) => F) => Stream<T, F>;
+  /** Run a side-effect on each Ok value without altering the stream. */
   readonly tap: (fn: (value: T) => void) => Stream<T, E>;
+  /** Collect all values into an array. Short-circuits on first error. */
   readonly collect: () => TaskLike<readonly T[], E>;
+  /** Run a side-effect for each value. Short-circuits on first error. */
   readonly forEach: (fn: (value: T) => void) => TaskLike<void, E>;
+  /** Fold all values with an accumulator. Short-circuits on first error. */
   readonly reduce: <U>(fn: (acc: U, value: T) => U, init: U) => TaskLike<U, E>;
+  /** Take the first Ok value, or None if the stream is empty. */
   readonly first: () => TaskLike<Option<T>, E>;
+  /** Concatenate another stream after this one. */
   readonly concat: (other: Stream<T, E>) => Stream<T, E>;
+  /** Pair elements 1:1 with another stream. */
   readonly zip: <U>(other: Stream<U, E>) => Stream<[T, U], E>;
   /** Sliding window of fixed size over the stream. */
   readonly window: (size: number) => Stream<readonly T[], E>;
@@ -68,6 +83,7 @@ export interface Stream<T, E> {
   readonly throttle: (ms: number) => Stream<T, E>;
   /** Skip consecutive duplicate values. Uses `===` when no equality function provided. */
   readonly distinctUntilChanged: (eq?: (a: T, b: T) => boolean) => Stream<T, E>;
+  /** Execute the stream, returning an async iterable of Results. */
   readonly run: () => AsyncIterable<Result<T, E>>;
 }
 
@@ -519,12 +535,19 @@ const sleep = (ms: number): Promise<void> => new Promise<void>(resolve => setTim
  * ```
  */
 export const Stream: {
+  /** Create a stream from a custom async iterable source. */
   <T, E>(source: () => AsyncIterable<Result<T, E>>): Stream<T, E>;
+  /** Create a stream from an async iterable of plain values. */
   readonly from: <T>(iterable: AsyncIterable<T>) => Stream<T, never>;
+  /** Create a stream from variadic values. */
   readonly of: <T>(...values: readonly T[]) => Stream<T, never>;
+  /** Create a stream from an array. */
   readonly fromArray: <T>(items: readonly T[]) => Stream<T, never>;
+  /** Create an empty stream. */
   readonly empty: <T = never, E = never>() => Stream<T, E>;
+  /** Create a stream by repeatedly unfolding a seed state. */
   readonly unfold: <T, S>(seed: S, fn: (state: S) => Option<[T, S]>) => Stream<T, never>;
+  /** Emit ascending tick counts at a fixed interval. */
   readonly interval: (period: Duration) => Stream<number, never>;
   /** Bridge a web standard ReadableStream into a pull-based Stream. */
   readonly fromReadable: <E = never>(readable: ReadableStream<Uint8Array>) => Stream<Uint8Array, E>;

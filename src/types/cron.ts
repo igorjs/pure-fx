@@ -280,8 +280,11 @@ const matchesCron = (cron: CronExpression, date: Date): boolean => {
  * ```
  */
 export const Cron: {
+  /** Parse and validate a cron expression string. */
   readonly parse: (expr: string) => Result<CronExpression, SchemaError>;
+  /** Compute the next occurrence after the given date. */
   readonly next: (cron: CronExpression, after?: Date) => Option<Date>;
+  /** Check whether a date matches the cron expression. */
   readonly matches: (cron: CronExpression, date: Date) => boolean;
 } = {
   parse: (expr: string): Result<CronExpression, SchemaError> => {

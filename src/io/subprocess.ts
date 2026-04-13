@@ -35,8 +35,11 @@ const mkTask = <T, E>(run: () => Promise<Result<T, E>>): TaskLike<T, E> => ({ ru
 
 /** Output of a subprocess execution. */
 export interface CommandResult {
+  /** The process exit code. */
   readonly exitCode: number;
+  /** Captured standard output. */
   readonly stdout: string;
+  /** Captured standard error. */
   readonly stderr: string;
 }
 
@@ -44,9 +47,13 @@ export interface CommandResult {
 
 /** Options for subprocess execution. */
 export interface CommandOptions {
+  /** Working directory for the subprocess. */
   readonly cwd?: string | undefined;
+  /** Environment variables to pass to the subprocess. */
   readonly env?: Record<string, string> | undefined;
+  /** Timeout in milliseconds before killing the subprocess. */
   readonly timeout?: number | undefined;
+  /** String data to write to the subprocess stdin. */
   readonly stdin?: string | undefined;
 }
 

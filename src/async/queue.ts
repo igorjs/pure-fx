@@ -21,9 +21,13 @@
  * priority), and a creation timestamp.
  */
 export interface Job<T> {
+  /** Unique auto-incrementing job identifier. */
   readonly id: string;
+  /** The payload data for this job. */
   readonly data: T;
+  /** Priority level; lower numbers are processed first. */
   readonly priority: number;
+  /** Timestamp (ms since epoch) when the job was created. */
   readonly createdAt: number;
 }
 

@@ -30,8 +30,11 @@ import { castErr, Err, Ok } from "../core/result.js";
  * ```
  */
 export interface SchemaError {
+  /** Dot-separated path to the invalid field. */
   readonly path: readonly string[];
+  /** Description of the expected type or constraint. */
   readonly expected: string;
+  /** String representation of the actual value received. */
   readonly received: string;
 }
 
@@ -252,46 +255,74 @@ const unionSchema = <T extends readonly SchemaType<any>[]>(
  * ```
  */
 export const Schema: {
+  /** Validates that input is a string. */
   readonly string: SchemaType<string>;
+  /** Validates that input is a finite number (not NaN). */
   readonly number: SchemaType<number>;
+  /** Validates that input is a boolean. */
   readonly boolean: SchemaType<boolean>;
+  /** Validate an object with a fixed shape of named fields. */
   readonly object: <T extends Record<string, SchemaType<any>>>(
     shape: T,
   ) => SchemaType<{ [K in keyof T]: T[K] extends SchemaType<infer U> ? U : never }>;
+  /** Validate a homogeneous array. */
   readonly array: <T>(element: SchemaType<T>) => SchemaType<readonly T[]>;
+  /** Validate a fixed-length tuple with per-position schemas. */
   readonly tuple: <T extends readonly SchemaType<any>[]>(
     ...schemas: T
   ) => SchemaType<{
     readonly [K in keyof T]: T[K] extends SchemaType<infer U> ? U : never;
   }>;
+  /** Validate a string-keyed record with uniform value type. */
   readonly record: <V>(value: SchemaType<V>) => SchemaType<Readonly<Record<string, V>>>;
+  /** Match an exact literal value. */
   readonly literal: <const T extends string | number | boolean>(value: T) => SchemaType<T>;
+  /** Match any one of the given schemas (first match wins). */
   readonly union: <T extends readonly SchemaType<any>[]>(
     ...schemas: T
   ) => SchemaType<T[number] extends SchemaType<infer U> ? U : never>;
+  /** Match a tagged union using a discriminant field. */
   readonly discriminatedUnion: <D extends string, M extends Record<string, SchemaType<any>>>(
     discriminant: D,
     mapping: M,
   ) => SchemaType<M[keyof M] extends SchemaType<infer U> ? U : never>;
+  /** Defer schema creation for recursive types. */
   readonly lazy: <T>(factory: () => SchemaType<T>) => SchemaType<T>;
+  /** Combine two schemas; input must satisfy both. */
   readonly intersection: <A, B>(a: SchemaType<A>, b: SchemaType<B>) => SchemaType<A & B>;
+  /** Validate a string against a regular expression. */
   readonly regex: (pattern: RegExp, label?: string) => SchemaType<string>;
+  /** Validate a non-empty string. */
   readonly nonEmpty: SchemaType<string>;
+  /** Validate a string with minimum length. */
   readonly minLength: (n: number) => SchemaType<string>;
+  /** Validate a string with maximum length. */
   readonly maxLength: (n: number) => SchemaType<string>;
+  /** Validate an email address format. */
   readonly email: SchemaType<string>;
+  /** Validate a URL format. */
   readonly url: SchemaType<string>;
+  /** Validate a UUID v4 format. */
   readonly uuid: SchemaType<string>;
+  /** Validate an ISO 8601 date string. */
   readonly isoDate: SchemaType<string>;
+  /** Parse a string or number into a Date object. */
   readonly date: SchemaType<Date>;
+  /** Validate that input is one of the given literal values. */
   readonly enum: <const T extends readonly (string | number | boolean)[]>(
     values: T,
   ) => SchemaType<T[number]>;
+  /** Validate an integer (no fractional part). */
   readonly int: SchemaType<number>;
+  /** Validate a number with a minimum value. */
   readonly min: (n: number) => SchemaType<number>;
+  /** Validate a number with a maximum value. */
   readonly max: (n: number) => SchemaType<number>;
+  /** Validate a number within an inclusive range. */
   readonly range: (lo: number, hi: number) => SchemaType<number>;
+  /** Validate a positive number (greater than 0). */
   readonly positive: SchemaType<number>;
+  /** Validate a non-negative number (greater than or equal to 0). */
   readonly nonNegative: SchemaType<number>;
 } = {
   /** Validates that input is a `string`. */

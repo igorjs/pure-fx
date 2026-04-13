@@ -43,6 +43,8 @@ declare const process: {
  */
 declare function setTimeout(callback: () => void, ms?: number): number;
 declare function clearTimeout(id: number): void;
+declare function setInterval(callback: () => void, ms?: number): number;
+declare function clearInterval(id: number): void;
 
 /**
  * Console API (WHATWG). Available in all JS runtimes.

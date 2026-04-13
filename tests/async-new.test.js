@@ -2239,7 +2239,7 @@ describe("Queue", () => {
   it("push and process a job", async () => {
     const processed = [];
     const queue = Queue.create({
-      handler: async (job) => {
+      handler: async job => {
         processed.push(job.data);
       },
     });
@@ -2287,7 +2287,7 @@ describe("Queue", () => {
 
     const queue = Queue.create({
       concurrency: 1,
-      handler: async (job) => {
+      handler: async job => {
         if (order.length === 0) {
           // First job blocks until gate opens, allowing others to queue
           await gatePromise;
@@ -2319,7 +2319,7 @@ describe("Queue", () => {
 
     const queue = Queue.create({
       concurrency: 2,
-      handler: async (job) => {
+      handler: async job => {
         await sleep(20);
         results.push(job.data);
       },
@@ -2342,7 +2342,9 @@ describe("Queue", () => {
 
   it("drain resolves immediately when queue is empty", async () => {
     const queue = Queue.create({
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     // Should resolve immediately with no jobs
@@ -2354,7 +2356,7 @@ describe("Queue", () => {
     const processed = [];
 
     const queue = Queue.create({
-      handler: async (job) => {
+      handler: async job => {
         processed.push(job.data);
       },
     });
@@ -2380,7 +2382,7 @@ describe("Queue", () => {
     const errors = [];
 
     const queue = Queue.create({
-      handler: async (job) => {
+      handler: async job => {
         throw new Error(`fail-${job.data}`);
       },
       onError: (error, job) => {
@@ -2406,7 +2408,7 @@ describe("Queue", () => {
 
     const queue = Queue.create({
       concurrency: 1,
-      handler: async (job) => {
+      handler: async job => {
         if (job.data === "first") {
           await firstJobPromise;
         }
@@ -2442,7 +2444,9 @@ describe("Queue", () => {
 
   it("returned instance is frozen", () => {
     const queue = Queue.create({
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     assert.ok(Object.isFrozen(queue));
@@ -2452,7 +2456,7 @@ describe("Queue", () => {
     const ids = [];
 
     const queue = Queue.create({
-      handler: async (job) => {
+      handler: async job => {
         ids.push(job.id);
       },
     });
@@ -2475,7 +2479,9 @@ describe("CronRunner", () => {
   it("create with valid cron expression", () => {
     const runner = CronRunner.create({
       schedule: "* * * * *",
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     assert.ok(runner);
@@ -2490,7 +2496,9 @@ describe("CronRunner", () => {
       () =>
         CronRunner.create({
           schedule: "not a cron",
-          handler: async () => {},
+          handler: async () => {
+            /* noop */
+          },
         }),
       /Invalid cron expression/,
     );
@@ -2499,7 +2507,9 @@ describe("CronRunner", () => {
   it("start/stop lifecycle", () => {
     const runner = CronRunner.create({
       schedule: "0 * * * *",
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     assert.equal(runner.isRunning(), false);
@@ -2512,7 +2522,9 @@ describe("CronRunner", () => {
   it("isRunning returns correct state", () => {
     const runner = CronRunner.create({
       schedule: "0 9 * * *",
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     assert.equal(runner.isRunning(), false);
@@ -2548,7 +2560,9 @@ describe("CronRunner", () => {
   it("stop prevents further executions", () => {
     const runner = CronRunner.create({
       schedule: "* * * * *",
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     runner.start();
@@ -2562,7 +2576,9 @@ describe("CronRunner", () => {
   it("nextRun returns a Date when running", () => {
     const runner = CronRunner.create({
       schedule: "* * * * *", // every minute
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     // Not running: nextRun is undefined
@@ -2583,7 +2599,7 @@ describe("CronRunner", () => {
       handler: async () => {
         throw new Error("cron-fail");
       },
-      onError: (error) => {
+      onError: error => {
         capturedError = error;
       },
       runImmediately: true,
@@ -2600,7 +2616,9 @@ describe("CronRunner", () => {
   it("returned instance is frozen", () => {
     const runner = CronRunner.create({
       schedule: "* * * * *",
-      handler: async () => {},
+      handler: async () => {
+        /* noop */
+      },
     });
 
     assert.ok(Object.isFrozen(runner));
