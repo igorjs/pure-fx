@@ -99,6 +99,7 @@ export interface PathParts {
   readonly name: string;
 }
 
+/** OS-aware path operations without node:path dependency. */
 export const Path: {
   /** The native path separator for the current platform. */
   readonly separator: string;

@@ -42,23 +42,25 @@ export interface WebSocketConnection<T = string> {
  * ```
  */
 export interface WebSocketHandler<T = string> {
+  /** Called when a new connection is opened. */
   readonly onOpen?: (ws: WebSocketConnection<T>) => void;
+  /** Called when a message is received from the client. */
   readonly onMessage?: (ws: WebSocketConnection<T>, data: T) => void;
+  /** Called when the connection is closed. */
   readonly onClose?: (ws: WebSocketConnection<T>, code: number, reason: string) => void;
+  /** Called when an error occurs on the connection. */
   readonly onError?: (ws: WebSocketConnection<T>, error: unknown) => void;
 }
 
-/**
- * A WebSocket route definition.
- */
+/** A WebSocket route definition mapping a URL pattern to a handler. */
 export interface WebSocketRoute<T = string> {
+  /** The URL pattern to match for this route. */
   readonly pattern: string;
+  /** The event handlers for connections matching this pattern. */
   readonly handler: WebSocketHandler<T>;
 }
 
-/**
- * A WebSocket upgrade result.
- */
+/** Result of a WebSocket upgrade attempt. */
 export interface UpgradeResult {
   /** Whether the request was upgraded to WebSocket. */
   readonly upgraded: boolean;

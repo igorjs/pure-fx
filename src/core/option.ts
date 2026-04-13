@@ -319,21 +319,31 @@ const partitionOptions = <T>(
   return { some, none };
 };
 
+/** Option namespace with constructors and collection utilities. */
 export const Option: {
+  /** Wrap a value in Some. */
   readonly Some: <T>(value: T) => Option<T>;
+  /** The singleton None value. */
   readonly None: Option<never>;
+  /** Convert a nullable value to an Option. */
   readonly fromNullable: <T>(value: T | null | undefined) => Option<T>;
+  /** Collect an array of Options into an Option of array. Short-circuits on first None. */
   readonly collect: <T>(options: readonly Option<T>[]) => Option<readonly T[]>;
+  /** Alias for collect. */
   readonly sequence: <T>(options: readonly Option<T>[]) => Option<readonly T[]>;
+  /** Map each item through a fallible function, collecting results. */
   readonly traverse: <A, T>(
     items: readonly A[],
     fn: (item: A) => Option<T>,
   ) => Option<readonly T[]>;
+  /** Split options into Some values and a None count. */
   readonly partition: <T>(options: readonly Option<T>[]) => {
     readonly some: readonly T[];
     readonly none: number;
   };
+  /** Pattern match on an Option value. */
   readonly match: <T, U>(option: Option<T>, matcher: OptionMatcher<T, U>) => U;
+  /** Type guard for Option values. */
   readonly is: (value: unknown) => value is Option<unknown>;
 } = {
   Some,

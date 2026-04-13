@@ -385,21 +385,32 @@ const partitionResults = <T, E>(
   return { ok, err };
 };
 
+/** Result namespace with constructors and collection utilities. */
 export const Result: {
+  /** Wrap a value in Ok. */
   readonly Ok: <T>(value: T) => Result<T, never>;
+  /** Wrap an error in Err. */
   readonly Err: <E>(error: E) => Result<never, E>;
+  /** Run a function, catching thrown errors into Err. */
   readonly tryCatch: <T, E = unknown>(fn: () => T, onError?: (e: unknown) => E) => Result<T, E>;
+  /** Convert a nullable value to a Result. */
   readonly fromNullable: <T, E>(value: T | null | undefined, onNull: () => E) => Result<T, E>;
+  /** Collect an array of Results into a Result of array. Short-circuits on first Err. */
   readonly collect: <T, E>(results: readonly Result<T, E>[]) => Result<readonly T[], E>;
+  /** Alias for collect. */
   readonly sequence: <T, E>(results: readonly Result<T, E>[]) => Result<readonly T[], E>;
+  /** Map each item through a fallible function, collecting results. */
   readonly traverse: <A, T, E>(
     items: readonly A[],
     fn: (item: A) => Result<T, E>,
   ) => Result<readonly T[], E>;
+  /** Split results into ok values and err values. */
   readonly partition: <T, E>(
     results: readonly Result<T, E>[],
   ) => { readonly ok: readonly T[]; readonly err: readonly E[] };
+  /** Pattern match on a Result value. */
   readonly match: <T, E, U>(result: Result<T, E>, matcher: ResultMatcher<T, E, U>) => U;
+  /** Type guard for Result values. */
   readonly is: (value: unknown) => value is Result<unknown, unknown>;
 } = {
   Ok,

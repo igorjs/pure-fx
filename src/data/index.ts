@@ -1,3 +1,18 @@
+/**
+ * @module data
+ *
+ * Immutable data structures, validation, encoding, and algebraic data types.
+ *
+ * Record, List, NonEmptyList, Schema, Codec, and ADT.
+ *
+ * @example
+ * ```ts
+ * import { Schema, Record, ADT } from '@igorjs/pure-fx/data'
+ *
+ * const UserSchema = Schema.object({ name: Schema.string, age: Schema.number });
+ * const user = Record({ name: 'Alice', age: 30 });
+ * ```
+ */
 export { ADT } from "./adt.js";
 export { Codec, type CodecType } from "./codec.js";
 export { isImmutable, List, Record } from "./constructors.js";

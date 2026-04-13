@@ -47,9 +47,13 @@ interface ClientRequestOptions {
 
 /** A typed HTTP response wrapper. */
 export interface ClientResponse {
+  /** HTTP status code. */
   readonly status: number;
+  /** HTTP status text. */
   readonly statusText: string;
+  /** Response headers. */
   readonly headers: Headers;
+  /** The underlying fetch Response object. */
   readonly raw: Response;
   /** Parse body as JSON. Returns Result. */
   readonly json: <T = unknown>() => Promise<Result<T, ErrType<"ParseError">>>;
@@ -108,26 +112,32 @@ export interface ClientOptions {
  * ```
  */
 export interface ClientInstance {
+  /** Send a GET request. */
   readonly get: (
     path: string,
     options?: ClientRequestOptions,
   ) => TaskLike<ClientResponse, ClientError>;
+  /** Send a POST request. */
   readonly post: (
     path: string,
     options?: ClientRequestOptions,
   ) => TaskLike<ClientResponse, ClientError>;
+  /** Send a PUT request. */
   readonly put: (
     path: string,
     options?: ClientRequestOptions,
   ) => TaskLike<ClientResponse, ClientError>;
+  /** Send a PATCH request. */
   readonly patch: (
     path: string,
     options?: ClientRequestOptions,
   ) => TaskLike<ClientResponse, ClientError>;
+  /** Send a DELETE request. */
   readonly delete: (
     path: string,
     options?: ClientRequestOptions,
   ) => TaskLike<ClientResponse, ClientError>;
+  /** Send a request with an arbitrary HTTP method. */
   readonly request: (
     method: string,
     path: string,

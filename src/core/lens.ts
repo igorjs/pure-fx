@@ -33,10 +33,15 @@ import { None, Some } from "./option.js";
  * ```
  */
 export interface Lens<S, A> {
+  /** Read the focused value from the source. */
   readonly get: (source: S) => A;
+  /** Set the focused value, returning a new source. */
   readonly set: (value: A) => (source: S) => S;
+  /** Transform the focused value in place, returning a new source. */
   readonly modify: (fn: (a: A) => A) => (source: S) => S;
+  /** Compose with another Lens, focusing deeper. */
   readonly compose: <B>(other: Lens<A, B>) => Lens<S, B>;
+  /** Compose with an Optional, producing a partial optic. */
   readonly composeOptional: <B>(other: LensOptional<A, B>) => LensOptional<S, B>;
 }
 
@@ -51,9 +56,13 @@ export interface Lens<S, A> {
  * ```
  */
 export interface LensOptional<S, A> {
+  /** Read the focused value, returning None if absent. */
   readonly getOption: (source: S) => Option<A>;
+  /** Set the focused value, returning a new source. */
   readonly set: (value: A) => (source: S) => S;
+  /** Transform the focused value if present, returning a new source. */
   readonly modify: (fn: (a: A) => A) => (source: S) => S;
+  /** Compose with another Optional, focusing deeper. */
   readonly compose: <B>(other: LensOptional<A, B>) => LensOptional<S, B>;
 }
 
@@ -224,10 +233,15 @@ export const LensOptional: {
  * ```
  */
 export interface Prism<S, A> {
+  /** Extract the focused value if the variant matches. */
   readonly getOption: (source: S) => Option<A>;
+  /** Construct the sum type from the focused value. */
   readonly reverseGet: (value: A) => S;
+  /** Transform the focused value if the variant matches. */
   readonly modify: (fn: (a: A) => A) => (source: S) => S;
+  /** Compose with another Prism, focusing deeper. */
   readonly compose: <B>(other: Prism<A, B>) => Prism<S, B>;
+  /** Convert this Prism to an Optional. */
   readonly toOptional: () => LensOptional<S, A>;
 }
 
@@ -289,12 +303,19 @@ export const Prism: {
  * ```
  */
 export interface Iso<S, A> {
+  /** Convert from S to A. */
   readonly get: (source: S) => A;
+  /** Convert from A back to S. */
   readonly reverseGet: (value: A) => S;
+  /** Transform the A side, round-tripping through the isomorphism. */
   readonly modify: (fn: (a: A) => A) => (source: S) => S;
+  /** Compose with another Iso, chaining the transformations. */
   readonly compose: <B>(other: Iso<A, B>) => Iso<S, B>;
+  /** Convert this Iso to a Lens. */
   readonly toLens: () => Lens<S, A>;
+  /** Convert this Iso to a Prism. */
   readonly toPrism: () => Prism<S, A>;
+  /** Swap the direction of the isomorphism. */
   readonly reverse: () => Iso<A, S>;
 }
 
@@ -354,8 +375,11 @@ export const Iso: {
  * ```
  */
 export interface Traversal<S, A> {
+  /** Read all focused values from the source. */
   readonly getAll: (source: S) => readonly A[];
+  /** Transform all focused values, returning a new source. */
   readonly modify: (fn: (a: A) => A) => (source: S) => S;
+  /** Set all focused values to the same value. */
   readonly set: (value: A) => (source: S) => S;
 }
 

@@ -53,9 +53,13 @@ const LEVEL_VALUE: Readonly<Record<LogLevel, number>> = {
  * ```
  */
 export interface Logger {
+  /** Log a debug-level message with optional context. */
   readonly debug: (message: string, context?: Record<string, unknown>) => void;
+  /** Log an info-level message with optional context. */
   readonly info: (message: string, context?: Record<string, unknown>) => void;
+  /** Log a warn-level message with optional context. */
   readonly warn: (message: string, context?: Record<string, unknown>) => void;
+  /** Log an error-level message with optional context. */
   readonly error: (message: string, context?: Record<string, unknown>) => void;
   /** Create a child logger with additional context fields. */
   readonly child: (context: Record<string, unknown>) => Logger;

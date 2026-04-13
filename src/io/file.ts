@@ -36,9 +36,13 @@ const mkTask = <T, E>(run: () => Promise<Result<T, E>>): TaskLike<T, E> => ({ ru
 
 /** Metadata returned by File.stat. */
 export interface FileStat {
+  /** Whether the path points to a regular file. */
   readonly isFile: boolean;
+  /** Whether the path points to a directory. */
   readonly isDirectory: boolean;
+  /** File size in bytes. */
   readonly size: number;
+  /** Last modification time, if available. */
   readonly mtime: Date | undefined;
 }
 
@@ -414,17 +418,29 @@ const tempDir = async (prefix?: string): Promise<Result<string, ErrType<"FileErr
  * ```
  */
 export const File: {
+  /** Read a text file as a UTF-8 string. */
   readonly read: (path: string) => TaskLike<string, ErrType<"FileError">>;
+  /** Write a string to a file, creating or overwriting it. */
   readonly write: (path: string, content: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Append a string to a file. */
   readonly append: (path: string, content: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Check whether a file exists. */
   readonly exists: (path: string) => TaskLike<boolean, ErrType<"FileError">>;
+  /** Create a directory recursively. */
   readonly makeDir: (path: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Remove a file. */
   readonly remove: (path: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Remove a directory recursively. */
   readonly removeDir: (path: string) => TaskLike<void, ErrType<"FileError">>;
+  /** List entries in a directory. */
   readonly list: (path: string) => TaskLike<readonly string[], ErrType<"FileError">>;
+  /** Get file or directory metadata. */
   readonly stat: (path: string) => TaskLike<FileStat, ErrType<"FileError">>;
+  /** Copy a file from src to dest. */
   readonly copy: (src: string, dest: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Rename or move a file. */
   readonly rename: (oldPath: string, newPath: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Create a temporary directory with optional prefix. */
   readonly tempDir: (prefix?: string) => TaskLike<string, ErrType<"FileError">>;
 } = {
   read: path => mkTask(() => readFile(path)),

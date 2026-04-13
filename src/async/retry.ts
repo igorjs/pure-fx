@@ -26,11 +26,17 @@ type BackoffStrategy = "fixed" | "exponential" | "linear";
  * Construct via `Retry.policy()` builder or `Retry.fixed()`/`Retry.exponential()`.
  */
 export interface RetryPolicy {
+  /** Maximum number of attempts including the initial try. */
   readonly maxAttempts: number;
+  /** Base delay between retries. */
   readonly delay: Duration;
+  /** Backoff strategy: fixed, exponential, or linear. */
   readonly backoff: BackoffStrategy;
+  /** Whether to add random jitter to the delay. */
   readonly jitter: boolean;
+  /** Maximum delay cap regardless of backoff calculation. */
   readonly maxDelay: Duration;
+  /** Predicate to decide whether a given error should be retried. */
   readonly shouldRetry: (error: unknown) => boolean;
 }
 

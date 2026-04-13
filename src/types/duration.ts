@@ -139,23 +139,41 @@ const zeroDuration: Duration = brand(0);
  * ```
  */
 export const Duration: {
+  /** Create a Duration from milliseconds. */
   readonly milliseconds: (ms: number) => Duration;
+  /** Create a Duration from seconds. */
   readonly seconds: (s: number) => Duration;
+  /** Create a Duration from minutes. */
   readonly minutes: (m: number) => Duration;
+  /** Create a Duration from hours. */
   readonly hours: (h: number) => Duration;
+  /** Create a Duration from days. */
   readonly days: (d: number) => Duration;
+  /** Extract the raw millisecond value. */
   readonly toMilliseconds: (d: Duration) => number;
+  /** Convert to seconds. */
   readonly toSeconds: (d: Duration) => number;
+  /** Convert to minutes. */
   readonly toMinutes: (d: Duration) => number;
+  /** Convert to hours. */
   readonly toHours: (d: Duration) => number;
+  /** Add two durations. */
   readonly add: (a: Duration, b: Duration) => Duration;
+  /** Subtract b from a. */
   readonly subtract: (a: Duration, b: Duration) => Duration;
+  /** Multiply a duration by a numeric factor. */
   readonly multiply: (d: Duration, factor: number) => Duration;
+  /** Check whether the duration is exactly zero. */
   readonly isZero: (d: Duration) => boolean;
+  /** Check whether the duration is greater than zero. */
   readonly isPositive: (d: Duration) => boolean;
+  /** Format the duration as a human-readable string. */
   readonly format: (d: Duration) => string;
+  /** A zero-length duration constant. */
   readonly zero: Duration;
+  /** Equality instance for Duration. */
   readonly eq: Eq<Duration>;
+  /** Ordering instance for Duration. */
   readonly ord: Ord<Duration>;
 } = {
   milliseconds,

@@ -37,7 +37,9 @@ const mkTask = <T, E>(run: () => Promise<Result<T, E>>): TaskLike<T, E> => ({ ru
 
 /** A resolved DNS address with IP family. */
 export interface DnsRecord {
+  /** The resolved IP address. */
   readonly address: string;
+  /** The IP address family (4 for IPv4, 6 for IPv6). */
   readonly family: 4 | 6;
 }
 
