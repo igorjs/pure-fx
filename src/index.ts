@@ -83,6 +83,7 @@ export {
 } from "./async/rate-limiter.js";
 export { Retry, type RetryPolicy } from "./async/retry.js";
 export { Mutex, type MutexInstance, Semaphore, type SemaphoreInstance } from "./async/semaphore.js";
+export { InvalidTransition, StateMachine } from "./async/state-machine.js";
 export { Stream } from "./async/stream.js";
 export { Task } from "./async/task.js";
 export { TimeoutError, Timer } from "./async/timer.js";
@@ -102,6 +103,7 @@ export { Match } from "./core/match.js";
 export { Ord } from "./core/ord.js";
 export { flow, pipe } from "./core/pipe.js";
 export { State } from "./core/state.js";
+export { ADT } from "./data/adt.js";
 export { Codec, type CodecType } from "./data/codec.js";
 export { isImmutable, List, Record } from "./data/constructors.js";
 export type { DeepReadonly } from "./data/internals.js";
