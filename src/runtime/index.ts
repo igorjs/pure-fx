@@ -19,7 +19,11 @@ export { Config } from "./config.js";
 export { Logger } from "./logger.js";
 /** Cross-runtime OS information (hostname, arch, memory). */
 export { Os } from "./os.js";
-/** Cross-platform path manipulation, line endings, and platform detection. */
+/** Line ending constants and normalization. */
+/** OS-aware path manipulation without node:path dependency. */
+/** Parsed path components (root, dir, base, ext, name). */
+/** Runtime platform detection (isWindows, isPosix). */
 export { Eol, Path, type PathParts, Platform } from "./platform.js";
-/** Cross-runtime process info, cwd, env, and exit. */
+/** Cross-runtime process info, cwd, env, args, and exit namespace. */
+/** Error returned when a process operation fails. */
 export { Process, ProcessError } from "./process.js";
