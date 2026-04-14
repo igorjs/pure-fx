@@ -499,6 +499,7 @@ export const Schema: {
   nonNegative: numberSchema.refine(n => n >= 0, "non-negative"),
 } as const;
 
+/** Type-level utilities for Schema inference. */
 export namespace Schema {
   /** Extract the TypeScript type that a schema validates to. */
   export type Infer<S> = S extends SchemaType<infer T> ? T : never;
