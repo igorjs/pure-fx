@@ -13,8 +13,13 @@
  * const cwd = Process.cwd();
  * ```
  */
+/** Typed environment variable validation and access. */
 export { Config } from "./config.js";
+/** Structured logger with configurable levels and formatters. */
 export { Logger } from "./logger.js";
+/** Cross-runtime OS information (hostname, arch, memory). */
 export { Os } from "./os.js";
+/** Cross-platform path manipulation, line endings, and platform detection. */
 export { Eol, Path, type PathParts, Platform } from "./platform.js";
+/** Cross-runtime process info, cwd, env, and exit. */
 export { Process, ProcessError } from "./process.js";
