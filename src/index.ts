@@ -46,7 +46,9 @@
 import type { Option, OptionMatcher } from "./core/option.js";
 import type { Result, ResultMatcher } from "./core/result.js";
 
+/** Option type and constructors for nullable value handling. */
 export { None, Option, type OptionMatcher, Some } from "./core/option.js";
+/** Result type and constructors for error-as-value handling. */
 export { Err, Ok, Result, type ResultMatcher, tryCatch } from "./core/result.js";
 
 /**
@@ -67,8 +69,11 @@ export function match<T, U>(value: Option<T>, matcher: OptionMatcher<T, U>): U;
 export function match(value: { match(m: object): unknown }, matcher: object): unknown {
   return value.match(matcher);
 }
+/** In-memory cache with TTL and optional LRU eviction. */
 export { Cache, type CacheInstance, type CacheOptions } from "./async/cache.js";
+/** Async communication channel for producer-consumer patterns. */
 export { Channel } from "./async/channel.js";
+/** Circuit breaker resilience pattern for failing-fast on repeated errors. */
 export {
   CircuitBreaker,
   type CircuitBreakerInstance,
@@ -76,14 +81,19 @@ export {
   CircuitOpen,
   type CircuitState,
 } from "./async/circuit-breaker.js";
+/** Cron-scheduled task runner with typed job callbacks. */
 export {
   CronRunner,
   type CronRunnerInstance,
   type CronRunnerOptions,
 } from "./async/cron-runner.js";
+/** Reader-style dependency injection for async computations. */
 export { Env } from "./async/env.js";
+/** Type-safe event emitter with typed event maps. */
 export { EventEmitter, type EventEmitterInstance } from "./async/event-emitter.js";
+/** Deferred evaluation that computes a value at most once. */
 export { Lazy } from "./async/lazy.js";
+/** Generic resource pool with idle timeout and health checks. */
 export {
   Pool,
   PoolError,
@@ -91,19 +101,28 @@ export {
   type PoolInstance,
   type PoolOptions,
 } from "./async/pool.js";
+/** Async job queue with concurrency control. */
 export { type Job, Queue, type QueueInstance, type QueueOptions } from "./async/queue.js";
+/** Token-bucket rate limiter for throttling operations. */
 export {
   RateLimited,
   RateLimiter,
   type RateLimiterInstance,
   type RateLimiterPolicy,
 } from "./async/rate-limiter.js";
+/** Configurable retry policy with backoff strategies. */
 export { Retry, type RetryPolicy } from "./async/retry.js";
+/** Semaphore and mutex primitives for concurrency control. */
 export { Mutex, type MutexInstance, Semaphore, type SemaphoreInstance } from "./async/semaphore.js";
+/** Typed finite state machine with validated transitions. */
 export { InvalidTransition, StateMachine } from "./async/state-machine.js";
+/** Lazy async sequence with backpressure and ReadableStream bridge. */
 export { Stream } from "./async/stream.js";
+/** Lazy, composable async computation that returns Result on run. */
 export { Task } from "./async/task.js";
+/** Timer utilities for sleep, interval, delay, and deadline. */
 export { TimeoutError, Timer } from "./async/timer.js";
+/** HTTP client built on Task with typed error variants. */
 export {
   Client,
   type ClientError,
@@ -114,39 +133,67 @@ export {
   NetworkError,
   ParseError,
 } from "./client.js";
+/** Typed equality comparison. */
 export { Eq } from "./core/eq.js";
+/** Optics for immutable nested data access and updates. */
 export { Iso, Lens, LensOptional, Prism, Traversal } from "./core/lens.js";
+/** Exhaustive pattern matching with compile-time coverage. */
 export { Match } from "./core/match.js";
+/** Typed ordering and comparison. */
 export { Ord } from "./core/ord.js";
+/** Left-to-right function composition and piping. */
 export { flow, pipe } from "./core/pipe.js";
+/** Pure state monad for threading state through computations. */
 export { State } from "./core/state.js";
+/** Algebraic data type constructor with exhaustive matching. */
 export { ADT } from "./data/adt.js";
+/** Bidirectional codec for encoding and decoding values. */
 export { Codec, type CodecType } from "./data/codec.js";
+/** Immutable Record, List constructors and immutability check. */
 export { isImmutable, List, Record } from "./data/constructors.js";
 /** Recursively marks all properties as readonly. */
 export type { DeepReadonly } from "./data/internals.js";
 /** An immutable array with functional methods. */
 export type { ImmutableList, ListMethods } from "./data/list.js";
+/** Non-empty list guaranteeing at least one element at the type level. */
 export { NonEmptyList } from "./data/non-empty-list.js";
 /** An immutable object with type-safe update methods. */
 export type { ImmutableRecord, RecordMethods } from "./data/record.js";
+/** Runtime data validation with composable schemas. */
 export { Schema, type SchemaError, type SchemaType } from "./data/schema.js";
+/** Structured cloning using the web standard algorithm. */
 export { Clone, CloneError } from "./io/clone.js";
+/** Web standard compression and decompression streams. */
 export { Compression, CompressionError } from "./io/compression.js";
+/** Web standard cryptographic hashing, encryption, and random bytes. */
 export { Crypto, CryptoError } from "./io/crypto.js";
+/** Cross-runtime DNS resolution returning Result. */
 export { Dns, DnsError, type DnsRecord } from "./io/dns.js";
+/** Base64, hex, and UTF-8 encoding and decoding. */
 export { Encoding, EncodingError } from "./io/encoding.js";
+/** Cross-runtime file read, write, append, stat, and remove. */
 export { File, FileError, type FileStat } from "./io/file.js";
+/** Safe JSON parse and stringify returning Result. */
 export { Json, JsonError } from "./io/json.js";
+/** Cross-runtime TCP client connections. */
 export { Net, NetError, type TcpConnection } from "./io/net.js";
+/** Cross-runtime subprocess execution with typed results. */
 export { Command, CommandError, type CommandOptions, type CommandResult } from "./io/subprocess.js";
+/** URL parsing and manipulation returning Result. */
 export { Url, UrlError } from "./io/url.js";
+/** Application lifecycle with graceful shutdown and error boundary. */
 export { Program } from "./program.js";
+/** Typed environment variable validation and access. */
 export { Config } from "./runtime/config.js";
+/** Structured logger with configurable levels and formatters. */
 export { Logger } from "./runtime/logger.js";
+/** Cross-runtime OS information (hostname, arch, memory). */
 export { Os } from "./runtime/os.js";
+/** Cross-platform path manipulation, line endings, and platform detection. */
 export { Eol, Path, type PathParts, Platform } from "./runtime/platform.js";
+/** Cross-runtime process info, cwd, env, and exit. */
 export { Process, ProcessError } from "./runtime/process.js";
+/** HTTP server with typed routing, middleware composition, and runtime adapters. */
 export {
   BodyReadError,
   type Context,
@@ -171,11 +218,15 @@ export {
   type TypedMiddleware,
   text,
 } from "./server.js";
+/** Cron expression parser and validator. */
 export { Cron, type CronExpression } from "./types/cron.js";
+/** Type-safe duration with unit conversions. */
 export { Duration } from "./types/duration.js";
+/** Structured error type constructor with tag-based discrimination. */
 export { ErrType, type ErrTypeConstructor } from "./types/error.js";
 /** Phantom-branded nominal type for compile-time domain safety. */
 export type { Type } from "./types/nominal.js";
+/** WebSocket handler routing with typed message protocols. */
 export {
   WebSocket,
   type WebSocketConnection,
