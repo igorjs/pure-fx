@@ -535,7 +535,7 @@ const sleep = (ms: number): Promise<void> => new Promise<void>(resolve => setTim
  * ```
  */
 export const Stream: {
-  /** Create a stream from a custom async iterable source. */
+  /** Create a stream from a custom async iterable Result source. */
   <T, E>(source: () => AsyncIterable<Result<T, E>>): Stream<T, E>;
   /** Create a stream from an async iterable of plain values. */
   readonly from: <T>(iterable: AsyncIterable<T>) => Stream<T, never>;

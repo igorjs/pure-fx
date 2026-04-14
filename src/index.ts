@@ -61,6 +61,7 @@ export { Err, Ok, Result, type ResultMatcher, tryCatch } from "./core/result.js"
  * match(Some('hi'), { Some: s => s.length, None: () => 0 })  // 2
  * ```
  */
+/** Pattern match on a Result or Option, handling each variant. */
 export function match<T, E, U>(value: Result<T, E>, matcher: ResultMatcher<T, E, U>): U;
 export function match<T, U>(value: Option<T>, matcher: OptionMatcher<T, U>): U;
 export function match(value: { match(m: object): unknown }, matcher: object): unknown {

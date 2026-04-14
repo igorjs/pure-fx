@@ -173,6 +173,7 @@ const createCache = <K, V>(options: CacheOptions): CacheInstance<K, V> => {
  * Create TTL-based in-memory caches.
  */
 export const Cache: {
+  /** Create a new TTL-based in-memory cache. */
   readonly create: <K, V>(options: CacheOptions) => CacheInstance<K, V>;
 } = {
   create: createCache,

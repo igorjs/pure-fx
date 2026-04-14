@@ -180,6 +180,7 @@ const createInstance = (policy: CircuitBreakerPolicy): CircuitBreakerInstance =>
  * ```
  */
 export const CircuitBreaker: {
+  /** Create a new circuit breaker instance with the given policy. */
   readonly create: (policy: CircuitBreakerPolicy) => CircuitBreakerInstance;
 } = {
   create: createInstance,

@@ -240,9 +240,13 @@ const createNonEmptyList = <T>(raw: readonly T[]): NonEmptyList<T> => {
  * ```
  */
 export const NonEmptyList: {
+  /** Create a NonEmptyList from a tuple with at least one element. */
   <T>(items: readonly [T, ...T[]]): NonEmptyList<T>;
+  /** Attempt to create a NonEmptyList from an array. Returns None if empty. */
   readonly from: <T>(items: readonly T[]) => Option<NonEmptyList<T>>;
+  /** Create a NonEmptyList from a head element and optional rest. */
   readonly of: <T>(head: T, ...rest: readonly T[]) => NonEmptyList<T>;
+  /** Type guard: returns true if value is a NonEmptyList. */
   readonly is: (value: unknown) => value is NonEmptyList<unknown>;
 } = Object.assign(<T>(items: readonly [T, ...T[]]): NonEmptyList<T> => createNonEmptyList(items), {
   from: <T>(items: readonly T[]): Option<NonEmptyList<T>> =>

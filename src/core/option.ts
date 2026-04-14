@@ -31,7 +31,9 @@ export type Option<T> = SomeImpl<T> | NoneImpl<T>;
 
 /** Pattern-match arms for {@link Option.match}. */
 export interface OptionMatcher<T, U> {
+  /** Handler for the Some variant. */
   readonly Some: (value: T) => U;
+  /** Handler for the None variant. */
   readonly None: () => U;
 }
 
@@ -43,19 +45,33 @@ export interface OptionMatcher<T, U> {
  * that propagate absence.
  */
 interface OptionMethods<T> {
+  /** Transform the value if present. */
   map<U>(fn: (value: T) => U): Option<U>;
+  /** Chain into a dependent computation that may produce None. */
   flatMap<U>(fn: (value: T) => Option<U>): Option<U>;
+  /** Keep the value only if the predicate holds. */
   filter(predicate: (value: T) => boolean): Option<T>;
+  /** Run a side-effect on the value without altering the Option. */
   tap(fn: (value: T) => void): Option<T>;
+  /** Extract the value or throw if None. */
   unwrap(): T;
+  /** Extract the value or return the fallback. */
   unwrapOr(_fallback: T): T;
+  /** Extract the value or compute a fallback. */
   unwrapOrElse(_fn: () => T): T;
+  /** Pattern match on Some or None. */
   match<U>(m: OptionMatcher<T, U>): U;
+  /** Convert to Result: Some becomes Ok, None becomes Err with the given error. */
   toResult<E>(_error: E): Result<T, E>;
+  /** Pair this value with another Option's value. */
   zip<U>(other: Option<U>): Option<[T, U]>;
+  /** Apply a wrapped function to this value. */
   ap<U>(fnOption: Option<(value: T) => U>): Option<U>;
+  /** Return this Option if Some, otherwise the other. */
   or(_other: Option<T>): Option<T>;
+  /** Serialize to a JSON-safe tagged object. */
   toJSON(): { tag: "Some"; value: T } | { tag: "None" };
+  /** Human-readable string representation. */
   toString(): string;
 }
 
@@ -68,12 +84,15 @@ interface OptionMethods<T> {
  * Construct via the {@link Some} factory rather than `new SomeImpl(...)`.
  */
 export class SomeImpl<T> implements OptionMethods<T> {
+  /** Discriminant tag for pattern matching. */
   readonly tag = "Some" as const;
-  constructor(readonly value: T) {}
+  constructor(/** The wrapped value. */ readonly value: T) {}
 
+  /** Whether this is a Some variant. Always true. */
   get isSome(): true {
     return true;
   }
+  /** Whether this is a None variant. Always false. */
   get isNone(): false {
     return false;
   }
@@ -136,6 +155,7 @@ export class SomeImpl<T> implements OptionMethods<T> {
   toJSON(): { tag: "Some"; value: T } {
     return { tag: "Some", value: this.value };
   }
+  /** Human-readable string representation. */
   toString(): string {
     return `Some(${String(this.value)})`;
   }
@@ -150,11 +170,14 @@ export class SomeImpl<T> implements OptionMethods<T> {
  * Use the singleton {@link None} constant rather than `new NoneImpl()`.
  */
 export class NoneImpl<T> implements OptionMethods<T> {
+  /** Discriminant tag for pattern matching. */
   readonly tag = "None" as const;
 
+  /** Whether this is a Some variant. Always false. */
   get isSome(): false {
     return false;
   }
+  /** Whether this is a None variant. Always true. */
   get isNone(): true {
     return true;
   }
@@ -211,6 +234,7 @@ export class NoneImpl<T> implements OptionMethods<T> {
   toJSON(): { tag: "None" } {
     return { tag: "None" };
   }
+  /** Human-readable string representation. */
   toString(): string {
     return "None";
   }

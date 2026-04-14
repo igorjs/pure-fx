@@ -137,8 +137,11 @@ const createOptional = <S, A>(
  * ```
  */
 export const Lens: {
+  /** Create a lens focusing on a single property by key. */
   readonly prop: <S>() => <K extends keyof S>(key: K) => Lens<S, S[K]>;
+  /** Create a lens from custom getter and setter functions. */
   readonly from: <S, A>(get: (s: S) => A, set: (a: A, s: S) => S) => Lens<S, A>;
+  /** Identity lens: focuses on the entire source. */
   readonly id: <S>() => Lens<S, S>;
 } = {
   prop:
@@ -176,8 +179,11 @@ export const Lens: {
  * ```
  */
 export const LensOptional: {
+  /** Create an optional focusing on an array index. */
   readonly index: <T>(i: number) => LensOptional<readonly T[], T>;
+  /** Create an optional focusing on a nullable property by key. */
   readonly fromNullable: <S>() => <K extends keyof S>(key: K) => LensOptional<S, NonNullable<S[K]>>;
+  /** Create an optional from custom getOption and setter functions. */
   readonly from: <S, A>(
     getOption: (s: S) => Option<A>,
     set: (a: A, s: S) => S,
@@ -278,6 +284,7 @@ const createPrism = <S, A>(getOption: (s: S) => Option<A>, reverseGet: (a: A) =>
  * ```
  */
 export const Prism: {
+  /** Create a prism from getOption and reverseGet functions. */
   readonly from: <S, A>(getOption: (s: S) => Option<A>, reverseGet: (a: A) => S) => Prism<S, A>;
 } = {
   from: createPrism,
@@ -348,7 +355,9 @@ const createIso = <S, A>(get: (s: S) => A, reverseGet: (a: A) => S): Iso<S, A> =
  * ```
  */
 export const Iso: {
+  /** Create an isomorphism from get and reverseGet functions. */
   readonly from: <S, A>(get: (s: S) => A, reverseGet: (a: A) => S) => Iso<S, A>;
+  /** Identity isomorphism: maps a type to itself. */
   readonly id: <S>() => Iso<S, S>;
 } = {
   from: createIso,
@@ -387,7 +396,9 @@ export interface Traversal<S, A> {
  * Create traversals for focusing on multiple targets.
  */
 export const Traversal: {
+  /** Create a traversal over all elements of a readonly array. */
   readonly fromArray: <T>() => Traversal<readonly T[], T>;
+  /** Create a traversal from custom getAll and modify functions. */
   readonly from: <S, A>(
     getAll: (s: S) => readonly A[],
     modify: (fn: (a: A) => A, s: S) => S,

@@ -243,6 +243,7 @@ const createClient = (config: ClientOptions = {}): ClientInstance => {
  * ```
  */
 export const Client: {
+  /** Create a new HTTP client with the given options. */
   readonly create: (options?: ClientOptions) => ClientInstance;
 } = {
   create: createClient,

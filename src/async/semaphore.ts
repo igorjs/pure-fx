@@ -123,6 +123,7 @@ const createMutex = (): MutexInstance => {
  * Create counting semaphores for concurrency control.
  */
 export const Semaphore: {
+  /** Create a counting semaphore with the given number of permits. */
   readonly create: (permits: number) => SemaphoreInstance;
 } = {
   create: createSemaphore,
@@ -132,6 +133,7 @@ export const Semaphore: {
  * Create mutual exclusion locks (semaphore with 1 permit).
  */
 export const Mutex: {
+  /** Create a mutual exclusion lock (semaphore with 1 permit). */
   readonly create: () => MutexInstance;
 } = {
   create: createMutex,

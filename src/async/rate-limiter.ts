@@ -133,6 +133,7 @@ const createRateLimiter = (policy: RateLimiterPolicy): RateLimiterInstance => {
  * ```
  */
 export const RateLimiter: {
+  /** Create a new token bucket rate limiter with the given policy. */
   readonly create: (policy: RateLimiterPolicy) => RateLimiterInstance;
 } = {
   create: createRateLimiter,

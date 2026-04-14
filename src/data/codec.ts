@@ -209,19 +209,27 @@ const nullableCodec = <I, O>(codec: CodecType<I, O>): CodecType<I | null, O | nu
  * ```
  */
 export const Codec: {
+  /** Create a codec from custom decode and encode functions. */
   readonly from: <I, O>(
     decode: (input: I) => Result<O, SchemaError>,
     encode: (output: O) => I,
   ) => CodecType<I, O>;
+  /** Create a codec from an existing Schema plus an encode function. */
   readonly fromSchema: <T>(
     schema: SchemaType<T>,
     encode: (value: T) => unknown,
   ) => CodecType<unknown, T>;
+  /** Codec for string values. */
   readonly string: CodecType<unknown, string>;
+  /** Codec for number values (rejects NaN). */
   readonly number: CodecType<unknown, number>;
+  /** Codec for boolean values. */
   readonly boolean: CodecType<unknown, boolean>;
+  /** Create a codec for an object with per-field codecs. */
   readonly object: <T extends CodecShape>(shape: T) => CodecType<unknown, DecodedShape<T>>;
+  /** Create a codec for an array of elements using an element codec. */
   readonly array: <T>(element: CodecType<unknown, T>) => CodecType<unknown, readonly T[]>;
+  /** Wrap a codec to also accept and produce null values. */
   readonly nullable: <I, O>(codec: CodecType<I, O>) => CodecType<I | null, O | null>;
 } = {
   from: createCodec,
