@@ -282,6 +282,7 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
  * Create generic resource pools for connections, handles, or any reusable resource.
  */
 export const Pool: {
+  /** Create a new resource pool with the given options. */
   readonly create: <T>(options: PoolOptions<T>) => PoolInstance<T>;
 } = {
   create: createPool,

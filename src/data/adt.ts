@@ -133,8 +133,7 @@ export const ADT = <Config extends Record<string, VariantDef>>(
 
 // ── Namespace merge for ADT.Infer ────────────────────────────────────────────
 
-// Why: mirrors Schema.Infer pattern. Lets callers extract the union type from
-// a constructed ADT value without manually writing out the discriminated union.
+/** Type-level utilities for algebraic data types. */
 export namespace ADT {
   /** Helper: extracts the return type of a constructor function. */
   type ConstructorReturn<T> = T extends (...args: never[]) => infer R ? R : never;

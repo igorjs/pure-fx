@@ -122,9 +122,12 @@ export { State } from "./core/state.js";
 export { ADT } from "./data/adt.js";
 export { Codec, type CodecType } from "./data/codec.js";
 export { isImmutable, List, Record } from "./data/constructors.js";
+/** Recursively marks all properties as readonly. */
 export type { DeepReadonly } from "./data/internals.js";
+/** An immutable array with functional methods. */
 export type { ImmutableList, ListMethods } from "./data/list.js";
 export { NonEmptyList } from "./data/non-empty-list.js";
+/** An immutable object with type-safe update methods. */
 export type { ImmutableRecord, RecordMethods } from "./data/record.js";
 export { Schema, type SchemaError, type SchemaType } from "./data/schema.js";
 export { Clone, CloneError } from "./io/clone.js";
@@ -170,6 +173,7 @@ export {
 export { Cron, type CronExpression } from "./types/cron.js";
 export { Duration } from "./types/duration.js";
 export { ErrType, type ErrTypeConstructor } from "./types/error.js";
+/** Phantom-branded nominal type for compile-time domain safety. */
 export type { Type } from "./types/nominal.js";
 export {
   WebSocket,

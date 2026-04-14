@@ -168,9 +168,13 @@ interface LoggerOptions {
  * ```
  */
 export const Logger: {
+  /** Create a new Logger instance with the given options. */
   readonly create: (options: LoggerOptions) => Logger;
+  /** JSON log sink that outputs structured records to stdout/stderr. */
   readonly json: LogSink;
+  /** Pretty log sink with human-readable timestamps and colours. */
   readonly pretty: LogSink;
+  /** Silent log sink that discards all output. Useful for tests. */
   readonly silent: LogSink;
 } = {
   create: (options: LoggerOptions): Logger =>

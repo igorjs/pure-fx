@@ -89,13 +89,21 @@ const sleep = (ms: number): Promise<void> => new Promise<void>(resolve => setTim
  * ```
  */
 interface RetryPolicyBuilder {
+  /** Set the maximum number of attempts (including the initial try). */
   readonly maxAttempts: (n: number) => RetryPolicyBuilder;
+  /** Set the base delay between retries (fixed backoff). */
   readonly delay: (d: Duration) => RetryPolicyBuilder;
+  /** Use exponential backoff with the given base delay. */
   readonly exponentialBackoff: (base: Duration) => RetryPolicyBuilder;
+  /** Use linear backoff with the given step duration. */
   readonly linearBackoff: (step: Duration) => RetryPolicyBuilder;
+  /** Enable or disable random jitter on the delay. */
   readonly jitter: (enabled?: boolean) => RetryPolicyBuilder;
+  /** Cap the delay at the given maximum regardless of backoff calculation. */
   readonly maxDelay: (d: Duration) => RetryPolicyBuilder;
+  /** Set a predicate to decide whether a given error should be retried. */
   readonly shouldRetry: (predicate: (error: unknown) => boolean) => RetryPolicyBuilder;
+  /** Build and freeze the retry policy. */
   readonly build: () => RetryPolicy;
 }
 
@@ -186,17 +194,22 @@ const applyRetry = <T, E>(
  * ```
  */
 export const Retry: {
+  /** Start building a retry policy with the fluent builder API. */
   readonly policy: () => RetryPolicyBuilder;
+  /** Apply a retry policy to a task. Returns a new task that retries on failure. */
   readonly apply: <T, E>(
     policy: RetryPolicy,
     task: TaskLike<T, E>,
     factory?: TaskFactory,
   ) => TaskLike<T, E>;
+  /** Curried version of apply, suitable for use with pipe. */
   readonly withPolicy: <T, E>(
     policy: RetryPolicy,
     factory?: TaskFactory,
   ) => (task: TaskLike<T, E>) => TaskLike<T, E>;
+  /** Create a fixed-delay retry policy. */
   readonly fixed: (attempts: number, delay: Duration) => RetryPolicy;
+  /** Create an exponential-backoff retry policy. */
   readonly exponential: (attempts: number, baseDelay: Duration) => RetryPolicy;
 } = {
   policy: () => createPolicyBuilder(defaultConfig),

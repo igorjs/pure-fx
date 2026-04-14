@@ -220,6 +220,7 @@ const createQueue = <T>(options: QueueOptions<T>): QueueInstance<T> => {
  * ```
  */
 export const Queue: {
+  /** Create a new async job queue with the given options. */
   readonly create: <T>(options: QueueOptions<T>) => QueueInstance<T>;
 } = {
   create: createQueue,

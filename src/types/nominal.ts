@@ -38,4 +38,5 @@
  */
 declare const __brand: unique symbol;
 
+/** Phantom-branded nominal type. `Type<Name, Base>` brands `Base` with a compile-time-only `Name` tag. */
 export type Type<Name extends string, Base> = Base & { readonly [__brand]: Name };

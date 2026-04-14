@@ -155,6 +155,7 @@ const createInstance = <Events extends Record<string, unknown>>(): EventEmitterI
  * ```
  */
 export const EventEmitter: {
+  /** Create a new type-safe event emitter instance. */
   readonly create: <Events extends Record<string, unknown>>() => EventEmitterInstance<Events>;
 } = {
   create: createInstance,

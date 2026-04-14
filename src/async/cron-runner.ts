@@ -182,6 +182,7 @@ const createCronRunner = (options: CronRunnerOptions): CronRunnerInstance => {
  * ```
  */
 export const CronRunner: {
+  /** Create a new cron-scheduled task runner. */
   readonly create: (options: CronRunnerOptions) => CronRunnerInstance;
 } = {
   create: createCronRunner,
