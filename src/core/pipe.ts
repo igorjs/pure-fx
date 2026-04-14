@@ -31,6 +31,7 @@
  * )
  * ```
  */
+/** Pass a value through a sequence of unary functions left-to-right. */
 export function pipe<A>(a: A): A;
 export function pipe<A, B>(a: A, ab: (a: A) => B): B;
 export function pipe<A, B, C>(a: A, ab: (a: A) => B, bc: (b: B) => C): C;
@@ -99,6 +100,7 @@ export function pipe(initial: unknown, ...fns: ((arg: unknown) => unknown)[]): u
  * processUser(rawInput);
  * ```
  */
+/** Compose functions left-to-right, returning a new function. */
 export function flow<A, B>(ab: (a: A) => B): (a: A) => B;
 export function flow<A, B, C>(ab: (a: A) => B, bc: (b: B) => C): (a: A) => C;
 export function flow<A, B, C, D>(ab: (a: A) => B, bc: (b: B) => C, cd: (c: C) => D): (a: A) => D;

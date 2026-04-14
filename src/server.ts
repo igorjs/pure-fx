@@ -459,34 +459,42 @@ export interface ServerBuilder<Ctx extends Record<string, unknown> = Record<stri
     resolver: (req: Request, ctx: Ctx) => Task<Ext, ServerError>,
   ): ServerBuilder<Ctx & Ext>;
 
+  /** Register a GET route handler. */
   get<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register a POST route handler. */
   post<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register a PUT route handler. */
   put<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register a PATCH route handler. */
   patch<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register a DELETE route handler. */
   delete<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register a HEAD route handler. */
   head<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register an OPTIONS route handler. */
   options<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,
   ): ServerBuilder<Ctx>;
+  /** Register a catch-all route handler matching any HTTP method. */
   all<P extends string>(
     pattern: P,
     handler: (ctx: Context<P> & Ctx) => Response | Task<Response, ServerError>,

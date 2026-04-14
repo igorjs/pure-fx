@@ -81,13 +81,17 @@ const loadConfig = <T extends ConfigShape>(
  * ```
  */
 export const Config: {
+  /** Define a typed config shape and get a loader with load() and loadFrom(). */
   readonly from: <T extends ConfigShape>(
     shape: T,
   ) => {
+    /** Load config from the runtime environment (process.env or Deno.env). */
     readonly load: () => Result<InferConfig<T>, SchemaError>;
+    /** Load config from a custom env record (useful for testing). */
     readonly loadFrom: (
       env: Record<string, string | undefined>,
     ) => Result<InferConfig<T>, SchemaError>;
+    /** The original schema shape definition. */
     readonly shape: T;
   };
 } = {

@@ -207,22 +207,33 @@ export type Task<T, E> = TaskImpl<T, E>;
  * ```
  */
 export const Task: {
+  /** Create a Task from a thunk returning Promise of Result. */
   <T, E>(run: () => Promise<Result<T, E>>): Task<T, E>;
+  /** Create a Task from a plain value. Always succeeds. */
   readonly of: <T>(value: T) => Task<T, never>;
+  /** Create a Task from an existing Result. */
   readonly fromResult: <T, E>(result: Result<T, E>) => Task<T, E>;
+  /** Create a Task from a Promise, catching rejections. */
   readonly fromPromise: <T, E = unknown>(
     promise: () => Promise<T>,
     onError?: (e: unknown) => E,
   ) => Task<T, E>;
+  /** Run all tasks in parallel, collecting results. Short-circuits on first error. */
   readonly all: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly T[], E>;
+  /** Race all tasks. The first to settle wins. */
   readonly race: <T, E>(tasks: readonly Task<T, E>[]) => Task<T, E>;
+  /** Run all tasks in parallel, collecting every Result (never short-circuits). */
   readonly allSettled: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly Result<T, E>[], never>;
+  /** Map each element through an async fallible function, collecting in parallel. */
   readonly traverse: <A, T, E>(
     items: readonly A[],
     fn: (item: A) => Task<T, E>,
   ) => Task<readonly T[], E>;
+  /** Alias for Task.all. Runs tasks in parallel and collects results. */
   readonly sequence: <T, E>(tasks: readonly Task<T, E>[]) => Task<readonly T[], E>;
+  /** Applicative apply: run both tasks in parallel, apply the function to the value. */
   readonly ap: <A, B, E>(fnTask: Task<(a: A) => B, E>, argTask: Task<A, E>) => Task<B, E>;
+  /** Type guard: returns true if value is a Task instance. */
   readonly is: (value: unknown) => value is Task<unknown, unknown>;
 } = Object.assign(<T, E>(run: () => Promise<Result<T, E>>): Task<T, E> => new TaskImpl(run), {
   /**

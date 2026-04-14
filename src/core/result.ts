@@ -33,7 +33,9 @@ export type Result<T, E> = OkImpl<T, E> | ErrImpl<T, E>;
 
 /** Pattern-match arms for {@link Result.match}. */
 export interface ResultMatcher<T, E, U> {
+  /** Handler for the Ok variant. */
   readonly Ok: (value: T) => U;
+  /** Handler for the Err variant. */
   readonly Err: (error: E) => U;
 }
 
@@ -45,20 +47,35 @@ export interface ResultMatcher<T, E, U> {
  * narrowing via `.isOk` / `.isErr` without casting.
  */
 interface ResultMethods<T, E> {
+  /** Transform the success value. */
   map<U>(fn: (value: T) => U): Result<U, E>;
+  /** Transform the error value. */
   mapErr<F>(_fn: (error: E) => F): Result<T, F>;
+  /** Chain into a dependent computation that may fail. */
   flatMap<U>(fn: (value: T) => Result<U, E>): Result<U, E>;
+  /** Run a side-effect on the success value without altering the Result. */
   tap(fn: (value: T) => void): Result<T, E>;
+  /** Run a side-effect on the error without altering the Result. */
   tapErr(_fn: (error: E) => void): Result<T, E>;
+  /** Extract the value or throw if Err. */
   unwrap(): T;
+  /** Extract the value or return the fallback. */
   unwrapOr(_fallback: T): T;
+  /** Extract the value or compute a fallback from the error. */
   unwrapOrElse(_fn: (error: E) => T): T;
+  /** Extract the error or throw if Ok. */
   unwrapErr(): never | E;
+  /** Pattern match on Ok or Err. */
   match<U>(m: ResultMatcher<T, E, U>): U;
+  /** Convert to Option: Ok becomes Some, Err becomes None. */
   toOption(): Option<T>;
+  /** Pair this value with another Result's value. */
   zip<U>(other: Result<U, E>): Result<[T, U], E>;
+  /** Apply a wrapped function to this value. */
   ap<U>(fnResult: Result<(value: T) => U, E>): Result<U, E>;
+  /** Serialize to a JSON-safe tagged object. */
   toJSON(): { tag: "Ok"; value: T } | { tag: "Err"; error: E };
+  /** Human-readable string representation. */
   toString(): string;
 }
 
@@ -71,12 +88,15 @@ interface ResultMethods<T, E> {
  * Construct via the {@link Ok} factory rather than `new OkImpl(...)`.
  */
 export class OkImpl<T, E> implements ResultMethods<T, E> {
+  /** Discriminant tag for pattern matching. */
   readonly tag = "Ok" as const;
-  constructor(readonly value: T) {}
+  constructor(/** The wrapped success value. */ readonly value: T) {}
 
+  /** Whether this is an Ok variant. Always true. */
   get isOk(): true {
     return true;
   }
+  /** Whether this is an Err variant. Always false. */
   get isErr(): false {
     return false;
   }
@@ -146,6 +166,7 @@ export class OkImpl<T, E> implements ResultMethods<T, E> {
   toJSON(): { tag: "Ok"; value: T } {
     return { tag: "Ok", value: this.value };
   }
+  /** Human-readable string representation. */
   toString(): string {
     return `Ok(${String(this.value)})`;
   }
@@ -160,12 +181,15 @@ export class OkImpl<T, E> implements ResultMethods<T, E> {
  * Construct via the {@link Err} factory rather than `new ErrImpl(...)`.
  */
 export class ErrImpl<T, E> implements ResultMethods<T, E> {
+  /** Discriminant tag for pattern matching. */
   readonly tag = "Err" as const;
-  constructor(readonly error: E) {}
+  constructor(/** The wrapped error value. */ readonly error: E) {}
 
+  /** Whether this is an Ok variant. Always false. */
   get isOk(): false {
     return false;
   }
+  /** Whether this is an Err variant. Always true. */
   get isErr(): true {
     return true;
   }
@@ -227,6 +251,7 @@ export class ErrImpl<T, E> implements ResultMethods<T, E> {
   toJSON(): { tag: "Err"; error: E } {
     return { tag: "Err", error: this.error };
   }
+  /** Human-readable string representation. */
   toString(): string {
     return `Err(${String(this.error)})`;
   }

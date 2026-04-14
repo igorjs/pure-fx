@@ -135,6 +135,7 @@ const createRouter = (routes: readonly WebSocketRoute[]): WebSocketRouter =>
  * ```
  */
 export const WebSocket: {
+  /** Create a new WebSocket router for registering route handlers. */
   readonly router: () => WebSocketRouter;
 } = {
   router: () => createRouter([]),

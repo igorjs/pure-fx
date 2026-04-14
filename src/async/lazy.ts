@@ -154,7 +154,9 @@ export type Lazy<T> = LazyImpl<T>;
  * ```
  */
 export const Lazy: {
+  /** Create a Lazy value from a deferred thunk. */
   <T>(thunk: () => T): Lazy<T>;
+  /** Type guard: returns true if value is a Lazy instance. */
   readonly is: (value: unknown) => value is Lazy<unknown>;
 } = Object.assign(<T>(thunk: () => T): Lazy<T> => new LazyImpl(thunk), {
   /** Type guard: returns true if `value` is a Lazy instance. */

@@ -164,7 +164,9 @@ const createUnboundedChannel = <T>(): Channel<T> => createBoundedChannel(Number.
  * ```
  */
 export const Channel: {
+  /** Create a bounded channel with backpressure when the buffer is full. */
   readonly bounded: <T>(capacity: number) => Channel<T>;
+  /** Create an unbounded channel that never blocks on send. */
   readonly unbounded: <T>() => Channel<T>;
 } = {
   bounded: createBoundedChannel,

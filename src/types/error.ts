@@ -82,14 +82,23 @@ const isErrType = (value: unknown): value is ErrType<string, string> => {
  * ```
  */
 interface ErrTypeInstance<Tag extends string, Code extends string> {
+  /** Brand symbol for cross-realm identification. */
   readonly [ERR_TYPE_BRAND]: true;
+  /** The literal tag discriminant for this error type. */
   readonly tag: Tag;
+  /** Alias for tag, matching Error.name convention. */
   readonly name: Tag;
+  /** The SCREAMING_SNAKE code for this error type. */
   readonly code: Code;
+  /** Human-readable error message. */
   readonly message: string;
+  /** Additional key-value metadata attached to this error. */
   readonly metadata: Readonly<Record<string, unknown>>;
+  /** Optional underlying cause of this error. */
   readonly cause: unknown | undefined;
+  /** Unix timestamp (ms) when this error was created. */
   readonly timestamp: number;
+  /** Stack trace captured at construction time, if available. */
   readonly stack: string | undefined;
 
   /** Wrap this error in `Err(this)` to create a `Result`. */
@@ -97,12 +106,19 @@ interface ErrTypeInstance<Tag extends string, Code extends string> {
 
   /** Serialize all fields except `stack`. Includes `cause` only if defined. */
   toJSON(): {
+    /** The tag discriminant. */
     readonly tag: Tag;
+    /** Alias for tag. */
     readonly name: Tag;
+    /** The error code. */
     readonly code: Code;
+    /** The error message. */
     readonly message: string;
+    /** Attached metadata. */
     readonly metadata: Readonly<Record<string, unknown>>;
+    /** Creation timestamp in milliseconds. */
     readonly timestamp: number;
+    /** Underlying cause, if present. */
     readonly cause?: unknown;
   };
 
@@ -281,7 +297,9 @@ export type ErrType<Tag extends string, Code extends string = string> = ErrTypeI
  * ```
  */
 export const ErrType: {
+  /** Define an error kind with auto-derived SCREAMING_SNAKE code. */
   <Tag extends string>(tag: Tag): ErrTypeConstructor<Tag, string>;
+  /** Define an error kind with an explicit code. */
   <Tag extends string, Code extends string>(tag: Tag, code: Code): ErrTypeConstructor<Tag, Code>;
   /** Type guard: check whether `value` is any {@link ErrType} instance. */
   is(value: unknown): value is ErrType<string, string>;
