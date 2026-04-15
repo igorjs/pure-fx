@@ -38,9 +38,9 @@ Result.fromNullable(maybeValue, () => 'was null');
 Result.partition([Ok(1), Err('a'), Ok(2)]); // { ok: [1, 2], err: ['a'] }
 ```
 
-**Methods:** `map`, `flatMap`, `tap`, `zip`, `ap`, `match`, `unwrap`, `unwrapOr`, `unwrapOrElse`, `toOption`, `isOk`, `isErr`
+**Methods:** `map`, `mapErr`, `flatMap`, `tap`, `tapErr`, `zip`, `ap`, `match`, `unwrap`, `unwrapOr`, `unwrapOrElse`, `unwrapErr`, `toOption`, `toJSON`, `toString`, `isOk`, `isErr`
 
-**Static:** `Ok`, `Err`, `tryCatch`, `fromNullable`, `collect`, `traverse`, `partition`, `is`
+**Static:** `Ok`, `Err`, `tryCatch`, `fromNullable`, `collect`, `sequence`, `traverse`, `partition`, `match`, `is`
 
 ## Option\<T\>
 
@@ -57,9 +57,23 @@ find('u1').map(u => u.name).unwrapOr('anonymous');
 // Convert nullable
 Option.fromNullable(document.getElementById('app'));
 
+// Collect array of Options
+Option.collect([Some(1), Some(2)]); // Some([1, 2])
+Option.collect([Some(1), None]);    // None
+
 // Partition
 Option.partition([Some(1), None, Some(2)]); // { some: [1, 2], none: 1 }
+
+// Filter, or, toResult
+Some(5).filter(n => n > 3);         // Some(5)
+Some(1).filter(n => n > 3);         // None
+None.or(Some(99));                   // Some(99)
+Some('ok').toResult('missing');      // Ok('ok')
 ```
+
+**Methods:** `map`, `flatMap`, `filter`, `tap`, `zip`, `ap`, `or`, `match`, `unwrap`, `unwrapOr`, `unwrapOrElse`, `toResult`, `toJSON`, `toString`, `isSome`, `isNone`
+
+**Static:** `Some`, `None`, `fromNullable`, `collect`, `sequence`, `traverse`, `partition`, `match`, `is`
 
 ## pipe / flow
 
