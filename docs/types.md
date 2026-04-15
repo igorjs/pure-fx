@@ -74,11 +74,38 @@ Duration.toMinutes(d);              // 1.5
 Duration.minutes(5);                // 300000
 Duration.hours(1);                  // 3600000
 Duration.days(7);                   // 604800000
+Duration.toHours(Duration.minutes(90)); // 1.5
+
+// Arithmetic
+const total = Duration.add(Duration.minutes(5), Duration.seconds(30));
+Duration.toSeconds(total);          // 330
+Duration.subtract(Duration.hours(1), Duration.minutes(15));
+Duration.multiply(Duration.seconds(10), 3);
+
+// Predicates and formatting
+Duration.isZero(Duration.zero);     // true
+Duration.isPositive(Duration.seconds(1)); // true
+Duration.format(Duration.add(Duration.hours(2), Duration.minutes(30)));
+// "2h 30m"
+
+// Typeclass instances
+Duration.eq.equals(Duration.seconds(1), Duration.milliseconds(1000)); // true
+Duration.ord.compare(Duration.seconds(1), Duration.seconds(2));       // -1
 
 // Used in APIs that accept Duration:
 Stream.interval(Duration.seconds(1));
 Retry.exponential({ base: Duration.milliseconds(100) });
 ```
+
+**Factories:** `milliseconds`, `seconds`, `minutes`, `hours`, `days`
+
+**Conversions:** `toMilliseconds`, `toSeconds`, `toMinutes`, `toHours`
+
+**Arithmetic:** `add`, `subtract`, `multiply`
+
+**Predicates:** `isZero`, `isPositive`
+
+**Other:** `format`, `zero`, `eq`, `ord`
 
 ## Cron
 
@@ -88,10 +115,16 @@ Cron expression parser with field validation.
 import { Cron } from '@igorjs/pure-ts'
 
 const expr = Cron.parse('*/5 * * * *');
-// Result<CronExpression, string>
+// Result<CronExpression, SchemaError>
 
+// Next occurrence after a given date
 if (expr.isOk) {
-  expr.value.minute;  // '*/5'
-  expr.value.hour;    // '*'
+  const next = Cron.next(expr.value);        // Option<Date>
+  const nextAfter = Cron.next(expr.value, new Date('2025-01-01'));
+
+  // Check if a date matches the schedule
+  Cron.matches(expr.value, new Date());      // boolean
 }
 ```
+
+**Static:** `parse`, `next`, `matches`

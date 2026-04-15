@@ -29,24 +29,29 @@ Adapters: `nodeAdapter`, `denoAdapter`, `bunAdapter`, `lambdaAdapter`
 
 ## Program
 
-Effect system for CLI entry points with signal handling and graceful shutdown.
+Process lifecycle wrapper for Task-based CLI programs with signal handling and graceful shutdown.
 
 ```ts
-import { Program } from '@igorjs/pure-ts'
+import { Program, Task } from '@igorjs/pure-ts'
 
-Program.create()
-  .setup(async () => {
-    // initialization
-    return { db: await connectDb() };
-  })
-  .run(async ({ db }) => {
-    // main logic
-    await processQueue(db);
-  })
-  .teardown(async ({ db }) => {
-    await db.close();
-  })
-  .execute(); // handles SIGTERM/SIGINT, returns exit code
+// Create from a Task or effect function receiving AbortSignal
+const main = Program('my-service', (signal) =>
+  Task.fromPromise(
+    () => startServer({ signal }),
+    String,
+  ),
+  { teardownTimeoutMs: 5000 },
+);
+
+// Production: handles SIGINT/SIGTERM, logs, calls process.exit
+await main.run();
+
+// Testing: returns raw Result, no process lifecycle
+const result = await main.execute();
+
+// With a plain Task (no signal needed)
+const simple = Program('worker', Task.of('done'));
+await simple.run();
 ```
 
 ## Logger
@@ -68,12 +73,21 @@ Environment variable validation via Schema.
 ```ts
 import { Config, Schema } from '@igorjs/pure-ts'
 
-const config = Config.from({
+const AppConfig = Config.from({
   PORT: Schema.string.transform(Number),
   DATABASE_URL: Schema.string,
   DEBUG: Schema.boolean.default(false),
-}).load();
+});
+
+// Load from process.env / Deno.env (auto-detected)
+const config = AppConfig.load();
 // Result<{ PORT: number, DATABASE_URL: string, DEBUG: boolean }, SchemaError>
+
+// Load from a custom env record (useful for testing)
+const testConfig = AppConfig.loadFrom({
+  PORT: '3000',
+  DATABASE_URL: 'postgres://localhost/test',
+});
 ```
 
 ## Os / Process / Path
@@ -91,6 +105,9 @@ Os.homeDir();     // Option<string>
 Process.cwd();    // Result<string, ProcessError>
 Process.pid();    // Option<number>
 Process.argv();   // readonly string[]
+Process.uptime();      // Option<number> (seconds)
+Process.memoryUsage(); // Option<{ heapUsed, heapTotal, rss }>
+Process.exit(0);       // never (terminates the process)
 Process.parseArgs({ port: Schema.string.transform(Number) });
 // Result<{ port: number }, SchemaError>
 

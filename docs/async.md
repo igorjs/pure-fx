@@ -133,10 +133,95 @@ const result = await limiter.tryAcquire(); // Ok(void) or Err(RateLimited)
 const cache = Cache.create<string, User>({ ttl: Duration.minutes(5) });
 await cache.getOrSet('user:1', () => fetchUser('1'));
 
-// Channel: async message passing
-const ch = Channel.create<string>(10); // buffer size
-await ch.send('hello');
-const msg = await ch.receive(); // 'hello'
+// Channel: see Channel section below
+```
+
+## Lazy
+
+Deferred computation that evaluates at most once and caches the result. Implements `Disposable` for scoped cleanup.
+
+```ts
+import { Lazy } from '@igorjs/pure-ts'
+
+const config = Lazy(() => loadExpensiveConfig());
+
+config.isEvaluated;         // false
+const value = config.value; // evaluates and caches
+config.value;               // returns cached (no re-evaluation)
+config.isEvaluated;         // true
+
+// Transform (still deferred)
+const port = config.map(c => c.port);
+
+// Safe access
+config.unwrapOr(defaultConfig);
+config.toOption();  // Some(value) or None if thunk throws
+config.toResult(e => String(e)); // Ok(value) or Err(message)
+
+// Scoped with `using` (ES2024 Disposable)
+{
+  using data = Lazy(() => parseHugeDataset());
+  transform(data.value);
+} // data disposed, memory released
+```
+
+## Env
+
+Reader-style dependency injection for async pipelines. Compose first, provide dependencies at the edge.
+
+```ts
+import { Env } from '@igorjs/pure-ts'
+
+type Deps = { db: Database; logger: Logger };
+
+const getUser = (id: string) =>
+  Env.access<Deps>().flatMap(({ db }) =>
+    Env.fromSync(env => db.query('SELECT ...', [id]))
+  );
+
+// Provide environment at the entry point
+const result = await getUser('u_123').run({ db, logger });
+
+// Compose
+Env.of<Deps, number>(42);           // wrap a plain value
+Env.access<Deps>();                   // access the full environment
+Env.from<Deps, User, Error>(async env => /* ... */);
+Env.fromSync<Deps, string>(env => env.db.url);
+
+// Narrow environment
+const narrowed = getUser('u_1').provide((small: { db: Database }) =>
+  ({ ...small, logger: console })
+);
+```
+
+## Channel
+
+Async producer/consumer communication with backpressure. Bounded channels block sends when the buffer is full.
+
+```ts
+import { Channel, Stream } from '@igorjs/pure-ts'
+
+// Bounded channel (backpressure when buffer fills)
+const ch = Channel.bounded<number>(10);
+
+// Unbounded channel (never blocks on send)
+const uch = Channel.unbounded<string>();
+
+// Producer
+await ch.send(1);
+await ch.send(2);
+ch.close();
+
+// Consumer (as async iterable)
+for await (const value of ch.receive()) {
+  console.log(value); // 1, 2
+}
+
+ch.isClosed(); // true
+ch.size();     // 0 (buffered items)
+
+// Bridge to Stream
+const stream = Stream.from(ch.receive());
 ```
 
 ## StateMachine
@@ -232,10 +317,12 @@ const runner = CronRunner.create({
   handler: async () => {
     await cleanupExpiredSessions();
   },
+  onError: (err) => console.log('Cron failed:', err),
   runImmediately: true,
 });
 
 runner.start();
 runner.isRunning(); // true
+runner.nextRun();   // Date | undefined
 runner.stop();
 ```

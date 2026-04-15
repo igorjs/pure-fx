@@ -6,11 +6,11 @@ Functional application framework for TypeScript. Zero dependencies. Errors as va
 
 | Module | Description | Doc |
 |--------|-------------|-----|
-| **Core** | Result, Option, pipe, flow, Match, Eq, Ord, State, Lens, Iso | [core.md](core.md) |
+| **Core** | Result, Option, pipe, flow, Match, Eq, Ord, State, Lens, Prism, Traversal, Iso | [core.md](core.md) |
 | **Data** | Record, List, NonEmptyList, Schema, Codec, ADT | [data.md](data.md) |
-| **Async** | Task, Stream, Lazy, Env, Timer, Retry, CircuitBreaker, StateMachine, EventEmitter, Pool, Queue, CronRunner | [async.md](async.md) |
-| **IO** | File, Command, Json, Crypto, Encoding, Compression, Url, Dns, Net | [io.md](io.md) |
-| **Runtime** | Server, Program, Logger, Config, Os, Process, Path | [runtime.md](runtime.md) |
+| **Async** | Task, Stream, Lazy, Env, Channel, Timer, Retry, CircuitBreaker, Semaphore, Mutex, RateLimiter, Cache, StateMachine, EventEmitter, Pool, Queue, CronRunner | [async.md](async.md) |
+| **IO** | File, Command, Json, Crypto, Encoding, Compression, Clone, Url, Dns, Net, Client, WebSocket | [io.md](io.md) |
+| **Runtime** | Server, Program, Logger, Config, Os, Process, Path, Eol, Platform | [runtime.md](runtime.md) |
 | **Types** | ErrType, Duration, Cron, Type (nominal) | [types.md](types.md) |
 | **StateMachine** | Type-safe FSM with compile-time transitions | [state-machine.md](state-machine.md) |
 

@@ -20,6 +20,9 @@ stat.value.isFile;      // true
 stat.value.size;        // 1234
 stat.value.mtime;       // Date
 
+// Delete a single file
+await File.remove('./old.txt').run();
+
 // Directory operations
 await File.makeDir('./a/b/c').run();        // recursive
 await File.removeDir('./tmp').run();         // recursive
