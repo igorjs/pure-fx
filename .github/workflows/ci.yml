@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - run: corepack enable
 
       - uses: actions/setup-node@v6
         with:
@@ -50,6 +51,7 @@ jobs:
     name: smoke / node-${{ matrix.node-version }}
     steps:
       - uses: actions/checkout@v6
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
@@ -67,6 +69,7 @@ jobs:
     name: smoke / deno
     steps:
       - uses: actions/checkout@v6
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -85,6 +88,7 @@ jobs:
     name: smoke / bun
     steps:
       - uses: actions/checkout@v6
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -103,6 +107,7 @@ jobs:
     name: smoke / cf-workers
     steps:
       - uses: actions/checkout@v6
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -119,6 +124,7 @@ jobs:
     name: smoke / browser
     steps:
       - uses: actions/checkout@v6
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: 24
