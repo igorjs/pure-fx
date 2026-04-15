@@ -223,3 +223,41 @@ describe("Program.run() signal handling", () => {
     assert.ok(elapsed < 3000, `Expected exit within 3s, took ${elapsed}ms`);
   });
 });
+
+// ── Silent option ───────────────────────────────────────────────────────────
+
+describe("Program.run() silent option", () => {
+  it("suppresses started/completed logs on Ok", async () => {
+    const r = await runFixture("program-silent.js");
+    assert.equal(r.code, 0);
+    assert.equal(r.stdout, "", "stdout should be empty with silent: true");
+    assert.equal(r.stderr, "", "stderr should be empty on silent Ok");
+  });
+
+  it("still logs errors to stderr even when silent", async () => {
+    const r = await runFixture("program-silent-err.js");
+    assert.equal(r.code, 1);
+    assert.equal(r.stdout, "", "stdout should be empty with silent: true");
+    assert.ok(r.stderr.includes("error: silent-fail"), "errors are never suppressed");
+  });
+});
+
+// ── Custom logger ───────────────────────────────────────────────────────────
+
+describe("Program.run() custom logger", () => {
+  it("uses Logger for lifecycle messages instead of console", async () => {
+    const r = await runFixture("program-logger.js");
+    assert.equal(r.code, 0);
+    // Logger.json writes to stdout. Parse each line as JSON.
+    const lines = r.stdout.trim().split("\n").filter(Boolean);
+    assert.ok(lines.length >= 2, `Expected at least 2 log lines, got ${lines.length}`);
+    const started = JSON.parse(lines[0]);
+    assert.equal(started.name, "custom");
+    assert.equal(started.level, "info");
+    assert.equal(started.message, "started");
+    const completed = JSON.parse(lines[lines.length - 1]);
+    assert.equal(completed.message, "completed");
+    // No raw console.log output (no [test] tag)
+    assert.ok(!r.stdout.includes("[test]"), "should not use console.log when logger is provided");
+  });
+});
