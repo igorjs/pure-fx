@@ -72,7 +72,12 @@ jobs:
       - run: pnpm run build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: npm publish --provenance --access public
 
   publish-gpr:
     needs: verify
@@ -92,7 +97,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - run: pnpm publish --no-git-checks
+
+      - name: Publish to GitHub Packages
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -105,7 +117,13 @@ jobs:
       - name: Set version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
-      - run: npx jsr publish
+      - name: Publish to JSR
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: npx jsr publish
 
   sync-version:
     needs: [publish-npm, publish-gpr, publish-jsr]
