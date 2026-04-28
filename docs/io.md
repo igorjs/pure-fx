@@ -131,6 +131,49 @@ const records = await Dns.resolve('example.com', 'A').run();
 const conn = await Net.connect({ host: 'localhost', port: 8080 }).run();
 ```
 
+## Terminal
+
+Cross-runtime terminal interaction for stdin reading, prompting, and password input. Handles TTY detection, piped input, timeouts, and EOF across Node, Deno, and Bun.
+
+```ts
+import { Terminal } from '@igorjs/pure-fx'
+
+// Check if running interactively
+Terminal.isInteractive(); // true if TTY, false if piped/CI
+
+// Read a line with prompt
+const name = await Terminal.readLine('Name: ').run();
+// Ok(Some("Alice")) or Ok(None) on EOF
+
+// Read with timeout (prevents blocking in hooks/daemons)
+const line = await Terminal.readLine('> ', { timeout: 5000 }).run();
+// Ok(None) if no input within 5 seconds
+
+// Read password (masked with asterisks, handles backspace)
+const pw = await Terminal.readPassword('Password: ').run();
+// Ok(Some("secret")) or Ok(None) on Ctrl+C/Ctrl+D
+
+// Yes/no confirmation (re-prompts on invalid input)
+const ok = await Terminal.confirm('Deploy to production?').run();
+// Ok(true) or Ok(false)
+
+// Read all piped stdin (non-blocking on TTY)
+// echo "data" | node app.js
+const input = await Terminal.readAll().run();
+// Ok("data\n")
+
+// Terminal size
+const size = Terminal.size();
+// Some({ columns: 120, rows: 40 }) or None
+
+// Clear screen
+Terminal.clear();
+
+// Write to stdout
+Terminal.write('loading...');
+Terminal.writeLine('done');
+```
+
 ## WebSocket
 
 Type-safe WebSocket routing with event handlers. Defines routes and handlers; actual upgrade is handled by the runtime adapter (Bun, Deno, or Node).

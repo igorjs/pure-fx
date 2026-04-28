@@ -80,6 +80,14 @@ export { CommandError } from "./subprocess.js";
 export type { CommandOptions } from "./subprocess.js";
 /** Output of a subprocess execution (exitCode, stdout, stderr). */
 export type { CommandResult } from "./subprocess.js";
+/** Cross-runtime terminal interaction for stdin reading and prompting. */
+export { Terminal } from "./terminal.js";
+/** Error returned when a terminal operation fails. */
+export { TerminalError } from "./terminal.js";
+/** Options for terminal read operations (timeout). */
+export type { TerminalReadOptions } from "./terminal.js";
+/** Terminal dimensions in character cells. */
+export type { TerminalSize } from "./terminal.js";
 /** URL parsing and manipulation namespace returning Result. */
 export { Url } from "./url.js";
 /** Error returned when URL parsing or construction fails. */
