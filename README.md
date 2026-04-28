@@ -65,7 +65,7 @@ const content = await File.read('./config.json').run();
 | **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec`, `ADT`, `StableVec` | [docs/data.md](docs/data.md) |
 | **Types** | `ErrType`, `Type`, `Duration`, `Cron` | [docs/types.md](docs/types.md) |
 | **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel`, `StateMachine`, `EventEmitter`, `Pool`, `Queue`, `CronRunner` | [docs/async.md](docs/async.md) |
-| **IO** | `File`, `Command`, `Json`, `Crypto`, `Encoding`, `Compression`, `Clone`, `Url`, `Client`, `WebSocket`, `Dns`, `Net` | [docs/io.md](docs/io.md) |
+| **IO** | `File`, `Command`, `Json`, `Crypto`, `Encoding`, `Compression`, `Clone`, `Url`, `Client`, `Terminal`, `WebSocket`, `Dns`, `Net` | [docs/io.md](docs/io.md) |
 | **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Os`, `Process`, `Path`, `Eol`, `Platform` | [docs/runtime.md](docs/runtime.md) |
 
 [Full documentation with examples](docs/index.md)
