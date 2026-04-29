@@ -50,6 +50,7 @@ interface NodeChildProcess {
 }
 
 interface NodeChild {
+  readonly pid?: number | undefined;
   readonly stdin: { write(data: string, encoding?: string): boolean; end(): void } | null;
   readonly stdout: {
     on(event: "data", cb: (chunk: { toString(): string }) => void): unknown;
@@ -59,7 +60,8 @@ interface NodeChild {
   } | null;
   on(event: "close", cb: (code: number | null) => void): unknown;
   on(event: "error", cb: (err: Error) => void): unknown;
-  kill(): boolean;
+  kill(signal?: string): boolean;
+  unref?(): void;
 }
 
 const getNodeCp = importNode<NodeChildProcess>("node:child_process");
@@ -177,6 +179,39 @@ const createDenoSubprocess = (): Subprocess | undefined => {
         stderr: decoder.decode(output.stderr),
       };
     },
+
+    spawn: async (cmd, args, options) => {
+      const spawnOpts = buildOpts(options);
+      const pipeOpts = options.capture === true ? { stdout: "piped", stderr: "piped" } : {};
+      const proc = new (
+        Cmd as new (
+          ...a: unknown[]
+        ) => {
+          spawn(): {
+            readonly pid: number;
+            output(): Promise<{ code: number; stdout: Uint8Array; stderr: Uint8Array }>;
+            kill(signal?: string): void;
+            unref(): void;
+          };
+        }
+      )(cmd, { args, ...pipeOpts, ...spawnOpts });
+      const child = proc.spawn();
+      const decoder = new TextDecoder();
+
+      return {
+        pid: child.pid,
+        kill: (signal?) => child.kill(signal),
+        unref: () => child.unref(),
+        wait: async () => {
+          const output = await child.output();
+          return {
+            exitCode: output.code,
+            stdout: decoder.decode(output.stdout),
+            stderr: decoder.decode(output.stderr),
+          };
+        },
+      };
+    },
   };
 };
 
@@ -230,6 +265,24 @@ const createBunSubprocess = (): Subprocess | undefined => {
         exitCode: result.exitCode,
         stdout: result.stdout.toString(),
         stderr: result.stderr.toString(),
+      };
+    },
+
+    spawn: async (cmd, args, options) => {
+      const spawnOpts = buildOpts(options);
+      const child = bun.spawn([cmd, ...args], spawnOpts);
+      return {
+        pid: (child as unknown as { pid?: number }).pid,
+        kill: () => child.kill(),
+        unref: () => (child as unknown as { unref?(): void }).unref?.(),
+        wait: async () => {
+          const [exitCode, stdout, stderr] = await Promise.all([
+            child.exited,
+            new Response(child.stdout).text(),
+            new Response(child.stderr).text(),
+          ]);
+          return { exitCode, stdout, stderr };
+        },
       };
     },
   };
@@ -304,6 +357,37 @@ const createNodeSubprocess = (): Subprocess => ({
         reject(error);
       });
     });
+  },
+
+  spawn: async (cmd, args, options) => {
+    const cp = await getNodeCp();
+    if (cp === null) throw new Error("node:child_process not available");
+
+    const nodeOpts: { cwd?: string; env?: Record<string, string>; stdio?: string[] } =
+      buildOpts(options);
+    if (options.capture !== true) {
+      nodeOpts.stdio = ["ignore", "inherit", "inherit"];
+    }
+    const child = cp.spawn(cmd, args, nodeOpts);
+
+    return {
+      pid: child.pid,
+      kill: (signal?) => child.kill(signal),
+      unref: () => child.unref?.(),
+      wait: () =>
+        new Promise<SubprocessResult>((resolve, reject) => {
+          let stdout = "";
+          let stderr = "";
+          child.stdout?.on("data", chunk => {
+            stdout += chunk.toString();
+          });
+          child.stderr?.on("data", chunk => {
+            stderr += chunk.toString();
+          });
+          child.on("error", reject);
+          child.on("close", code => resolve({ exitCode: code ?? 1, stdout, stderr }));
+        }),
+    };
   },
 });
 

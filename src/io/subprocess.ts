@@ -14,6 +14,8 @@
  */
 
 import { makeTask, type TaskLike } from "../async/task-like.js";
+import type { Option } from "../core/option.js";
+import { None, Some } from "../core/option.js";
 import { Err, Ok } from "../core/result.js";
 import { resolveSubprocess } from "../runtime/adapters/subprocess.js";
 import { ErrType, type ErrTypeConstructor } from "../types/error.js";
@@ -42,33 +44,78 @@ export interface CommandOptions {
   readonly stdin?: string | undefined;
 }
 
+/** Options for spawning a background process. */
+export interface SpawnOptions {
+  readonly cwd?: string | undefined;
+  readonly env?: Record<string, string> | undefined;
+  /** Pipe and collect stdout/stderr (default: inherit parent streams). */
+  readonly capture?: boolean | undefined;
+}
+
+// ── Child process handle ────────────────────────────────────────────────────
+
+/** A spawned background process with lifecycle controls. */
+export interface ChildProcess {
+  /** Process ID, if available. */
+  readonly pid: Option<number>;
+  /** Kill the process with an optional signal. */
+  readonly kill: (signal?: string) => void;
+  /**
+   * Detach the child so the parent can exit independently.
+   *
+   * After unref, the parent process will not wait for this child
+   * to exit before terminating. Use for fire-and-forget daemons
+   * and background workers.
+   */
+  readonly unref: () => void;
+  /** Wait for the process to exit and collect output. */
+  readonly wait: () => TaskLike<CommandResult, ErrType<"CommandError">>;
+}
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
  * Cross-runtime subprocess execution.
  *
- * Detects the runtime (Deno, Bun, Node) via the adapter layer and
- * dispatches to the appropriate subprocess API. Returns TaskLike so
- * execution is lazy until `.run()` is called.
- *
- * Non-zero exit codes are **not** errors: the full stdout/stderr/exitCode
- * is returned in Ok. Only actual failures produce Err(CommandError).
- *
  * @example
  * ```ts
+ * // Run and wait for result
  * const result = await Command.exec('echo', ['hello']).run();
- * if (result.isOk) {
- *   console.log(result.value.stdout); // 'hello\n'
+ *
+ * // Fire and forget
+ * const child = await Command.spawn('my-server', ['--port', '8080']).run();
+ * if (child.isOk) {
+ *   child.value.unref(); // parent can exit, child keeps running
+ * }
+ *
+ * // Spawn and wait later
+ * const child = await Command.spawn('build', ['--watch'], { capture: true }).run();
+ * if (child.isOk) {
+ *   const result = await child.value.wait().run();
  * }
  * ```
  */
 export const Command: {
-  /** Execute a command with optional arguments and options. */
+  /** Execute a command, wait for completion, and return output. */
   readonly exec: (
     cmd: string,
     args?: readonly string[],
     options?: CommandOptions,
   ) => TaskLike<CommandResult, ErrType<"CommandError">>;
+
+  /**
+   * Spawn a background process and return a handle immediately.
+   *
+   * Unlike exec, spawn does not wait for the process to finish.
+   * Use the returned ChildProcess to kill, unref, or wait later.
+   * By default stdout/stderr inherit from the parent; pass
+   * `{ capture: true }` to pipe and collect output via wait().
+   */
+  readonly spawn: (
+    cmd: string,
+    args?: readonly string[],
+    options?: SpawnOptions,
+  ) => TaskLike<ChildProcess, ErrType<"CommandError">>;
 } = {
   exec: (
     cmd: string,
@@ -82,6 +129,38 @@ export const Command: {
       const subprocess = resolveSubprocess();
       try {
         return Ok(await subprocess.exec(cmd, resolvedArgs, resolvedOptions));
+      } catch (e) {
+        return Err(CommandError(e instanceof Error ? e.message : String(e), { cmd, args }));
+      }
+    });
+  },
+
+  spawn: (
+    cmd: string,
+    args?: readonly string[],
+    options?: SpawnOptions,
+  ): TaskLike<ChildProcess, ErrType<"CommandError">> => {
+    const resolvedArgs = args ?? [];
+    const resolvedOptions = options ?? {};
+
+    return makeTask(async () => {
+      try {
+        const subprocess = resolveSubprocess();
+        const raw = await subprocess.spawn(cmd, resolvedArgs, resolvedOptions);
+        const child: ChildProcess = {
+          pid: raw.pid !== undefined ? Some(raw.pid) : None,
+          kill: (signal?) => raw.kill(signal),
+          unref: () => raw.unref(),
+          wait: () =>
+            makeTask(async () => {
+              try {
+                return Ok(await raw.wait());
+              } catch (e) {
+                return Err(CommandError(e instanceof Error ? e.message : String(e), { cmd, args }));
+              }
+            }),
+        };
+        return Ok(child);
       } catch (e) {
         return Err(CommandError(e instanceof Error ? e.message : String(e), { cmd, args }));
       }
