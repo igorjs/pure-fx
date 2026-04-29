@@ -38,7 +38,7 @@ export const Json: {
   /** Stringify a value. Returns Result instead of throwing on circular refs. */
   readonly stringify: (
     value: unknown,
-    replacer?: (key: string, value: unknown) => unknown,
+    replacer?: ((key: string, value: unknown) => unknown) | null,
     space?: number,
   ) => Result<string, ErrType<"JsonError">>;
 } = {
@@ -51,11 +51,11 @@ export const Json: {
   },
   stringify: (
     value: unknown,
-    replacer?: (key: string, value: unknown) => unknown,
+    replacer?: ((key: string, value: unknown) => unknown) | null,
     space?: number,
   ): Result<string, ErrType<"JsonError">> => {
     try {
-      return Ok(JSON.stringify(value, replacer, space));
+      return Ok(JSON.stringify(value, replacer ?? undefined, space));
     } catch (e) {
       return Err(JsonError(e instanceof Error ? e.message : String(e)));
     }
