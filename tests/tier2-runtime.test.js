@@ -125,6 +125,66 @@ describe("Command", () => {
 });
 
 // =============================================================================
+// Command.spawn
+// =============================================================================
+
+describe("Command.spawn", () => {
+  it("returns a TaskLike with lazy run()", () => {
+    const task = Command.spawn("echo", ["hello"]);
+    assert.equal(typeof task.run, "function");
+  });
+
+  it("returns Ok with a ChildProcess handle", async () => {
+    const result = await Command.spawn("echo", ["spawn-test"]).run();
+    assert.equal(result.isOk, true);
+    assert.equal(typeof result.value.kill, "function");
+    assert.equal(typeof result.value.unref, "function");
+    assert.equal(typeof result.value.wait, "function");
+    // Wait for it to finish to avoid orphan
+    await result.value.wait().run();
+  });
+
+  it("pid returns Some(number)", async () => {
+    const result = await Command.spawn("echo", ["pid-test"]).run();
+    assert.equal(result.isOk, true);
+    assert.equal(result.value.pid.isSome, true);
+    assert.equal(typeof result.value.pid.unwrap(), "number");
+    await result.value.wait().run();
+  });
+
+  it("wait() returns CommandResult after process exits", async () => {
+    const spawnResult = await Command.spawn("echo", ["wait-test"], { capture: true }).run();
+    assert.equal(spawnResult.isOk, true);
+    const waitResult = await spawnResult.value.wait().run();
+    assert.equal(waitResult.isOk, true);
+    assert.equal(waitResult.value.exitCode, 0);
+    assert.ok(waitResult.value.stdout.includes("wait-test"));
+  });
+
+  it("kill() terminates a running process", async () => {
+    const result = await Command.spawn("sleep", ["10"]).run();
+    assert.equal(result.isOk, true);
+    result.value.kill();
+    const waitResult = await result.value.wait().run();
+    assert.equal(waitResult.isOk, true);
+    assert.notEqual(waitResult.value.exitCode, 0);
+  });
+
+  it("fails for nonexistent command on wait()", async () => {
+    const result = await Command.spawn("nonexistent-cmd-xyz-12345").run();
+    // spawn itself may succeed (process handle created)
+    // but wait() surfaces the ENOENT error
+    if (result.isOk) {
+      const waitResult = await result.value.wait().run();
+      assert.equal(waitResult.isErr, true);
+      assert.equal(waitResult.error.tag, "CommandError");
+    } else {
+      assert.equal(result.error.tag, "CommandError");
+    }
+  });
+});
+
+// =============================================================================
 // Os
 // =============================================================================
 

@@ -84,9 +84,30 @@ export interface SubprocessResult {
   readonly stderr: string;
 }
 
+/** A spawned background process. */
+export interface SpawnedProcess {
+  /** Process ID, if available. */
+  readonly pid: number | undefined;
+  /** Kill the process. */
+  kill(signal?: string): void;
+  /** Detach the child so the parent can exit independently. */
+  unref(): void;
+  /** Wait for the process to exit and collect output. */
+  wait(): Promise<SubprocessResult>;
+}
+
+/** Options for spawning a background process. */
+export interface SpawnOptions {
+  readonly cwd?: string | undefined;
+  readonly env?: Record<string, string> | undefined;
+  /** Pipe stdout/stderr and collect output (default: inherit). */
+  readonly capture?: boolean | undefined;
+}
+
 /** Normalised subprocess execution. */
 export interface Subprocess {
   exec(cmd: string, args: readonly string[], options: SubprocessOptions): Promise<SubprocessResult>;
+  spawn(cmd: string, args: readonly string[], options: SpawnOptions): Promise<SpawnedProcess>;
 }
 
 // ── DNS ─────────────────────────────────────────────────────────────────────

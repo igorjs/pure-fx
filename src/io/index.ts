@@ -80,6 +80,10 @@ export { CommandError } from "./subprocess.js";
 export type { CommandOptions } from "./subprocess.js";
 /** Output of a subprocess execution (exitCode, stdout, stderr). */
 export type { CommandResult } from "./subprocess.js";
+/** A spawned background process with lifecycle controls. */
+export type { ChildProcess } from "./subprocess.js";
+/** Options for spawning a background process. */
+export type { SpawnOptions } from "./subprocess.js";
 /** Cross-runtime terminal interaction for stdin reading and prompting. */
 export { Terminal } from "./terminal.js";
 /** Error returned when a terminal operation fails. */
