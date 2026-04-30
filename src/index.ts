@@ -285,8 +285,12 @@ export { CloneError } from "./io/clone.js";
 export { Compression } from "./io/compression.js";
 /** Error returned when compression or decompression fails. */
 export { CompressionError } from "./io/compression.js";
-/** Web standard cryptographic hashing, encryption, and random bytes namespace. */
+/** Batteries-included cryptographic operations using the Web Crypto API. */
 export { Crypto } from "./io/crypto.js";
+/** A CryptoKey descriptor for use with Crypto operations. */
+export type { CryptoKeyDescriptor } from "./io/crypto.js";
+/** A CryptoKey pair (publicKey + privateKey) for asymmetric operations. */
+export type { CryptoKeyPairDescriptor } from "./io/crypto.js";
 /** Error returned when a cryptographic operation fails. */
 export { CryptoError } from "./io/crypto.js";
 /** Cross-runtime DNS resolution namespace returning Task. */
