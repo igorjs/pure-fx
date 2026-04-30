@@ -57,3 +57,11 @@ export type { ResultMatcher } from "./result.js";
 export { tryCatch } from "./result.js";
 /** Pure state monad for threading state through a sequence of computations. */
 export { State } from "./state.js";
+/** Create a failed Validation with one or more accumulated errors. */
+export { Invalid } from "./validation.js";
+/** Discriminated union representing a valid value or accumulated errors. */
+export { Validation } from "./validation.js";
+/** Pattern-match arms for Validation.match. */
+export type { ValidationMatcher } from "./validation.js";
+/** Create a successful Validation wrapping a value. */
+export { Valid } from "./validation.js";

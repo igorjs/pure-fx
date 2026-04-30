@@ -38,6 +38,10 @@ export type { ResultMatcher } from "../core/result.js";
 
 /** Algebraic data type constructor with exhaustive matching. */
 export { ADT } from "./adt.js";
+/** Persistent immutable hash map backed by a HAMT. */
+export { HashMap } from "./hash-map.js";
+/** An immutable hash map instance with get, set, delete, and functional methods. */
+export type { ImmutableHashMap } from "./hash-map.js";
 /** Bidirectional codec namespace for encoding and decoding values. */
 export { Codec } from "./codec.js";
 /** Interface describing a bidirectional codec that can decode and encode. */
