@@ -45,6 +45,7 @@
 
 import type { Option, OptionMatcher } from "./core/option.js";
 import type { Result, ResultMatcher } from "./core/result.js";
+import type { Validation, ValidationMatcher } from "./core/validation.js";
 
 // ── Core ────────────────────────────────────────────────────────────────────
 
@@ -70,9 +71,17 @@ export { Result } from "./core/result.js";
 export type { ResultMatcher } from "./core/result.js";
 /** Execute a function in try/catch, returning Result instead of throwing. */
 export { tryCatch } from "./core/result.js";
+/** Create a failed Validation with one or more accumulated errors. */
+export { Invalid } from "./core/validation.js";
+/** Discriminated union representing a valid value or accumulated errors. */
+export { Validation } from "./core/validation.js";
+/** Pattern-match arms for Validation.match. */
+export type { ValidationMatcher } from "./core/validation.js";
+/** Create a successful Validation wrapping a value. */
+export { Valid } from "./core/validation.js";
 
 /**
- * Universal pattern match for {@link Result} and {@link Option}.
+ * Universal pattern match for {@link Result}, {@link Option}, and {@link Validation}.
  *
  * Standalone alias so callers who prefer bare imports over namespace access
  * can write `match(value, arms)` instead of `Result.match(value, arms)`.
@@ -81,11 +90,14 @@ export { tryCatch } from "./core/result.js";
  * ```ts
  * match(Ok(42), { Ok: v => v * 2, Err: () => 0 })   // 84
  * match(Some('hi'), { Some: s => s.length, None: () => 0 })  // 2
+ * match(Valid(1), { Valid: v => v, Invalid: () => 0 })  // 1
  * ```
  */
 export function match<T, E, U>(value: Result<T, E>, matcher: ResultMatcher<T, E, U>): U;
 /** Pattern match on an Option, handling Some and None variants. */
 export function match<T, U>(value: Option<T>, matcher: OptionMatcher<T, U>): U;
+/** Pattern match on a Validation, handling Valid and Invalid variants. */
+export function match<T, E, U>(value: Validation<T, E>, matcher: ValidationMatcher<T, E, U>): U;
 export function match(value: { match(m: object): unknown }, matcher: object): unknown {
   return value.match(matcher);
 }
@@ -117,6 +129,10 @@ export { State } from "./core/state.js";
 
 /** Algebraic data type constructor with exhaustive matching. */
 export { ADT } from "./data/adt.js";
+/** Persistent immutable hash map backed by a HAMT. */
+export { HashMap } from "./data/hash-map.js";
+/** An immutable hash map instance with get, set, delete, and functional methods. */
+export type { ImmutableHashMap } from "./data/hash-map.js";
 /** Bidirectional codec namespace for encoding and decoding values. */
 export { Codec } from "./data/codec.js";
 /** Interface describing a bidirectional codec that can decode and encode. */
