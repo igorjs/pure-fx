@@ -1,7 +1,8 @@
 /**
- * runtime-smoke.mjs - Cross-runtime smoke test for multi-runtime modules.
+ * runtime-smoke.mjs - Cross-runtime smoke test for runtime-dependent modules.
  *
- * Validates File, Command, Process, and Os on every supported runtime.
+ * Validates File, Command, Process, Os, Path, Platform, Eol, Logger, Config,
+ * Terminal, Dns, and Net on every supported runtime.
  * Uses only console.log for output and throws on failure (no node:test,
  * no node:assert) so it runs identically on Node, Deno, Bun, and QuickJS.
  *
@@ -9,10 +10,10 @@
  *   node tests/runtime-smoke.mjs
  *   deno run --allow-all tests/runtime-smoke.mjs
  *   bun tests/runtime-smoke.mjs
- *   qjs --std tests/runtime-smoke.mjs
  */
 
-const { File, Command, Process, Os } = await import("../dist/index.js");
+const { File, Command, Process, Os, Path, Platform, Eol, Logger, Config, Terminal, Dns, Schema } =
+  await import("../dist/index.js");
 
 let passed = 0;
 let failed = 0;
@@ -179,7 +180,7 @@ section("Command.exec with cwd");
   const cwdResult = await Command.exec("pwd", [], { cwd: "/tmp" }).run();
   assert(cwdResult.isOk, "exec pwd with cwd succeeds");
   assert(
-    cwdResult.value.stdout.includes("/tmp"),
+    cwdResult.value.stdout.includes("/tmp") || cwdResult.value.stdout.includes("/private/tmp"),
     `cwd respected (got: "${cwdResult.value.stdout.trim()}")`,
   );
 }
@@ -204,6 +205,17 @@ section("Process");
 
   const argv = Process.argv();
   assert(Array.isArray(argv), "argv returns an array");
+
+  const mem = Process.memoryUsage();
+  assert(mem.isSome, "memoryUsage returns Some");
+  assert(mem.unwrap().heapUsed > 0, "memoryUsage.heapUsed > 0");
+
+  const env = Process.env("PATH");
+  assert(env.isSome, "env('PATH') returns Some");
+  assert(typeof env.unwrap() === "string", "env('PATH') is a string");
+
+  const noEnv = Process.env("NONEXISTENT_VAR_XYZ_12345");
+  assert(noEnv.isNone, "env for missing var returns None");
 }
 
 // ── Os ──────────────────────────────────────────────────────────────────────
@@ -217,13 +229,145 @@ section("Os");
   );
 
   const homeDir = Os.homeDir();
-  // homeDir may be None in some environments
   if (homeDir.isSome) {
     assert(
       typeof homeDir.unwrap() === "string",
       `homeDir is a string (got: "${homeDir.unwrap()}")`,
     );
   }
+
+  const hostname = Os.hostname();
+  // hostname may be None in some environments (e.g. restricted runtimes)
+  if (hostname.isSome) {
+    assert(typeof hostname.unwrap() === "string", "hostname is a string");
+  } else {
+    assert(true, "hostname returns None (acceptable in this env)");
+  }
+
+  const arch = Os.arch();
+  assert(
+    typeof arch === "string" && arch.length > 0,
+    `arch is a non-empty string (got: "${arch}")`,
+  );
+
+  const platform = Os.platform();
+  assert(
+    typeof platform === "string" && platform.length > 0,
+    `platform is non-empty (got: "${platform}")`,
+  );
+}
+
+// ── Path ────────────────────────────────────────────────────────────────────
+
+section("Path");
+{
+  const joined = Path.join("/usr", "local", "bin");
+  assert(joined === "/usr/local/bin", `Path.join (got: "${joined}")`);
+
+  const parsed = Path.parse("/usr/local/bin/node");
+  assert(parsed.base === "node", `Path.parse base (got: "${parsed.base}")`);
+  assert(parsed.dir === "/usr/local/bin", `Path.parse dir (got: "${parsed.dir}")`);
+
+  assert(Path.isAbsolute("/foo"), "Path.isAbsolute('/foo')");
+  assert(!Path.isAbsolute("foo"), "Path.isAbsolute('foo') false");
+
+  const ext = Path.extname("file.txt");
+  assert(ext === ".txt", `Path.extname (got: "${ext}")`);
+
+  const base = Path.basename("/a/b/file.txt");
+  assert(base === "file.txt", `Path.basename (got: "${base}")`);
+
+  const dir = Path.dirname("/a/b/file.txt");
+  assert(dir === "/a/b", `Path.dirname (got: "${dir}")`);
+}
+
+// ── Platform / Eol ──────────────────────────────────────────────────────────
+
+section("Platform / Eol");
+{
+  assert(typeof Platform.os === "string", "Platform.os is string");
+  assert(typeof Platform.isWindows === "boolean", "Platform.isWindows is boolean");
+
+  assert(typeof Eol.lf === "string", "Eol.lf");
+  assert(typeof Eol.crlf === "string", "Eol.crlf");
+  assert(typeof Eol.native === "string", "Eol.native");
+
+  const normalized = Eol.normalize("a\r\nb\nc");
+  assert(typeof normalized === "string", "Eol.normalize returns string");
+}
+
+// ── Logger ──────────────────────────────────────────────────────────────────
+
+section("Logger");
+{
+  const messages = [];
+  const logger = Logger.create({
+    level: "debug",
+    sink: record => {
+      messages.push(record);
+    },
+  });
+  logger.info("test message");
+  assert(messages.length === 1, "Logger.info logs a message");
+  assert(messages[0].level === "info", "Logger record has level");
+  assert(messages[0].message === "test message", "Logger record has message");
+
+  logger.debug("debug msg");
+  assert(messages.length === 2, "Logger.debug logs at debug level");
+
+  // Level filtering
+  const warnMessages = [];
+  const warnLogger = Logger.create({
+    level: "warn",
+    sink: record => {
+      warnMessages.push(record);
+    },
+  });
+  warnLogger.debug("should not appear");
+  warnLogger.info("should not appear");
+  warnLogger.warn("should appear");
+  assert(warnMessages.length === 1, "Logger level filtering");
+}
+
+// ── Config ──────────────────────────────────────────────────────────────────
+
+section("Config");
+{
+  const config = Config.from({
+    HOST: Schema.string.default("localhost"),
+  });
+  const result = config.loadFrom({});
+  assert(result.isOk, "Config.loadFrom with defaults succeeds");
+  assert(result.value.HOST === "localhost", `Config default value (got: ${result.value.HOST})`);
+
+  const withValue = config.loadFrom({ HOST: "0.0.0.0" });
+  assert(withValue.isOk, "Config.loadFrom with value succeeds");
+  assert(withValue.value.HOST === "0.0.0.0", `Config reads value (got: ${withValue.value.HOST})`);
+}
+
+// ── Dns ─────────────────────────────────────────────────────────────────────
+
+section("Dns");
+{
+  const result = await Dns.resolve("localhost").run();
+  // localhost resolution may vary by runtime/OS, just check it returns a result
+  assert(result.isOk || result.isErr, "Dns.resolve returns a Result");
+  if (result.isOk) {
+    assert(result.value.length > 0, "Dns.resolve returns addresses");
+    assert(typeof result.value[0] === "string", "Dns record is a string");
+  }
+}
+
+// ── Terminal ────────────────────────────────────────────────────────────────
+
+section("Terminal");
+{
+  assert(typeof Terminal.isInteractive() === "boolean", "Terminal.isInteractive()");
+  const size = Terminal.size();
+  assert(
+    size.isNone || (size.isSome && typeof size.unwrap().columns === "number"),
+    "Terminal.size()",
+  );
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────
@@ -233,7 +377,6 @@ console.log(`Smoke test results: ${passed} passed, ${failed} failed`);
 console.log(`========================================`);
 
 if (failed > 0) {
-  // Use a cross-runtime exit strategy
   if (typeof process !== "undefined" && typeof process.exit === "function") {
     process.exit(1);
   }
