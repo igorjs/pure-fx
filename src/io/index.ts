@@ -44,6 +44,18 @@ export { CompressionError } from "./compression.js";
 export { Crypto } from "./crypto.js";
 /** Error returned when a cryptographic operation fails. */
 export { CryptoError } from "./crypto.js";
+/** Cross-runtime Foreign Function Interface for native library loading. */
+export { FFI } from "./ffi.js";
+/** Error returned when an FFI operation fails. */
+export { FfiError } from "./ffi.js";
+/** A loaded dynamic library with callable native functions. */
+export type { FfiLibrary } from "./ffi.js";
+/** Definition of a single native function symbol. */
+export type { FfiSymbolDefinition } from "./ffi.js";
+/** Map of symbol names to their definitions. */
+export type { FfiSymbols } from "./ffi.js";
+/** Supported FFI scalar types. */
+export type { FfiType } from "./ffi.js";
 /** Cross-runtime DNS resolution namespace returning Task. */
 export { Dns } from "./dns.js";
 /** Error returned when DNS resolution fails. */

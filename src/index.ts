@@ -293,6 +293,18 @@ export type { CryptoKeyDescriptor } from "./io/crypto.js";
 export type { CryptoKeyPairDescriptor } from "./io/crypto.js";
 /** Error returned when a cryptographic operation fails. */
 export { CryptoError } from "./io/crypto.js";
+/** Cross-runtime Foreign Function Interface for native library loading. */
+export { FFI } from "./io/ffi.js";
+/** Error returned when an FFI operation fails. */
+export { FfiError } from "./io/ffi.js";
+/** A loaded dynamic library with callable native functions. */
+export type { FfiLibrary } from "./io/ffi.js";
+/** Definition of a single native function symbol. */
+export type { FfiSymbolDefinition } from "./io/ffi.js";
+/** Map of symbol names to their definitions. */
+export type { FfiSymbols } from "./io/ffi.js";
+/** Supported FFI scalar types. */
+export type { FfiType } from "./io/ffi.js";
 /** Cross-runtime DNS resolution namespace returning Task. */
 export { Dns } from "./io/dns.js";
 /** Error returned when DNS resolution fails. */

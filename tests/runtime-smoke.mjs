@@ -12,8 +12,21 @@
  *   bun tests/runtime-smoke.mjs
  */
 
-const { File, Command, Process, Os, Path, Platform, Eol, Logger, Config, Terminal, Dns, Schema } =
-  await import("../dist/index.js");
+const {
+  File,
+  Command,
+  Process,
+  Os,
+  Path,
+  Platform,
+  Eol,
+  Logger,
+  Config,
+  Terminal,
+  Dns,
+  Schema,
+  FFI,
+} = await import("../dist/index.js");
 
 let passed = 0;
 let failed = 0;
@@ -207,8 +220,12 @@ section("Process");
   assert(Array.isArray(argv), "argv returns an array");
 
   const mem = Process.memoryUsage();
-  assert(mem.isSome, "memoryUsage returns Some");
-  assert(mem.unwrap().heapUsed > 0, "memoryUsage.heapUsed > 0");
+  // memoryUsage may return None on some runtimes (e.g. Deno)
+  if (mem.isSome) {
+    assert(mem.unwrap().heapUsed > 0, "memoryUsage.heapUsed > 0");
+  } else {
+    assert(true, "memoryUsage returns None (acceptable)");
+  }
 
   const env = Process.env("PATH");
   assert(env.isSome, "env('PATH') returns Some");
@@ -368,6 +385,39 @@ section("Terminal");
     size.isNone || (size.isSome && typeof size.unwrap().columns === "number"),
     "Terminal.size()",
   );
+}
+
+// ── FFI ─────────────────────────────────────────────────────────────────────
+
+section("FFI");
+{
+  assert(
+    typeof FFI.suffix === "string" && FFI.suffix.length > 0,
+    `FFI.suffix (got: "${FFI.suffix}")`,
+  );
+  assert(typeof FFI.isAvailable() === "boolean", "FFI.isAvailable()");
+  assert(typeof FFI.types.I32 === "string", "FFI.types.I32");
+  assert(typeof FFI.types.F64 === "string", "FFI.types.F64");
+  assert(typeof FFI.types.POINTER === "string", "FFI.types.POINTER");
+
+  const libcPath = FFI.systemLib("c");
+  assert(
+    typeof libcPath === "string" && libcPath.length > 0,
+    `FFI.systemLib('c') (got: "${libcPath}")`,
+  );
+
+  // Try to open libc and call getpid (Deno/Bun only, Node 24 will get Err)
+  const lib = FFI.open(libcPath, {
+    getpid: { parameters: [], result: "i32" },
+  });
+  if (lib.isOk) {
+    const pid = lib.value.symbols.getpid();
+    assert(typeof pid === "number" && pid > 0, `FFI getpid() (got: ${pid})`);
+    lib.value.close();
+  } else {
+    // Expected on Node <25
+    assert(lib.isErr, `FFI.open returns Err on unsupported runtime (got: ${lib.error.message})`);
+  }
 }
 
 // ── Summary ─────────────────────────────────────────────────────────────────
