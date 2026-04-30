@@ -24,10 +24,16 @@ const createDenoDns = (): Dns | undefined => {
 
   return {
     lookup: async hostname => {
-      const addresses = await deno.resolveDns!(hostname, "A");
-      const first = addresses[0];
-      if (first === undefined) throw new Error(`No addresses found for ${hostname}`);
-      return { address: first, family: 4 };
+      // Try IPv4 first, fall back to IPv6
+      try {
+        const a = await deno.resolveDns!(hostname, "A");
+        if (a.length > 0) return { address: a[0]!, family: 4 };
+      } catch {
+        // A record lookup failed, try AAAA
+      }
+      const aaaa = await deno.resolveDns!(hostname, "AAAA");
+      if (aaaa.length > 0) return { address: aaaa[0]!, family: 6 };
+      throw new Error(`No addresses found for ${hostname}`);
     },
     resolve: (hostname, type) => deno.resolveDns!(hostname, type),
   };
