@@ -246,7 +246,9 @@ describe("forEach", () => {
       ["b", 2],
     ]);
     const keys = [];
-    m.forEach((_v, k) => keys.push(k));
+    m.forEach((_v, k) => {
+      keys.push(k);
+    });
     assert.equal(keys.length, 2);
     assert.ok(keys.includes("a"));
     assert.ok(keys.includes("b"));

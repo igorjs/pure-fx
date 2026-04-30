@@ -168,43 +168,49 @@ const trieGet = <K, V>(
   return trieGet(node.children[idx] as Node<K, V>, key, hash, shift + BITS);
 };
 
+type SetResult<K, V> = { node: Node<K, V>; added: boolean };
+
+/** Handle set on a leaf node: update existing key, collision chain, or split. */
+const trieSetLeaf = <K, V>(
+  leaf: LeafNode<K, V>,
+  entry: Entry<K, V>,
+  shift: number,
+): SetResult<K, V> => {
+  const existing = leaf.entries;
+  for (let i = 0; i < existing.length; i++) {
+    if (existing[i]!.key === entry.key) {
+      if (existing[i]!.value === entry.value) return { node: leaf, added: false };
+      const updated = existing.slice();
+      updated[i] = entry;
+      return { node: mkLeaf(updated), added: false };
+    }
+  }
+
+  // Same hash: collision chain
+  if (existing[0]!.hash === entry.hash) {
+    return { node: mkLeaf([...existing, entry]), added: true };
+  }
+
+  // Different hash: split into an internal node
+  let internal: Node<K, V> = mkInternal(0, []);
+  for (const e of existing) {
+    internal = trieSet(internal, e, shift).node;
+  }
+  const result = trieSet(internal, entry, shift);
+  return { node: result.node, added: true };
+};
+
 const trieSet = <K, V>(
   node: Node<K, V> | undefined,
   entry: Entry<K, V>,
   shift: number,
-): { node: Node<K, V>; added: boolean } => {
+): SetResult<K, V> => {
   if (node === undefined) {
     return { node: mkLeaf([entry]), added: true };
   }
 
   if (node.kind === "leaf") {
-    const existing = node.entries;
-    // Check for key update
-    for (let i = 0; i < existing.length; i++) {
-      if (existing[i]!.key === entry.key) {
-        if (existing[i]!.value === entry.value) {
-          return { node, added: false };
-        }
-        const updated = existing.slice();
-        updated[i] = entry;
-        return { node: mkLeaf(updated), added: false };
-      }
-    }
-
-    // Same hash prefix at this level: collision chain or push down
-    if (existing[0]!.hash === entry.hash) {
-      return { node: mkLeaf([...existing, entry]), added: true };
-    }
-
-    // Different hash: split into an internal node
-    let internal: Node<K, V> = mkInternal(0, []);
-    // Re-insert existing entries
-    for (const e of existing) {
-      internal = trieSet(internal, e, shift).node;
-    }
-    // Insert new entry
-    const result = trieSet(internal, entry, shift);
-    return { node: result.node, added: true };
+    return trieSetLeaf(node, entry, shift);
   }
 
   // Internal node
@@ -213,7 +219,6 @@ const trieSet = <K, V>(
   const idx = popcount(node.bitmap, pos);
 
   if ((node.bitmap & bit) === 0) {
-    // Empty slot: insert new leaf
     const child = mkLeaf<K, V>([entry]);
     return {
       node: mkInternal(node.bitmap | bit, insertChild(node.children, idx, child)),
@@ -499,7 +504,7 @@ class HashMapImpl<K, V> implements ImmutableHashMap<K, V> {
 
 // ── Singleton empty instance ─────────────────────────────────────────────────
 
-const empty: ImmutableHashMap<any, any> = new HashMapImpl(undefined, 0);
+const empty: ImmutableHashMap<never, never> = new HashMapImpl<never, never>(undefined, 0);
 
 // ── Public factories ─────────────────────────────────────────────────────────
 
