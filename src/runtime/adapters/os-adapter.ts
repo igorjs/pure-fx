@@ -83,7 +83,13 @@ const createDenoOsInfo = (): OsInfo | undefined => {
         return undefined;
       }
     },
-    uptime: () => undefined,
+    uptime: () => {
+      try {
+        return deno.osUptime?.();
+      } catch {
+        return undefined;
+      }
+    },
   };
 };
 

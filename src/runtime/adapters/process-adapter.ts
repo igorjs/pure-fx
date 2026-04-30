@@ -13,28 +13,38 @@ const createDenoProcessInfo = (): ProcessInfo | undefined => {
   const deno = getDeno();
   if (deno === undefined) return undefined;
 
-  const denoEnv = (
-    deno as unknown as {
-      env?: {
-        get?(key: string): string | undefined;
-        toObject?(): Record<string, string>;
-      };
-    }
-  ).env;
-
   return {
     cwd: () => deno.cwd(),
     pid: deno.pid,
     argv: deno.args,
     env: ((key?: string) => {
       try {
-        if (key === undefined) return denoEnv?.toObject?.() ?? {};
-        return denoEnv?.get?.(key);
+        if (key === undefined) return deno.env?.toObject?.() ?? {};
+        return deno.env?.get?.(key);
       } catch {
         return key === undefined ? {} : undefined;
       }
     }) as ProcessInfo["env"],
     exit: (code?) => deno.exit(code),
+    ...(deno.osUptime
+      ? {
+          uptime: (): number => {
+            try {
+              return deno.osUptime!();
+            } catch {
+              return 0;
+            }
+          },
+        }
+      : {}),
+    ...(deno.memoryUsage
+      ? {
+          memoryUsage: (): ProcessMemory => {
+            const mem = deno.memoryUsage!();
+            return { heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss };
+          },
+        }
+      : {}),
   };
 };
 

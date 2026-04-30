@@ -52,6 +52,12 @@ export interface DenoGlobal {
   readonly args: readonly string[];
   cwd(): string;
   exit(code?: number): never;
+  memoryUsage?(): { rss: number; heapTotal: number; heapUsed: number; external: number };
+  osUptime?(): number;
+  readonly env?: {
+    get?(key: string): string | undefined;
+    toObject?(): Record<string, string>;
+  };
 }
 
 /** Minimal Node/Bun process global shape. */
