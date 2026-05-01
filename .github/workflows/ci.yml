@@ -59,9 +59,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Runtime smoke test
-        run: node tests/runtime-smoke.mjs
+        run: node tests/integration-runtime.mjs
       - name: Web smoke test
-        run: node tests/web-smoke.mjs
+        run: node tests/integration-web.mjs
 
   smoke-deno:
     needs: lint-and-test
@@ -78,9 +78,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Runtime smoke test
-        run: deno run --allow-all tests/runtime-smoke.mjs
+        run: deno run --allow-all tests/integration-runtime.mjs
       - name: Web smoke test
-        run: deno run --allow-all tests/web-smoke.mjs
+        run: deno run --allow-all tests/integration-web.mjs
 
   smoke-bun:
     needs: lint-and-test
@@ -97,9 +97,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Runtime smoke test
-        run: bun tests/runtime-smoke.mjs
+        run: bun tests/integration-runtime.mjs
       - name: Web smoke test
-        run: bun tests/web-smoke.mjs
+        run: bun tests/integration-web.mjs
 
   smoke-workers:
     needs: lint-and-test
