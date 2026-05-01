@@ -86,6 +86,13 @@ export async function runIntegrationWeb(lib) {
     Url,
     Crypto,
     Clone,
+    Compression,
+    LensOptional,
+    RateLimiter,
+    Pool,
+    tryCatch,
+    isImmutable,
+    makeTask,
   } = lib;
 
   // ── Core: Result ────────────────────────────────────────────────────────
@@ -689,6 +696,216 @@ export async function runIntegrationWeb(lib) {
     assert(cloned.value.b.c === 2, "Clone.deep preserves values");
     assert(cloned.value !== original, "Clone.deep returns new object");
     assert(cloned.value.b !== original.b, "Clone.deep deep copies");
+  }
+
+  // ── Retry ──────────────────────────────────────────────────────────────
+
+  section("Retry");
+  {
+    let attempts = 0;
+    const policy = Retry.policy().maxAttempts(3).delay(1).build();
+    const task = Retry.apply(
+      policy,
+      Task(() => {
+        attempts++;
+        if (attempts < 3) return Promise.resolve(Err("fail"));
+        return Promise.resolve(Ok("done"));
+      }),
+    );
+    const r = await task.run();
+    assert(r.isOk && r.value === "done", "Retry succeeds after retries");
+    assert(attempts === 3, `Retry attempted ${attempts} times`);
+  }
+
+  // ── CircuitBreaker ────────────────────────────────────────────────────
+
+  section("CircuitBreaker");
+  {
+    const cb = CircuitBreaker.create({ threshold: 2, resetTimeout: 100 });
+    assert(cb.state() === "closed", "CircuitBreaker starts closed");
+    await cb.protect(Task.of(1)).run();
+    assert(cb.state() === "closed", "CircuitBreaker stays closed on success");
+  }
+
+  // ── RateLimiter ───────────────────────────────────────────────────────
+
+  section("RateLimiter");
+  {
+    const rl = RateLimiter.create({ capacity: 2, refillRate: 1, refillInterval: 1000 });
+    assert(rl.tryAcquire() === true, "RateLimiter first acquire");
+    assert(rl.tryAcquire() === true, "RateLimiter second acquire");
+    assert(rl.tryAcquire() === false, "RateLimiter exhausted");
+  }
+
+  // ── Pool ──────────────────────────────────────────────────────────────
+
+  section("Pool");
+  {
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        return { id: created };
+      },
+      maxSize: 2,
+    });
+    const r = await pool.use(async resource => resource.id).run();
+    assert(r.isOk && r.value === 1, "Pool.use");
+    await pool.drain();
+  }
+
+  // ── LensOptional ──────────────────────────────────────────────────────
+
+  section("LensOptional / Traversal");
+  {
+    const opt = LensOptional.index(1);
+    assert(opt.getOption([10, 20, 30]).unwrap() === 20, "LensOptional.getOption");
+    assert(opt.set(99)([10, 20, 30])[1] === 99, "LensOptional.set");
+
+    const t = Traversal.fromArray();
+    assert(t.getAll([1, 2, 3]).length === 3, "Traversal.getAll");
+    assert(t.modify(x => x * 10)([1, 2])[0] === 10, "Traversal.modify");
+  }
+
+  // ── tryCatch / isImmutable / makeTask ─────────────────────────────────
+
+  section("tryCatch / isImmutable / makeTask");
+  {
+    assert(tryCatch(() => JSON.parse('{"a":1}')).isOk, "tryCatch success");
+    assert(tryCatch(() => JSON.parse("bad"), String).isErr, "tryCatch catches");
+    assert(isImmutable(Record({ x: 1 })), "isImmutable Record");
+    assert(!isImmutable({}), "isImmutable plain object");
+    const t = makeTask(async () => Ok(42));
+    assert((await t.run()).unwrap() === 42, "makeTask");
+  }
+
+  // ── Compression ───────────────────────────────────────────────────────
+
+  // CompressionStream hangs on Deno, only test on Node/Bun
+  section("Compression");
+  if (typeof globalThis.Deno === "undefined") {
+    const input = new TextEncoder().encode("compress me");
+    const gz = await Compression.gzip(input).run();
+    assert(gz.isOk, "Compression.gzip");
+    const ungz = await Compression.gunzip(gz.value).run();
+    assert(
+      ungz.isOk && new TextDecoder().decode(ungz.value) === "compress me",
+      "Compression roundtrip",
+    );
+  } else {
+    assert(true, "Compression skipped on Deno");
+  }
+
+  // ── Deep Result coverage ──────────────────────────────────────────────
+
+  section("Result (deep)");
+  {
+    assert(
+      Ok(1)
+        .flatMap(n => Ok(n + 1))
+        .unwrap() === 2,
+      "Result.flatMap",
+    );
+    assert(Err("e").flatMap(() => Ok(1)).isErr, "Result.flatMap short-circuits");
+    assert(
+      Err("e")
+        .mapErr(e => `${e}!`)
+        .unwrapErr() === "e!",
+      "Err.mapErr",
+    );
+    let tapped = 0;
+    Ok(42).tap(v => {
+      tapped = v;
+    });
+    assert(tapped === 42, "Ok.tap");
+    assert(Ok(1).unwrapOrElse(() => 99) === 1, "Ok.unwrapOrElse");
+    assert(Err("e").unwrapOrElse(() => 99) === 99, "Err.unwrapOrElse");
+    assert(Ok(42).toJSON().tag === "Ok", "Ok.toJSON");
+    assert(Ok(42).toString() === "Ok(42)", "Ok.toString");
+    assert(Ok(1).zip(Ok(2)).unwrap()[1] === 2, "Ok.zip");
+    assert(
+      Ok(5)
+        .ap(Ok(n => n * 2))
+        .unwrap() === 10,
+      "Ok.ap",
+    );
+    const { ok, err } = Result.partition([Ok(1), Err("a"), Ok(2)]);
+    assert(ok.length === 2 && err.length === 1, "Result.partition");
+  }
+
+  // ── Deep Option coverage ──────────────────────────────────────────────
+
+  section("Option (deep)");
+  {
+    assert(
+      Some(1)
+        .flatMap(n => Some(n + 1))
+        .unwrap() === 2,
+      "Option.flatMap",
+    );
+    assert(Some(5).filter(n => n > 3).isSome, "Some.filter pass");
+    assert(Some(1).filter(n => n > 3).isNone, "Some.filter fail");
+    assert(None.or(Some(99)).unwrap() === 99, "None.or");
+    assert(Some(1).toResult("err").isOk, "Some.toResult");
+    assert(None.toResult("err").isErr, "None.toResult");
+    assert(Some(42).toJSON().tag === "Some", "Some.toJSON");
+    assert(Some(1).zip(Some(2)).unwrap()[0] === 1, "Some.zip");
+    assert(
+      Some(5)
+        .ap(Some(n => n * 2))
+        .unwrap() === 10,
+      "Some.ap",
+    );
+    const { some, none } = Option.partition([Some(1), None, Some(2)]);
+    assert(some.length === 2 && none === 1, "Option.partition");
+  }
+
+  // ── Deep Task coverage ────────────────────────────────────────────────
+
+  section("Task (deep)");
+  {
+    const chained = await Task.of(5)
+      .flatMap(n => Task.of(n * 2))
+      .run();
+    assert(chained.unwrap() === 10, "Task.flatMap");
+
+    const errTask = Task(() => Promise.resolve(Err("fail")));
+    const mapped = await errTask.mapErr(e => `${e}!`).run();
+    assert(mapped.unwrapErr() === "fail!", "Task.mapErr");
+
+    let tapped = 0;
+    await Task.of(42)
+      .tap(v => {
+        tapped = v;
+      })
+      .run();
+    assert(tapped === 42, "Task.tap");
+
+    const zipped = await Task.of("a").zip(Task.of(1)).run();
+    assert(zipped.unwrap()[0] === "a", "Task.zip");
+
+    const settled = await Task.allSettled([Task.of(1), errTask]).run();
+    assert(settled.unwrap()[0].isOk && settled.unwrap()[1].isErr, "Task.allSettled");
+
+    const ap = await Task.ap(
+      Task.of(n => n * 3),
+      Task.of(10),
+    ).run();
+    assert(ap.unwrap() === 30, "Task.ap");
+
+    assert(Task.is(Task.of(1)) && !Task.is(42), "Task.is");
+
+    const fromProm = await Task.fromPromise(() => Promise.resolve(42)).run();
+    assert(fromProm.unwrap() === 42, "Task.fromPromise");
+
+    let memo = 0;
+    const memoized = Task(() => {
+      memo++;
+      return Promise.resolve(Ok(1));
+    }).memoize();
+    await memoized.run();
+    await memoized.run();
+    assert(memo === 1, "Task.memoize");
   }
 
   // ── Summary ────────────────────────────────────────────────────────────

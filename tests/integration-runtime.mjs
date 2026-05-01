@@ -420,6 +420,109 @@ section("FFI");
   }
 }
 
+// ── Process (extended) ──────────────────────────────────────────────────────
+
+section("Process (extended)");
+{
+  const ppid = Process.ppid();
+  if (ppid.isSome) {
+    assert(typeof ppid.unwrap() === "number" && ppid.unwrap() > 0, `ppid (got: ${ppid.unwrap()})`);
+  } else {
+    assert(true, "ppid None (acceptable)");
+  }
+
+  const uid = Process.uid();
+  if (uid.isSome) {
+    assert(typeof uid.unwrap() === "number", `uid (got: ${uid.unwrap()})`);
+  } else {
+    assert(true, "uid None (acceptable on Windows)");
+  }
+
+  const gid = Process.gid();
+  if (gid.isSome) {
+    assert(typeof gid.unwrap() === "number", `gid (got: ${gid.unwrap()})`);
+  } else {
+    assert(true, "gid None (acceptable on Windows)");
+  }
+
+  const execPath = Process.execPath();
+  if (execPath.isSome) {
+    assert(typeof execPath.unwrap() === "string" && execPath.unwrap().length > 0, "execPath");
+  } else {
+    assert(true, "execPath None (acceptable)");
+  }
+}
+
+// ── Os (extended) ──────────────────────────────────────────────────────────
+
+section("Os (extended)");
+{
+  const release = Os.osRelease();
+  if (release.isSome) {
+    assert(typeof release.unwrap() === "string" && release.unwrap().length > 0, "osRelease");
+  } else {
+    assert(true, "osRelease None (acceptable)");
+  }
+
+  const load = Os.loadavg();
+  if (load.isSome) {
+    const [l1, l5, l15] = load.unwrap();
+    assert(typeof l1 === "number" && typeof l5 === "number" && typeof l15 === "number", "loadavg");
+  } else {
+    assert(true, "loadavg None (acceptable on Windows)");
+  }
+
+  const ifaces = Os.networkInterfaces();
+  assert(Array.isArray(ifaces), "networkInterfaces returns array");
+  if (ifaces.length > 0) {
+    assert(typeof ifaces[0].name === "string", "networkInterface.name");
+    assert(typeof ifaces[0].address === "string", "networkInterface.address");
+    assert(ifaces[0].family === "IPv4" || ifaces[0].family === "IPv6", "networkInterface.family");
+  }
+}
+
+// ── Eol ──────────────────────────────────────────────────────────────────────
+
+section("Eol");
+assert(Eol.lf === "\n", "Eol.lf");
+assert(Eol.crlf === "\r\n", "Eol.crlf");
+assert(Eol.native === "\n" || Eol.native === "\r\n", "Eol.native");
+assert(Eol.normalize("a\r\nb\nc\r\n") === "a\nb\nc\n", "Eol.normalize");
+
+// ── File (extended) ─────────────────────────────────────────────────────────
+
+section("File (extended)");
+{
+  const tmpResult = await File.tempDir("integ-ext-").run();
+  assert(tmpResult.isOk, "tempDir for extended tests");
+  const tmp = tmpResult.value;
+
+  const binData = new Uint8Array([0, 1, 2, 255, 254, 253]);
+  const binPath = `${tmp}/binary.bin`;
+  assert((await File.writeBytes(binPath, binData).run()).isOk, "File.writeBytes");
+  const readResult = await File.readBytes(binPath).run();
+  assert(readResult.isOk && readResult.value.length === 6, "File.readBytes");
+
+  const realResult = await File.realPath(binPath).run();
+  assert(realResult.isOk && typeof realResult.value === "string", "File.realPath");
+
+  assert((await File.truncate(binPath, 3).run()).isOk, "File.truncate");
+  const afterTrunc = await File.readBytes(binPath).run();
+  assert(afterTrunc.isOk && afterTrunc.value.length === 3, "File.truncate result");
+
+  const symPath = `${tmp}/sym.link`;
+  assert((await File.symlink(binPath, symPath).run()).isOk, "File.symlink");
+  const linkTarget = await File.readLink(symPath).run();
+  assert(linkTarget.isOk && linkTarget.value.includes("binary.bin"), "File.readLink");
+  assert((await File.lstat(symPath).run()).isOk, "File.lstat");
+
+  const hardPath = `${tmp}/hard.bin`;
+  assert((await File.link(binPath, hardPath).run()).isOk, "File.link");
+  assert((await File.chmod(binPath, 0o644).run()).isOk, "File.chmod");
+
+  await File.removeDir(tmp).run();
+}
+
 // ── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n========================================`);
@@ -430,5 +533,5 @@ if (failed > 0) {
   if (typeof process !== "undefined" && typeof process.exit === "function") {
     process.exit(1);
   }
-  throw new Error(`${failed} smoke test(s) failed`);
+  throw new Error(`${failed} integration test(s) failed`);
 }
