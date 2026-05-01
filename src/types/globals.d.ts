@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * structuredClone is an HTML spec API (not ECMAScript), available in
  * Node 17+ and all modern browsers. Not included in any ES lib target.
