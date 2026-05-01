@@ -58,6 +58,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+      - name: Unit tests
+        run: pnpm test
       - name: Runtime integration test
         run: node ${{ matrix.node-version == '25' && '--allow-ffi' || '' }} tests/integration-runtime.mjs
       - name: Web integration test

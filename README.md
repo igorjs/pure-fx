@@ -14,7 +14,7 @@ Functional application framework for TypeScript. Zero dependencies.
 Errors are values, not exceptions. Data is immutable, enforced at runtime. Async is lazy and composable.
 
 ![Node.js](https://img.shields.io/badge/Node.js_22+-339933?logo=nodedotjs&logoColor=white)
-![Deno](https://img.shields.io/badge/Deno_2+-000000?logo=deno&logoColor=white)
+![Deno](https://img.shields.io/badge/Deno_2.0+-000000?logo=deno&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/CF_Workers-F38020?logo=cloudflare&logoColor=white)
 ![Browser](https://img.shields.io/badge/Chromium-4285F4?logo=googlechrome&logoColor=white)
@@ -81,8 +81,8 @@ const content = await File.read('./config.json').run();
 
 Most modules are pure TypeScript and work everywhere. Runtime-dependent modules adapt automatically:
 
-| Module | Node 22+ | Node 25+ | Deno | Bun | Workers | Browser |
-|--------|----------|----------|------|-----|---------|---------|
+| Module | Node 22+ | Node 25+ | Deno 2+ | Bun | Workers | Browser |
+|--------|----------|----------|---------|-----|---------|---------|
 | Core, Data, Async, Types | Yes | Yes | Yes | Yes | Yes | Yes |
 | `Crypto` (full Web Crypto) | Yes | Yes | Yes | Yes | Yes | Yes |
 | `Compression` | Yes | Yes | Yes | Yes | Partial | Partial |
@@ -123,6 +123,10 @@ if (result.isErr) {
   console.log(result.error.message); // "ENOENT: no such file..."
 }
 ```
+
+### Deno requires version 2.0+
+
+Pure TS uses Deno 2.0+ APIs. Deno 1.x is not supported. Compression requires Deno 1.38+ for `CompressionStream`, but all other modules require Deno 2.0+.
 
 ### Modules return Err in Workers/Browser
 
