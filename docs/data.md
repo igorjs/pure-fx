@@ -200,3 +200,37 @@ vec.clear();     // remove all elements
 **When to use:** long-lived collections with frequent insert/remove where external code holds references (game loops, simulations, ECS).
 
 **When NOT to use:** short-lived arrays or ordered collections (removal reorders via swap).
+
+## HashMap\<K, V\>
+
+Persistent immutable hash map backed by a Hash Array Mapped Trie (HAMT). O(log32 N) get/set/delete with structural sharing.
+
+```ts
+import { HashMap } from '@igorjs/pure-ts'
+
+const m = HashMap.of([['name', 'Alice'], ['city', 'Sydney']]);
+m.get('name');          // Some('Alice')
+m.get('missing');       // None
+m.has('city');          // true
+m.size;                 // 2
+
+// Immutable: mutations return new maps
+const m2 = m.set('age', '30');
+m.size;  // still 2
+m2.size; // 3
+
+// Functional operations
+m.map(v => v.toUpperCase());  // HashMap { name => ALICE, city => SYDNEY }
+m.filter(v => v.length > 4);  // HashMap { city => Sydney }
+m.reduce((acc, v) => acc + v, ''); // 'AliceSydney'
+
+// Create from other types
+HashMap.fromObject({ a: 1, b: 2 });
+HashMap.fromMap(new Map([['x', 1]]));
+
+// Non-string keys
+HashMap.of([[1, 'one'], [2, 'two']]);
+
+// Structural equality
+m.equals(HashMap.of([['city', 'Sydney'], ['name', 'Alice']])); // true
+```

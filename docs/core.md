@@ -166,3 +166,94 @@ celsius.get(100);          // 212
 celsius.reverseGet(212);   // 100
 celsius.reverse().get(212); // 100
 ```
+
+## Validation\<T, E\>
+
+Like `Result` but accumulates **all** errors instead of short-circuiting on the first. Use for form validation, config parsing, or any scenario where you want every error at once.
+
+```ts
+import { Valid, Invalid, Validation } from '@igorjs/pure-ts'
+
+const validateName = (s: string) =>
+  s.trim().length > 0 ? Valid(s.trim()) : Invalid('name required');
+
+const validateAge = (n: number) =>
+  n > 0 && n < 150 ? Valid(n) : Invalid('invalid age');
+
+// zip accumulates errors from BOTH sides:
+const result = validateName('').zip(validateAge(-5));
+// Invalid(['name required', 'invalid age'])
+
+// collect accumulates from an array:
+Validation.collect([validateName(''), validateAge(-5), validateEmail('bad')]);
+// Invalid(['name required', 'invalid age', 'invalid email'])
+
+// Convert to/from Result:
+Validation.fromResult(Ok(42));    // Valid(42)
+Valid(42).toResult();              // Ok(42)
+Invalid(['e']).toResult();         // Err(['e'])
+```
+
+**Key difference from Result:** `flatMap` still short-circuits (the next step depends on the current value). Use `zip` and `ap` for independent validations that should accumulate errors.
+
+## Prism\<S, A\>
+
+Optic for focusing on a variant of a sum type. Like Lens but the target may not exist.
+
+```ts
+import { Prism, Some, None } from '@igorjs/pure-ts'
+
+const numPrism = Prism.from(
+  (v: unknown) => typeof v === 'number' ? Some(v) : None,
+  (v: number) => v,
+);
+
+numPrism.getOption(42);     // Some(42)
+numPrism.getOption('hi');   // None
+numPrism.reverseGet(42);    // 42
+```
+
+## Traversal\<S, A\>
+
+Optic focusing on multiple targets within a data structure.
+
+```ts
+import { Traversal } from '@igorjs/pure-ts'
+
+const items = Traversal.fromArray<number>();
+items.getAll([1, 2, 3]);               // [1, 2, 3]
+items.modify(x => x * 10)([1, 2, 3]); // [10, 20, 30]
+```
+
+## LensOptional\<S, A\>
+
+Optic for values that may not exist in the source (nullable properties, array indices).
+
+```ts
+import { LensOptional } from '@igorjs/pure-ts'
+
+const second = LensOptional.index<number>(1);
+second.getOption([10, 20, 30]); // Some(20)
+second.set(99)([10, 20, 30]);   // [10, 99, 30]
+
+const nullable = LensOptional.fromNullable<{ name?: string }>()('name');
+nullable.getOption({ name: 'hi' }); // Some('hi')
+nullable.getOption({});              // None
+```
+
+## Iso\<S, A\>
+
+Lossless bidirectional transformation between two types.
+
+```ts
+import { Iso } from '@igorjs/pure-ts'
+
+const celsius = Iso.from(
+  (c: number) => c * 9/5 + 32,
+  (f: number) => (f - 32) * 5/9,
+);
+
+celsius.get(0);           // 32
+celsius.reverseGet(32);   // 0
+celsius.reverse().get(32); // 0
+```

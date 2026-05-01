@@ -8,6 +8,13 @@
  * Deno uses `Deno`. This module uses the ProcessInfo adapter from
  * runtime/adapters which normalises both behind a single interface,
  * returning Result/Option instead of throwing.
+ *
+ * **Troubleshooting:**
+ * - `uid()`/`gid()` return `None` on Windows (POSIX-only APIs).
+ * - `env('KEY')` returns `None` on Deno without `--allow-env`.
+ * - `memoryUsage()` returns `None` if the runtime doesn't expose heap stats.
+ * - `ppid` returns `None` on some restricted runtimes.
+ * - All methods return `Option` or `Result`, never throw.
  */
 
 import { None, type Option, Some } from "../core/option.js";
