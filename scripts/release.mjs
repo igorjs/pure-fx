@@ -214,10 +214,25 @@ try {
   // Non-critical: skip if test count extraction fails
 }
 
+// -- Update SECURITY.md supported version -------------------------------------
+
+try {
+  const security = readFileSync("SECURITY.md", "utf8");
+  const updated = security
+    .replace(/\| [\d.]+\.x \(latest\)\s*\| Yes\s*\|/, `| ${newVersion.replace(/\.\d+$/, ".x")} (latest) | Yes |`)
+    .replace(/\| < [\d.]+\s*\| No\s*\|/, `| < ${newVersion.replace(/\.\d+$/, "")} | No |`);
+  if (updated !== security) {
+    writeFileSync("SECURITY.md", updated);
+    log(`Updated SECURITY.md: ${newVersion.replace(/\.\d+$/, ".x")} supported`);
+  }
+} catch {
+  // Non-critical: skip if SECURITY.md doesn't exist
+}
+
 // -- Commit, tag, push --------------------------------------------------------
 
 log("Committing...");
-run("git add package.json jsr.json README.md");
+run("git add package.json jsr.json README.md SECURITY.md");
 const commitMsg = `chore: bump to ${newVersion}\n\n${changelog}`;
 writeFileSync(".git/.release-msg.tmp", commitMsg);
 run('git commit --signoff --gpg-sign --file .git/.release-msg.tmp');
