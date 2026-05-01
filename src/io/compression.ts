@@ -31,20 +31,19 @@ interface StreamReader<T> {
 
 interface ReadableStreamLike<T> {
   getReader(): StreamReader<T>;
+  pipeThrough(transform: TransformStreamLike): ReadableStreamLike<Uint8Array>;
 }
 
 interface TransformStreamLike {
   readonly readable: ReadableStreamLike<Uint8Array>;
-  readonly writable: WritableStreamLike;
 }
 
-interface WritableStreamLike {
-  getWriter(): StreamWriter;
+interface BlobLike {
+  stream(): ReadableStreamLike<Uint8Array>;
 }
 
-interface StreamWriter {
-  write(chunk: Uint8Array): Promise<void>;
-  close(): Promise<void>;
+interface BlobConstructor {
+  new (parts: readonly Uint8Array[]): BlobLike;
 }
 
 interface CompressionStreamConstructor {
@@ -55,7 +54,8 @@ interface DecompressionStreamConstructor {
   new (format: string): TransformStreamLike;
 }
 
-/** Access compression APIs structurally from globalThis. */
+const getBlob = (): BlobConstructor => (globalThis as unknown as { Blob: BlobConstructor }).Blob;
+
 const getCompressionStream = (): CompressionStreamConstructor =>
   (globalThis as unknown as { CompressionStream: CompressionStreamConstructor }).CompressionStream;
 
@@ -68,33 +68,24 @@ const getDecompressionStream = (): DecompressionStreamConstructor =>
 /**
  * Pipe data through a transform stream and collect the output.
  *
- * Writes the input to the writable side, then reads all chunks from
- * the readable side into a single Uint8Array.
+ * Uses the web standard Blob.stream().pipeThrough() pattern which
+ * handles backpressure correctly across all runtimes (Node, Deno, Bun).
  */
 const pipeThrough = async (
   data: Uint8Array,
   transform: TransformStreamLike,
 ): Promise<Uint8Array> => {
-  const writer = transform.writable.getWriter();
-  const reader = transform.readable.getReader();
-
-  // Write and read concurrently. Sequential write-then-read deadlocks
-  // on Deno because writer.close() waits for the readable side to drain.
-  const writePromise = writer.write(data).then(() => writer.close());
-
+  const stream = new (getBlob())([data]).stream().pipeThrough(transform);
+  const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let totalLength = 0;
 
-  const readPromise = (async () => {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      totalLength += value.length;
-    }
-  })();
-
-  await Promise.all([writePromise, readPromise]);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLength += value.length;
+  }
 
   const result = new Uint8Array(totalLength);
   let offset = 0;
