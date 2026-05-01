@@ -4,8 +4,11 @@
  * OS information adapter implementations for Deno and Node/Bun.
  */
 
-import { getDeno, getNodeProcess, requireNode } from "./detect.js";
-import type { OsInfo } from "./types.js";
+import { getDeno, getNodeProcess, requireNode, requireReady } from "./detect.js";
+import type { NetworkInterface, OsInfo } from "./types.js";
+
+// Ensure requireNode is initialised before adapters run
+await requireReady;
 
 // ── Node structural types ───────────────────────────────────────────────────
 
@@ -19,6 +22,12 @@ interface NodeOs {
   tmpdir(): string;
   homedir(): string;
   uptime(): number;
+  release(): string;
+  loadavg(): readonly [number, number, number];
+  networkInterfaces(): Record<
+    string,
+    readonly { address: string; family: string; mac: string; internal: boolean }[]
+  >;
 }
 
 const getNodeOs = requireNode<NodeOs>("node:os");
@@ -90,6 +99,45 @@ const createDenoOsInfo = (): OsInfo | undefined => {
         return undefined;
       }
     },
+    ...(deno.osRelease
+      ? {
+          osRelease: (): string | undefined => {
+            try {
+              return deno.osRelease!();
+            } catch {
+              return undefined;
+            }
+          },
+        }
+      : {}),
+    ...(deno.loadavg
+      ? {
+          loadavg: (): readonly [number, number, number] | undefined => {
+            try {
+              return deno.loadavg!();
+            } catch {
+              return undefined;
+            }
+          },
+        }
+      : {}),
+    ...(deno.networkInterfaces
+      ? {
+          networkInterfaces: (): readonly NetworkInterface[] => {
+            try {
+              return deno.networkInterfaces!().map(iface => ({
+                name: iface.name,
+                address: iface.address,
+                family: iface.family,
+                mac: iface.mac,
+                internal: iface.address === "127.0.0.1" || iface.address === "::1",
+              }));
+            } catch {
+              return [];
+            }
+          },
+        }
+      : {}),
   };
 };
 
@@ -156,6 +204,41 @@ const createNodeOsInfo = (): OsInfo | undefined => {
         return proc.env["HOME"] ?? proc.env["USERPROFILE"];
       }
       return undefined;
+    },
+    osRelease: () => {
+      try {
+        return os.release();
+      } catch {
+        return undefined;
+      }
+    },
+    loadavg: () => {
+      try {
+        return os.loadavg();
+      } catch {
+        return undefined;
+      }
+    },
+    networkInterfaces: (): readonly NetworkInterface[] => {
+      try {
+        const ifaces = os.networkInterfaces();
+        const result: NetworkInterface[] = [];
+        for (const [name, addrs] of Object.entries(ifaces)) {
+          if (addrs === undefined) continue;
+          for (const addr of addrs) {
+            result.push({
+              name,
+              address: addr.address,
+              family: addr.family === "IPv6" || addr.family === "IPv6" ? "IPv6" : "IPv4",
+              mac: addr.mac,
+              internal: addr.internal,
+            });
+          }
+        }
+        return result;
+      } catch {
+        return [];
+      }
     },
     uptime: () => {
       try {

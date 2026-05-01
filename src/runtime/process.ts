@@ -110,6 +110,14 @@ export const Process: {
     { readonly [K in keyof T]: T[K] extends SchemaType<infer U> ? U : never },
     SchemaError
   >;
+  /** Get the parent process ID. */
+  readonly ppid: () => Option<number>;
+  /** Get the user ID of the process (POSIX only). */
+  readonly uid: () => Option<number>;
+  /** Get the group ID of the process (POSIX only). */
+  readonly gid: () => Option<number>;
+  /** Get the path to the runtime executable (node, deno, bun). */
+  readonly execPath: () => Option<string>;
   /** Exit the process with the given code. */
   readonly exit: (code?: number) => never;
 } = {
@@ -187,6 +195,37 @@ export const Process: {
       { readonly [K in keyof T]: T[K] extends SchemaType<infer U> ? U : never },
       SchemaError
     >;
+  },
+
+  ppid: (): Option<number> => (adapter?.ppid !== undefined ? Some(adapter.ppid) : None),
+
+  uid: (): Option<number> => {
+    if (adapter?.uid === undefined) return None;
+    try {
+      const val = adapter.uid();
+      return val !== undefined ? Some(val) : None;
+    } catch {
+      return None;
+    }
+  },
+
+  gid: (): Option<number> => {
+    if (adapter?.gid === undefined) return None;
+    try {
+      const val = adapter.gid();
+      return val !== undefined ? Some(val) : None;
+    } catch {
+      return None;
+    }
+  },
+
+  execPath: (): Option<string> => {
+    if (adapter?.execPath === undefined) return None;
+    try {
+      return Some(adapter.execPath());
+    } catch {
+      return None;
+    }
   },
 
   exit: (code?: number): never => {

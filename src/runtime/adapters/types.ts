@@ -65,6 +65,16 @@ export interface Fs {
   copyFile(src: string, dest: string): Promise<void>;
   rename(oldPath: string, newPath: string): Promise<void>;
   makeTempDir(prefix?: string): Promise<string>;
+  readBytes?(path: string): Promise<Uint8Array>;
+  writeBytes?(path: string, data: Uint8Array): Promise<void>;
+  symlink?(target: string, path: string): Promise<void>;
+  link?(existingPath: string, newPath: string): Promise<void>;
+  chmod?(path: string, mode: number): Promise<void>;
+  chown?(path: string, uid: number, gid: number): Promise<void>;
+  truncate?(path: string, len?: number): Promise<void>;
+  realPath?(path: string): Promise<string>;
+  readLink?(path: string): Promise<string>;
+  lstat?(path: string): Promise<FsStat>;
 }
 
 // ── Subprocess ──────────────────────────────────────────────────────────────
@@ -145,6 +155,9 @@ export interface OsInfo {
   tmpDir(): string;
   homeDir(): string | undefined;
   uptime(): number | undefined;
+  osRelease?(): string | undefined;
+  loadavg?(): readonly [number, number, number] | undefined;
+  networkInterfaces?(): readonly NetworkInterface[];
 }
 
 // ── Process ─────────────────────────────────────────────────────────────────
@@ -160,10 +173,23 @@ export interface ProcessMemory {
 export interface ProcessInfo {
   cwd(): string;
   readonly pid: number;
+  readonly ppid?: number;
   readonly argv: readonly string[];
   env(): Record<string, string>;
   env(key: string): string | undefined;
   exit(code?: number): never;
   uptime?(): number;
   memoryUsage?(): ProcessMemory;
+  uid?(): number | undefined;
+  gid?(): number | undefined;
+  execPath?(): string;
+}
+
+/** Network interface address info. */
+export interface NetworkInterface {
+  readonly name: string;
+  readonly address: string;
+  readonly family: "IPv4" | "IPv6";
+  readonly mac?: string;
+  readonly internal: boolean;
 }
