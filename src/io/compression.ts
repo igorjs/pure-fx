@@ -75,24 +75,27 @@ const pipeThrough = async (
   data: Uint8Array,
   transform: TransformStreamLike,
 ): Promise<Uint8Array> => {
-  // Write input data to the transform's writable side.
   const writer = transform.writable.getWriter();
-  await writer.write(data);
-  await writer.close();
-
-  // Read all output chunks from the readable side.
   const reader = transform.readable.getReader();
+
+  // Write and read concurrently. Sequential write-then-read deadlocks
+  // on Deno because writer.close() waits for the readable side to drain.
+  const writePromise = writer.write(data).then(() => writer.close());
+
   const chunks: Uint8Array[] = [];
   let totalLength = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    totalLength += value.length;
-  }
+  const readPromise = (async () => {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLength += value.length;
+    }
+  })();
 
-  // Concatenate all chunks into a single Uint8Array.
+  await Promise.all([writePromise, readPromise]);
+
   const result = new Uint8Array(totalLength);
   let offset = 0;
   for (const chunk of chunks) {

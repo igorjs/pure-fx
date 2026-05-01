@@ -789,9 +789,8 @@ export async function runIntegrationWeb(lib) {
 
   // ── Compression ───────────────────────────────────────────────────────
 
-  // CompressionStream hangs on Deno, only test on Node/Bun
   section("Compression");
-  if (typeof globalThis.Deno === "undefined") {
+  {
     const input = new TextEncoder().encode("compress me");
     const gz = await Compression.gzip(input).run();
     assert(gz.isOk, "Compression.gzip");
@@ -800,8 +799,6 @@ export async function runIntegrationWeb(lib) {
       ungz.isOk && new TextDecoder().decode(ungz.value) === "compress me",
       "Compression roundtrip",
     );
-  } else {
-    assert(true, "Compression skipped on Deno");
   }
 
   // ── Deep Result coverage ──────────────────────────────────────────────
