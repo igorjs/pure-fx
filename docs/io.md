@@ -196,3 +196,105 @@ const ws = WebSocket.router()
 ws.routes;       // readonly WebSocketRoute[]
 ws.match('/chat'); // WebSocketHandler | undefined
 ```
+
+## FFI
+
+Cross-runtime Foreign Function Interface for loading native shared libraries. Works on Deno, Bun, and Node 25+.
+
+```ts
+import { FFI } from '@igorjs/pure-fx'
+
+// Check availability
+if (!FFI.isAvailable()) {
+  console.log('FFI not available in this runtime');
+}
+
+// Load a native library
+const lib = FFI.open(`./libmath.${FFI.suffix}`, {
+  add: { parameters: ['i32', 'i32'], result: 'i32' },
+  pi:  { parameters: [], result: 'f64' },
+});
+
+if (lib.isOk) {
+  const { symbols, close } = lib.value;
+  console.log(symbols.add(2, 3));  // 5
+  console.log(symbols.pi());       // 3.14159...
+  close(); // release the library
+}
+
+// System libraries
+const libc = FFI.open(FFI.systemLib('c'), {
+  getpid: { parameters: [], result: 'i32' },
+});
+
+// Supported types
+FFI.types.I32;     // 'i32'
+FFI.types.F64;     // 'f64'
+FFI.types.POINTER; // 'pointer'
+FFI.types.BUFFER;  // 'buffer'
+FFI.types.VOID;    // 'void'
+FFI.types.BOOL;    // 'bool'
+```
+
+**Runtime requirements:**
+- **Deno**: `deno run --allow-ffi`
+- **Bun**: Works out of the box
+- **Node 25+**: `node --allow-ffi` (experimental)
+- **Node 22-24**: Not available. Returns `Err(FfiError(...))`.
+
+**Platform library extensions:**
+- macOS: `.dylib`
+- Linux: `.so`
+- Windows: `.dll`
+
+Use `FFI.suffix` to get the correct extension for the current platform.
+
+## Crypto (expanded)
+
+Full Web Crypto API coverage. All operations return `Result` or `Task`.
+
+```ts
+import { Crypto } from '@igorjs/pure-fx'
+
+// Random
+Crypto.uuid();                          // 'f47ac10b-...'
+Crypto.randomBytes(32);                 // Ok(Uint8Array)
+Crypto.randomInt(1, 100);              // Ok(42)
+
+// Hashing
+await Crypto.hash('SHA-256', 'hello').run();     // Ok(Uint8Array)
+await Crypto.hashHex('SHA-256', 'hello').run();  // Ok('2cf24d...')
+
+// HMAC
+const key = (await Crypto.generateKey.hmac('SHA-256').run()).unwrap();
+const sig = (await Crypto.hmac.sign(key, 'data').run()).unwrap();
+await Crypto.hmac.verify(key, sig, 'data').run(); // Ok(true)
+
+// AES-GCM encryption
+const aesKey = (await Crypto.generateKey.aesGcm(256).run()).unwrap();
+const encrypted = (await Crypto.aesGcm.encrypt(aesKey, 'secret').run()).unwrap();
+const decrypted = await Crypto.aesGcm.decrypt(aesKey, encrypted.iv, encrypted.data).run();
+
+// ECDSA signatures
+const pair = (await Crypto.generateKey.ecdsa('P-256').run()).unwrap();
+const ecSig = (await Crypto.ecdsa.sign(pair.privateKey, 'message').run()).unwrap();
+await Crypto.ecdsa.verify(pair.publicKey, ecSig, 'message').run(); // Ok(true)
+
+// Key derivation
+await Crypto.pbkdf2.deriveBits('password', salt, 100000, 'SHA-256', 256).run();
+await Crypto.hkdf.deriveBits(keyMaterial, salt, info, 'SHA-256', 256).run();
+
+// Key exchange (ECDH)
+const alice = (await Crypto.generateKey.ecdh('P-256').run()).unwrap();
+const bob = (await Crypto.generateKey.ecdh('P-256').run()).unwrap();
+const shared = await Crypto.ecdh.deriveBits(alice.privateKey, bob.publicKey, 256).run();
+
+// Key import/export
+const exported = await Crypto.exportKey('jwk', key).run();
+const imported = await Crypto.importKey.jwk(jwk, algorithm, usages).run();
+
+// Key wrapping
+const wrapped = await Crypto.wrapKey('raw', dataKey, wrapKey, { name: 'AES-GCM', iv }).run();
+```
+
+**Full API:** `uuid`, `randomBytes`, `randomInt`, `hash`, `hashHex`, `timingSafeEqual`, `hmac.sign/verify`, `aesGcm.encrypt/decrypt`, `aesCbc.encrypt/decrypt`, `ecdsa.sign/verify`, `rsaPss.sign/verify`, `rsaOaep.encrypt/decrypt`, `pbkdf2.deriveBits`, `hkdf.deriveBits`, `ecdh.deriveBits`, `generateKey.*`, `importKey.*`, `exportKey`, `wrapKey`, `unwrapKey`.

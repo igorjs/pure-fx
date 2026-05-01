@@ -7,8 +7,19 @@
  * The web standard Compression Streams API is async and stream-based,
  * requiring boilerplate to collect the output into a single Uint8Array.
  * These wrappers handle the piping and collection, returning Task for
- * lazy, composable async operations. Available in Node 22.15+, Deno,
+ * lazy, composable async operations. Available in Node 22.15+, Deno 1.38+,
  * and Bun with no imports required.
+ *
+ * **Implementation note:** Uses `Blob.stream().pipeThrough()` to pipe data
+ * through the transform stream. This is the web standard approach and handles
+ * backpressure correctly across all runtimes. Earlier versions used manual
+ * writer/reader coordination which deadlocked on Deno.
+ *
+ * **Troubleshooting:**
+ * - If compression hangs, ensure Deno >= 1.38 (older versions have buggy
+ *   CompressionStream).
+ * - Workers/Browser: CompressionStream may not be available in all
+ *   environments. Operations return `Err(CompressionError(...))` if missing.
  */
 
 import { makeTask, type TaskLike } from "../async/task-like.js";

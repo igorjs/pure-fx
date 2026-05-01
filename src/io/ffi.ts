@@ -9,7 +9,19 @@
  * - **Deno**: `Deno.dlopen()` (requires `--allow-ffi`)
  * - **Bun**: `bun:ffi`
  *
- * All operations return Result or Task, making failure paths explicit.
+ * All operations return Result, making failure paths explicit.
+ *
+ * **Troubleshooting:**
+ * - `Err("FFI not available...")`: You're on Node <25. Upgrade to Node 25+
+ *   and run with `--allow-ffi`, or use Deno/Bun.
+ * - `Err("...library not found...")`: The shared library path is wrong.
+ *   Use `FFI.systemLib('name')` for system libraries, or provide an
+ *   absolute path. Check `FFI.suffix` for the correct file extension.
+ * - `Err("...symbol not found...")`: The function name doesn't match what
+ *   the library exports. Check with `nm -D libfoo.so` (Linux) or
+ *   `nm -gU libfoo.dylib` (macOS).
+ * - Deno requires `--allow-ffi` permission flag.
+ * - Use `FFI.isAvailable()` to check before attempting to load.
  *
  * @example
  * ```ts

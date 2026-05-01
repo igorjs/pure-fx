@@ -7,6 +7,14 @@
  * Importing `node:os` binds the module to Node.js. This module uses the
  * OsInfo adapter from runtime/adapters which normalises Deno and Node/Bun
  * OS APIs behind a single interface.
+ *
+ * **Troubleshooting:**
+ * - `hostname()` returns `None` on Deno without `--allow-sys`.
+ * - `loadavg()` returns `None` on Windows (not supported by the OS).
+ * - `networkInterfaces()` returns `[]` if the runtime can't access
+ *   network info (permissions or environment restrictions).
+ * - `osRelease()` may return `None` in some restricted environments.
+ * - All methods return `Option` or a safe default, never throw.
  */
 
 import { None, type Option, Some } from "../core/option.js";

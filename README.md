@@ -4,7 +4,7 @@
 [![JSR](https://jsr.io/badges/@igorjs/pure-fx)](https://jsr.io/@igorjs/pure-fx)
 [![JSR Score](https://jsr.io/badges/@igorjs/pure-fx/score)](https://jsr.io/@igorjs/pure-fx)
 [![License](https://img.shields.io/npm/l/@igorjs/pure-fx)](https://github.com/igorjs/pure-fx/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1035_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1462_passing-brightgreen)]()
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
 
 Functional application framework for TypeScript. Zero dependencies.
@@ -55,6 +55,11 @@ const data = await Task.fromPromise(() => fetch('/api'), String)
 const User = Schema.object({ name: Schema.string, age: Schema.number });
 User.parse(untrustedData); // Result<{ name: string; age: number }, SchemaError>
 
+// Accumulate ALL validation errors (not just the first)
+const name = Valid("Alice");
+const age = Invalid("age must be positive");
+name.zip(age); // Invalid(["age must be positive"])
+
 // Read a file (works on Node, Deno, Bun)
 const content = await File.read('./config.json').run();
 ```
@@ -63,14 +68,65 @@ const content = await File.read('./config.json').run();
 
 | Layer | Primitives | Docs |
 |-------|------------|------|
-| **Core** | `Result`, `Option`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Iso` | [docs/core.md](docs/core.md) |
-| **Data** | `Record`, `List`, `NonEmptyList`, `Schema`, `Codec`, `ADT`, `StableVec` | [docs/data.md](docs/data.md) |
+| **Core** | `Result`, `Option`, `Validation`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Prism`, `Iso`, `Traversal`, `LensOptional` | [docs/core.md](docs/core.md) |
+| **Data** | `Record`, `List`, `NonEmptyList`, `HashMap`, `Schema`, `Codec`, `ADT`, `StableVec` | [docs/data.md](docs/data.md) |
 | **Types** | `ErrType`, `Type`, `Duration`, `Cron` | [docs/types.md](docs/types.md) |
 | **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel`, `StateMachine`, `EventEmitter`, `Pool`, `Queue`, `CronRunner` | [docs/async.md](docs/async.md) |
-| **IO** | `File`, `Command`, `Json`, `Crypto`, `Encoding`, `Compression`, `Clone`, `Url`, `Client`, `Terminal`, `WebSocket`, `Dns`, `Net` | [docs/io.md](docs/io.md) |
+| **IO** | `File`, `Command`, `Json`, `Crypto`, `Encoding`, `Compression`, `Clone`, `Url`, `Client`, `Terminal`, `WebSocket`, `Dns`, `Net`, `FFI` | [docs/io.md](docs/io.md) |
 | **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Os`, `Process`, `Path`, `Eol`, `Platform` | [docs/runtime.md](docs/runtime.md) |
 
 [Full documentation with examples](docs/index.md)
+
+## Runtime Compatibility
+
+Most modules are pure TypeScript and work everywhere. Runtime-dependent modules adapt automatically:
+
+| Module | Node 22+ | Node 25+ | Deno | Bun | Workers | Browser |
+|--------|----------|----------|------|-----|---------|---------|
+| Core, Data, Async, Types | Yes | Yes | Yes | Yes | Yes | Yes |
+| `Crypto` (full Web Crypto) | Yes | Yes | Yes | Yes | Yes | Yes |
+| `Compression` | Yes | Yes | Yes | Yes | Partial | Partial |
+| `File`, `Command`, `Terminal` | Yes | Yes | Yes | Yes | No | No |
+| `Process`, `Os`, `Path` | Yes | Yes | Yes | Yes | No | No |
+| `Dns`, `Net` | Yes | Yes | Yes | Yes | No | No |
+| `FFI` | No | Yes (`--allow-ffi`) | Yes (`--allow-ffi`) | Yes | No | No |
+| `Server` | Yes | Yes | Yes | Yes | Yes (adapter) | No |
+
+## Troubleshooting
+
+### Compression hangs on older Deno versions
+
+Pure FX uses `Blob.stream().pipeThrough()` for compression, which requires Deno 1.38+. If compression operations hang, update Deno.
+
+### FFI not available
+
+FFI requires native library loading capabilities:
+- **Deno**: Run with `--allow-ffi`
+- **Bun**: Works out of the box
+- **Node 25+**: Run with `--allow-ffi` (experimental)
+- **Node 22-24**: Not available. `FFI.open()` returns `Err(FfiError("..."))`. Use `FFI.isAvailable()` to check.
+
+### Os/Process return None for some values
+
+Some OS APIs are permission-gated on Deno (e.g. `hostname`, `env`). Run with `--allow-sys` and `--allow-env`, or use `deno run --allow-all`.
+
+On Windows, `Process.uid()` and `Process.gid()` return `None` (POSIX-only APIs).
+
+### File operations return Err
+
+All file operations return `Result` or `Task` instead of throwing. Check the error:
+
+```ts
+const result = await File.read('./missing.txt').run();
+if (result.isErr) {
+  console.log(result.error.tag);     // "FileError"
+  console.log(result.error.message); // "ENOENT: no such file..."
+}
+```
+
+### Modules return Err in Workers/Browser
+
+Runtime-dependent modules (`File`, `Command`, `Process`, etc.) gracefully return `Err` or `None` in environments that don't support them. They never throw.
 
 ## Subpath Imports
 
@@ -80,9 +136,9 @@ import { Ok, Task, Schema } from '@igorjs/pure-fx'
 
 // Or import specific modules for smaller bundles
 import { Ok, Err, pipe } from '@igorjs/pure-fx/core'
-import { Schema } from '@igorjs/pure-fx/data'
+import { Schema, HashMap } from '@igorjs/pure-fx/data'
 import { Task, Stream } from '@igorjs/pure-fx/async'
-import { File, Command } from '@igorjs/pure-fx/io'
+import { File, Command, FFI } from '@igorjs/pure-fx/io'
 ```
 
 ## License
