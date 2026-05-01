@@ -27,10 +27,10 @@ const HTML = `<!DOCTYPE html>
 <head><title>pure-ts browser smoke test</title></head>
 <body>
 <script type="module">
-import { runWebSmoke } from "./tests/web-smoke.mjs";
+import { runIntegrationWeb } from "./tests/integration-web.mjs";
 import * as lib from "./dist/index.js";
 
-const result = await runWebSmoke(lib);
+const result = await runIntegrationWeb(lib);
 window.__testResult = result;
 </script>
 </body>

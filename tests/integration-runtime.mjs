@@ -1,5 +1,5 @@
 /**
- * runtime-smoke.mjs - Cross-runtime smoke test for runtime-dependent modules.
+ * integration-runtime.mjs - Cross-runtime smoke test for runtime-dependent modules.
  *
  * Validates File, Command, Process, Os, Path, Platform, Eol, Logger, Config,
  * Terminal, Dns, and Net on every supported runtime.
@@ -7,9 +7,9 @@
  * no node:assert) so it runs identically on Node, Deno, Bun, and QuickJS.
  *
  * Run:
- *   node tests/runtime-smoke.mjs
- *   deno run --allow-all tests/runtime-smoke.mjs
- *   bun tests/runtime-smoke.mjs
+ *   node tests/integration-runtime.mjs
+ *   deno run --allow-all tests/integration-runtime.mjs
+ *   bun tests/integration-runtime.mjs
  */
 
 const {
@@ -423,7 +423,7 @@ section("FFI");
 // ── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n========================================`);
-console.log(`Smoke test results: ${passed} passed, ${failed} failed`);
+console.log(`Integration test (runtime): ${passed} passed, ${failed} failed`);
 console.log(`========================================`);
 
 if (failed > 0) {

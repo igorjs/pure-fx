@@ -1,5 +1,5 @@
 /**
- * web-smoke.mjs - Comprehensive cross-runtime smoke test for all pure and
+ * integration-web.mjs - Comprehensive cross-runtime smoke test for all pure and
  * web-standard modules.
  *
  * Tests every module that requires no runtime-specific APIs: core (Result,
@@ -13,13 +13,13 @@
  * Designed to run in restricted environments: Cloudflare Workers (miniflare)
  * and browsers (Playwright). Uses only console.log for output.
  *
- * Run directly:    node tests/web-smoke.mjs
+ * Run directly:    node tests/integration-web.mjs
  * Via miniflare:   see tests/workers/worker.mjs
  * Via Playwright:  see tests/browser/browser.test.mjs
  */
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: smoke test is intentionally a single large function
-export async function runWebSmoke(lib) {
+export async function runIntegrationWeb(lib) {
   let passed = 0;
   let failed = 0;
   const logs = [];
@@ -694,7 +694,7 @@ export async function runWebSmoke(lib) {
   // ── Summary ────────────────────────────────────────────────────────────
 
   log(`\n========================================`);
-  log(`Web smoke test: ${passed} passed, ${failed} failed`);
+  log(`Integration test (web): ${passed} passed, ${failed} failed`);
   log(`========================================`);
 
   return { passed, failed, logs };
@@ -703,7 +703,7 @@ export async function runWebSmoke(lib) {
 // Self-execute when run directly (Node/Deno/Bun)
 if (typeof process !== "undefined" || typeof Deno !== "undefined") {
   const lib = await import("../dist/index.js");
-  const { passed, failed, logs } = await runWebSmoke(lib);
+  const { passed, failed, logs } = await runIntegrationWeb(lib);
   for (const line of logs) {
     console.log(line);
   }
