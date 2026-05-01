@@ -128,3 +128,7 @@ if (expr.isOk) {
 ```
 
 **Static:** `parse`, `next`, `matches`
+
+---
+
+Previous: [Data](data.md) | Next: [Async](async.md)

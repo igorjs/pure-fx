@@ -6,13 +6,12 @@ Functional application framework for TypeScript. Zero dependencies. Errors as va
 
 | Module | Description | Doc |
 |--------|-------------|-----|
-| **Core** | Result, Option, pipe, flow, Match, Eq, Ord, State, Lens, Prism, Traversal, Iso | [core.md](core.md) |
-| **Data** | Record, List, NonEmptyList, Schema, Codec, ADT, StableVec | [data.md](data.md) |
-| **Async** | Task, Stream, Lazy, Env, Channel, Timer, Retry, CircuitBreaker, Semaphore, Mutex, RateLimiter, Cache, StateMachine, EventEmitter, Pool, Queue, CronRunner | [async.md](async.md) |
-| **IO** | File, Command, Json, Crypto, Encoding, Compression, Clone, Url, Dns, Net, Client, Terminal, WebSocket | [io.md](io.md) |
-| **Runtime** | Server, Program, Logger, Config, Os, Process, Path, Eol, Platform | [runtime.md](runtime.md) |
+| **Core** | Result, Option, Validation, pipe, flow, Match, Eq, Ord, State, Lens, Prism, Traversal, Iso, LensOptional | [core.md](core.md) |
+| **Data** | Record, List, NonEmptyList, HashMap, Schema, Codec, ADT, StableVec | [data.md](data.md) |
 | **Types** | ErrType, Duration, Cron, Type (nominal) | [types.md](types.md) |
-| **StateMachine** | Type-safe FSM with compile-time transitions | [state-machine.md](state-machine.md) |
+| **Async** | Task, Stream, Lazy, Env, Channel, Timer, Retry, CircuitBreaker, Semaphore, Mutex, RateLimiter, Cache, StateMachine, EventEmitter, Pool, Queue, CronRunner | [async.md](async.md) |
+| **IO** | File, Command, Json, Crypto, Encoding, Compression, Clone, Url, Dns, Net, Client, Terminal, WebSocket, FFI | [io.md](io.md) |
+| **Runtime** | Server, Program, Logger, Config, Os, Process, Path, Eol, Platform | [runtime.md](runtime.md) |
 
 ## Quick Start
 
@@ -25,8 +24,9 @@ import { Ok, Err, pipe, Task, Schema, File } from '@igorjs/pure-ts'
 
 // Or import specific modules for smaller bundles:
 import { Ok, Err, pipe } from '@igorjs/pure-ts/core'
-import { Schema } from '@igorjs/pure-ts/data'
+import { Schema, HashMap } from '@igorjs/pure-ts/data'
 import { Task } from '@igorjs/pure-ts/async'
+import { File, FFI } from '@igorjs/pure-ts/io'
 ```
 
 ## Principles
@@ -35,29 +35,36 @@ import { Task } from '@igorjs/pure-ts/async'
 2. **Immutability at runtime**: Records and Lists are deep-frozen. Mutations throw TypeError.
 3. **Lazy async**: Task and Stream describe computations. Nothing runs until `.run()`.
 4. **Zero dependencies**: Everything is built from scratch. No node_modules to audit.
-5. **Multi-runtime**: CI-tested on Node.js 22+, Node.js 24, Deno, Bun, Cloudflare Workers (miniflare), and Chromium (Playwright).
+5. **Multi-runtime**: CI-tested on Node.js 22+, Deno, Bun, Cloudflare Workers, and Chromium.
+6. **Batteries included**: Full Web Crypto, FFI, Compression, DNS, TCP, subprocess, and more.
 
 ## Runtime Compatibility
 
-CI-tested on 7 environments:
+CI-tested on 8 environments:
 
-| Runtime | Unit Tests | Smoke Tests |
-|---------|-----------|-------------|
-| Node.js 22 | 1035 | 96 (runtime + web) |
-| Node.js 24 | - | 96 |
-| Deno | - | 96 |
-| Bun | - | 96 |
-| CF Workers (miniflare) | - | 50 (web) |
-| Chromium (Playwright) | - | 50 (web) |
+| Runtime | Unit Tests | Integration Tests |
+|---------|-----------|-------------------|
+| Node.js 22 | 1462 | 337 (runtime + web) |
+| Node.js 24 | - | 337 |
+| Node.js 25 | - | 337 (with `--allow-ffi`) |
+| Deno 2+ | - | 337 |
+| Bun | - | 337 |
+| CF Workers (miniflare) | - | 249 (web) |
+| Chromium (Playwright) | - | 249 (web) |
 
-Pure and web modules work everywhere. Multi-runtime modules (File, Command, Os, Process, Server) detect Deno/Bun/Node via `globalThis` and return `Err`/`None` in environments without filesystem or subprocess support.
+Pure and web modules work everywhere. Runtime-dependent modules (File, Command, Os, Process, FFI) detect the runtime via `globalThis` and return `Err`/`None` in restricted environments. They never throw.
 
 ## Building
 
 ```bash
-npm run check          # Type check (TS7)
-npm run build          # Build
-npm test               # Test runtime
-npm run test:types     # Test types (compile-time safety suite)
-npm run release patch  # Bump, changelog, tag, push, GitHub release
+pnpm run lint          # Biome lint + format
+pnpm run check         # Type check (tsgo)
+pnpm run build         # Build to dist/
+pnpm test              # Unit tests (node --test)
+pnpm run test:types    # Type tests (compile-time safety)
+node scripts/release.mjs minor  # Bump, changelog, tag, push, GitHub release
 ```
+
+---
+
+Next: [Core](core.md)

@@ -234,3 +234,7 @@ HashMap.of([[1, 'one'], [2, 'two']]);
 // Structural equality
 m.equals(HashMap.of([['city', 'Sydney'], ['name', 'Alice']])); // true
 ```
+
+---
+
+Previous: [Core](core.md) | Next: [Types](types.md)

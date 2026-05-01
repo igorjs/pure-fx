@@ -356,3 +356,7 @@ const start = Timer.now();
 doWork();
 const elapsed = Timer.now() - start;
 ```
+
+---
+
+Previous: [Types](types.md) | Next: [IO](io.md)

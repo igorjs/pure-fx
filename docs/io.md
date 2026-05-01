@@ -503,3 +503,7 @@ const wrapped = await Crypto.wrapKey('raw', dataKey, wrapKey, { name: 'AES-GCM',
 ```
 
 **Full API:** `uuid`, `randomBytes`, `randomInt`, `hash`, `hashHex`, `timingSafeEqual`, `hmac.sign/verify`, `aesGcm.encrypt/decrypt`, `aesCbc.encrypt/decrypt`, `ecdsa.sign/verify`, `rsaPss.sign/verify`, `rsaOaep.encrypt/decrypt`, `pbkdf2.deriveBits`, `hkdf.deriveBits`, `ecdh.deriveBits`, `generateKey.*`, `importKey.*`, `exportKey`, `wrapKey`, `unwrapKey`.
+
+---
+
+Previous: [Async](async.md) | Next: [Runtime](runtime.md)
