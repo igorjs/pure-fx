@@ -147,3 +147,7 @@ Net                    TcpClient               Deno, Node/Bun
 ```
 
 Each adapter has a `resolve*()` function that auto-detects the runtime via `globalThis` structural typing (no `node:` imports). Detection order: Deno first, then Node/Bun, returning `null` when neither is available. Public modules convert `null` into typed `Err` values so consumers never see raw failures.
+
+---
+
+Previous: [IO](io.md) | Next: [Index](index.md)

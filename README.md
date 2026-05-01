@@ -35,9 +35,9 @@ npx jsr add @igorjs/pure-fx
 ## Quick Example
 
 ```ts
-import { Ok, Err, pipe, Task, Schema, File, Match } from '@igorjs/pure-fx'
+import { Ok, Err, pipe, Task, Schema, File, Valid, Invalid } from '@igorjs/pure-fx'
 
-// Errors as values
+// Errors as values, not exceptions
 const parse = (s: string) => {
   const n = Number(s);
   return Number.isNaN(n) ? Err('not a number') : Ok(n);
@@ -56,9 +56,9 @@ const User = Schema.object({ name: Schema.string, age: Schema.number });
 User.parse(untrustedData); // Result<{ name: string; age: number }, SchemaError>
 
 // Accumulate ALL validation errors (not just the first)
-const name = Valid("Alice");
-const age = Invalid("age must be positive");
-name.zip(age); // Invalid(["age must be positive"])
+const validateName = (s: string) => s ? Valid(s) : Invalid('name required');
+const validateAge = (n: number) => n > 0 ? Valid(n) : Invalid('must be positive');
+validateName('').zip(validateAge(-1)); // Invalid(['name required', 'must be positive'])
 
 // Read a file (works on Node, Deno, Bun)
 const content = await File.read('./config.json').run();

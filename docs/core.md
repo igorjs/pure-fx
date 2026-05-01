@@ -257,3 +257,7 @@ celsius.get(0);           // 32
 celsius.reverseGet(32);   // 0
 celsius.reverse().get(32); // 0
 ```
+
+---
+
+Previous: [Index](index.md) | Next: [Data](data.md)
