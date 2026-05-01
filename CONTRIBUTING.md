@@ -32,7 +32,7 @@ The DCO bot will check every commit in your PR. If any commit is missing the tra
 
 First-time contributors must sign a CLA. This grants the project a license to use your contribution and protects both you and the project.
 
-**Individual contributors:** Sign the [Individual CLA](.github/CLA.md) by commenting on your first PR with:
+**Individual contributors:** Sign the [Individual CLA](.github/ICLA.md) by commenting on your first PR with:
 
 ```
 I have read the CLA Document and I hereby sign the CLA.
@@ -120,4 +120,4 @@ Do **not** open a public issue for security vulnerabilities. See [SECURITY.md](S
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE), subject to the terms of the [CLA](.github/CLA.md).
+By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE), subject to the terms of the [CLA](.github/ICLA.md).
