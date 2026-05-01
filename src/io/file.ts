@@ -104,6 +104,26 @@ export const File: {
   readonly rename: (oldPath: string, newPath: string) => TaskLike<void, ErrType<"FileError">>;
   /** Create a temporary directory with optional prefix. */
   readonly tempDir: (prefix?: string) => TaskLike<string, ErrType<"FileError">>;
+  /** Read a file as raw bytes (Uint8Array). */
+  readonly readBytes: (path: string) => TaskLike<Uint8Array, ErrType<"FileError">>;
+  /** Write raw bytes to a file. */
+  readonly writeBytes: (path: string, data: Uint8Array) => TaskLike<void, ErrType<"FileError">>;
+  /** Create a symbolic link. */
+  readonly symlink: (target: string, path: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Create a hard link. */
+  readonly link: (existingPath: string, newPath: string) => TaskLike<void, ErrType<"FileError">>;
+  /** Change file permissions (POSIX only). */
+  readonly chmod: (path: string, mode: number) => TaskLike<void, ErrType<"FileError">>;
+  /** Change file ownership (POSIX only). */
+  readonly chown: (path: string, uid: number, gid: number) => TaskLike<void, ErrType<"FileError">>;
+  /** Truncate a file to the given length (default 0). */
+  readonly truncate: (path: string, len?: number) => TaskLike<void, ErrType<"FileError">>;
+  /** Resolve a path to its canonical absolute path. */
+  readonly realPath: (path: string) => TaskLike<string, ErrType<"FileError">>;
+  /** Read the target of a symbolic link. */
+  readonly readLink: (path: string) => TaskLike<string, ErrType<"FileError">>;
+  /** Like stat but does not follow symlinks. */
+  readonly lstat: (path: string) => TaskLike<FileStat, ErrType<"FileError">>;
 } = {
   read: path => withFs(fs => fs.readFile(path).then(Eol.normalize), { path }),
   write: (path, content) => withFs(fs => fs.writeFile(path, content), { path }),
@@ -127,4 +147,85 @@ export const File: {
   copy: (src, dest) => withFs(fs => fs.copyFile(src, dest), { src, dest }),
   rename: (oldPath, newPath) => withFs(fs => fs.rename(oldPath, newPath), { oldPath, newPath }),
   tempDir: prefix => withFs(fs => fs.makeTempDir(prefix)),
+  readBytes: path =>
+    withFs(
+      fs => {
+        if (fs.readBytes === undefined) throw new Error("readBytes not available in this runtime");
+        return fs.readBytes(path);
+      },
+      { path },
+    ),
+  writeBytes: (path, data) =>
+    withFs(
+      fs => {
+        if (fs.writeBytes === undefined)
+          throw new Error("writeBytes not available in this runtime");
+        return fs.writeBytes(path, data);
+      },
+      { path },
+    ),
+  symlink: (target, path) =>
+    withFs(
+      fs => {
+        if (fs.symlink === undefined) throw new Error("symlink not available in this runtime");
+        return fs.symlink(target, path);
+      },
+      { target, path },
+    ),
+  link: (existingPath, newPath) =>
+    withFs(
+      fs => {
+        if (fs.link === undefined) throw new Error("link not available in this runtime");
+        return fs.link(existingPath, newPath);
+      },
+      { existingPath, newPath },
+    ),
+  chmod: (path, mode) =>
+    withFs(
+      fs => {
+        if (fs.chmod === undefined) throw new Error("chmod not available in this runtime");
+        return fs.chmod(path, mode);
+      },
+      { path },
+    ),
+  chown: (path, uid, gid) =>
+    withFs(
+      fs => {
+        if (fs.chown === undefined) throw new Error("chown not available in this runtime");
+        return fs.chown(path, uid, gid);
+      },
+      { path },
+    ),
+  truncate: (path, len) =>
+    withFs(
+      fs => {
+        if (fs.truncate === undefined) throw new Error("truncate not available in this runtime");
+        return fs.truncate(path, len);
+      },
+      { path },
+    ),
+  realPath: path =>
+    withFs(
+      fs => {
+        if (fs.realPath === undefined) throw new Error("realPath not available in this runtime");
+        return fs.realPath(path);
+      },
+      { path },
+    ),
+  readLink: path =>
+    withFs(
+      fs => {
+        if (fs.readLink === undefined) throw new Error("readLink not available in this runtime");
+        return fs.readLink(path);
+      },
+      { path },
+    ),
+  lstat: path =>
+    withFs(
+      fs => {
+        if (fs.lstat === undefined) throw new Error("lstat not available in this runtime");
+        return fs.lstat(path);
+      },
+      { path },
+    ),
 };

@@ -49,15 +49,45 @@ export interface DenoGlobal {
   }>;
   // Process
   readonly pid: number;
+  readonly ppid?: number;
   readonly args: readonly string[];
   cwd(): string;
   exit(code?: number): never;
   memoryUsage?(): { rss: number; heapTotal: number; heapUsed: number; external: number };
   osUptime?(): number;
+  osRelease?(): string;
+  loadavg?(): readonly [number, number, number];
+  networkInterfaces?(): readonly {
+    name: string;
+    address: string;
+    family: "IPv4" | "IPv6";
+    mac: string;
+    scopeid?: number;
+  }[];
+  uid?(): number;
+  gid?(): number;
+  execPath?(): string;
   readonly env?: {
     get?(key: string): string | undefined;
     toObject?(): Record<string, string>;
   };
+  // Additional FS
+  readFile?(path: string): Promise<Uint8Array>;
+  writeFile?(path: string, data: Uint8Array): Promise<void>;
+  lstat?(path: string): Promise<{
+    isFile: boolean;
+    isDirectory: boolean;
+    isSymlink: boolean;
+    size: number;
+    mtime: Date | null;
+  }>;
+  realPath?(path: string): Promise<string>;
+  readLink?(path: string): Promise<string>;
+  symlink?(target: string, path: string): Promise<void>;
+  link?(oldPath: string, newPath: string): Promise<void>;
+  chmod?(path: string, mode: number): Promise<void>;
+  chown?(path: string, uid: number, gid: number): Promise<void>;
+  truncate?(path: string, len?: number): Promise<void>;
 }
 
 /** Minimal Node/Bun process global shape. */
@@ -128,12 +158,46 @@ export const importNode = <T>(module: string): (() => Promise<T | null>) => {
  * Node and Bun where require is available. Returns null in Deno
  * and browsers.
  */
+/**
+ * Get a working require function in any context (CJS or ESM).
+ * In CJS, Function('return require')() works.
+ * In ESM, we use dynamic import('node:module').createRequire.
+ */
+let cachedRequire: ((id: string) => unknown) | null | undefined;
+
+const initRequire = async (): Promise<(id: string) => unknown> => {
+  if (cachedRequire !== undefined) return cachedRequire!;
+  try {
+    cachedRequire = Function("return require")() as (id: string) => unknown;
+    return cachedRequire;
+  } catch {
+    // ESM context
+  }
+  try {
+    const mod = (await Function('return import("node:module")')()) as {
+      createRequire(url: string): (id: string) => unknown;
+    };
+    cachedRequire = mod.createRequire("file:///");
+    return cachedRequire;
+  } catch {
+    cachedRequire = null;
+  }
+  return cachedRequire!;
+};
+
+// Eagerly initialise (the promise settles before any adapter runs)
+const requireReady = initRequire();
+
 export const requireNode = <T>(module: string): (() => T | null) => {
   let cached: T | null | undefined;
   return (): T | null => {
     if (cached !== undefined) return cached;
+    if (cachedRequire === null || cachedRequire === undefined) {
+      cached = null;
+      return null;
+    }
     try {
-      cached = Function(`return require("${module}")`)() as T;
+      cached = cachedRequire(module) as T;
       return cached;
     } catch {
       cached = null;
@@ -141,3 +205,6 @@ export const requireNode = <T>(module: string): (() => T | null) => {
     }
   };
 };
+
+/** Ensure requireNode is ready (call at module init time via top-level await). */
+export { requireReady };

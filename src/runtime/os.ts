@@ -54,6 +54,12 @@ export const Os: {
   readonly homeDir: () => Option<string>;
   /** Get the system uptime in seconds. */
   readonly uptime: () => Option<number>;
+  /** Get the OS release version string (e.g. '6.5.0-35-generic', '14.5'). */
+  readonly osRelease: () => Option<string>;
+  /** Get 1, 5, and 15 minute load averages. Returns None on Windows. */
+  readonly loadavg: () => Option<readonly [number, number, number]>;
+  /** Get network interface addresses. */
+  readonly networkInterfaces: () => readonly import("./adapters/types.js").NetworkInterface[];
 } = {
   hostname: () => tryOpt(() => adapter!.hostname()),
   arch: () => adapter?.arch() ?? "unknown",
@@ -64,4 +70,7 @@ export const Os: {
   tmpDir: () => adapter?.tmpDir() ?? "/tmp",
   homeDir: () => tryOpt(() => adapter!.homeDir()),
   uptime: () => tryOpt(() => adapter!.uptime()),
+  osRelease: () => tryOpt(() => adapter!.osRelease?.()),
+  loadavg: () => tryOpt(() => adapter!.loadavg?.()),
+  networkInterfaces: () => adapter?.networkInterfaces?.() ?? [],
 };
