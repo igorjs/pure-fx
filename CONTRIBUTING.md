@@ -30,15 +30,17 @@ The DCO bot will check every commit in your PR. If any commit is missing the tra
 
 ### 2. Contributor License Agreement (CLA)
 
-First-time contributors must sign the [Individual CLA](.github/CLA.md). This grants the project a license to use your contribution and protects both you and the project.
+First-time contributors must sign a CLA. This grants the project a license to use your contribution and protects both you and the project.
 
-To sign, comment on your first PR with:
+**Individual contributors:** Sign the [Individual CLA](.github/CLA.md) by commenting on your first PR with:
 
 ```
 I have read the CLA Document and I hereby sign the CLA.
 ```
 
 The CLA bot will record your signature automatically. You only need to do this once across all repositories maintained by igorjs.
+
+**Corporate contributors:** If you are contributing on behalf of your employer, your organisation must sign the [Corporate CLA](.github/CCLA.md). Email the signed document to oss@mail.igorjs.io. Individual employees listed as Designated Employees do not need to sign the Individual CLA separately.
 
 ## Development
 
