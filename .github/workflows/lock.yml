@@ -1,0 +1,27 @@
+name: Lock Closed Issues & PRs
+
+on:
+  schedule:
+    - cron: "0 10 1,15 * *"  # 1st and 15th of each month at 10am UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dessant/lock-threads@v5
+        with:
+          issue-inactive-days: 90
+          pr-inactive-days: 30
+          issue-lock-reason: "resolved"
+          pr-lock-reason: "resolved"
+          issue-comment: >
+            This issue has been locked because it has been closed for more than 90 days
+            with no further activity. Please open a new issue if the problem persists.
+          pr-comment: >
+            This PR has been locked because it has been closed for more than 30 days
+            with no further activity. Please open a new PR if you'd like to continue this work.

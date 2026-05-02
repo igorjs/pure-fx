@@ -1,6 +1,8 @@
 # Pure FX
 
+[![CI](https://github.com/igorjs/pure-fx/actions/workflows/ci.yml/badge.svg)](https://github.com/igorjs/pure-fx/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@igorjs/pure-fx?color=blue)](https://www.npmjs.com/package/@igorjs/pure-fx)
+[![npm downloads](https://img.shields.io/npm/dm/@igorjs/pure-fx)](https://www.npmjs.com/package/@igorjs/pure-fx)
 [![JSR](https://jsr.io/badges/@igorjs/pure-fx)](https://jsr.io/@igorjs/pure-fx)
 [![JSR Score](https://jsr.io/badges/@igorjs/pure-fx/score)](https://jsr.io/@igorjs/pure-fx)
 [![License](https://img.shields.io/npm/l/@igorjs/pure-fx)](https://github.com/igorjs/pure-fx/blob/main/LICENSE)
