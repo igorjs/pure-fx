@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Pure FX"
+abstract: "Functional application framework for TypeScript. Zero dependencies. Errors as values. Immutability at runtime."
+type: software
+license: Apache-2.0
+url: "https://github.com/igorjs/pure-fx"
+repository-code: "https://github.com/igorjs/pure-fx"
+authors:
+  - alias: igorjs
+    email: oss@mail.igorjs.io
+keywords:
+  - typescript
+  - functional-programming
+  - result
+  - option
+  - validation
+  - immutable
+  - zero-dependencies
+  - cross-runtime
