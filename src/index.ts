@@ -298,7 +298,7 @@ export { CryptoError } from "./io/crypto.js";
 /** Cross-runtime Foreign Function Interface for native library loading. */
 export { FFI } from "./io/ffi.js";
 /** Error returned when an FFI operation fails. */
-export { FfiError } from "./io/ffi.js";
+export { FFIError } from "./io/ffi.js";
 /** A loaded dynamic library with callable native functions. */
 export type { FfiLibrary } from "./io/ffi.js";
 /** Definition of a single native function symbol. */
