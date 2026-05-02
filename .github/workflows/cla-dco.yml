@@ -10,6 +10,10 @@ permissions:
   pull-requests: write
   contents: write
 
+concurrency:
+  group: cla-signature
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -70,7 +74,7 @@ jobs:
             core.setOutput('cla_pass', hasSigned ? 'true' : 'false');
             core.setOutput('author', author);
 
-      - name: Record CLA signature and commit
+      - name: Record CLA signature
         if: >
           github.event_name == 'issue_comment' &&
           steps.cla.outputs.cla_pass == 'false' &&
@@ -79,41 +83,71 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const { execSync } = require('child_process');
             const filePath = '.github/contributors.json';
-            const contributors = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
             const author = context.payload.comment.user.login;
             const date = new Date().toISOString().split('T')[0];
+            const maxRetries = 3;
 
-            // Check not already signed (race condition guard)
-            if (contributors.signed.some(s => s.github.toLowerCase() === author.toLowerCase())) {
-              core.info(`@${author} already signed.`);
-              return;
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                // Fetch current file via API (gets latest SHA)
+                const { data: file } = await github.rest.repos.getContent({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: filePath,
+                  ref: 'main',
+                });
+
+                const content = Buffer.from(file.content, 'base64').toString('utf-8');
+                const contributors = JSON.parse(content);
+
+                // Already signed (another workflow beat us)
+                if (contributors.signed.some(s => s.github.toLowerCase() === author.toLowerCase())) {
+                  core.info(`@${author} already signed (detected on attempt ${attempt}).`);
+                  break;
+                }
+
+                // Add signature
+                contributors.signed.push({ name: author, github: author, date });
+                const updated = JSON.stringify(contributors, null, 2) + '\n';
+
+                // Atomic update via API (fails if SHA changed since we read it)
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  path: filePath,
+                  message: `chore: record CLA signature for @${author} [skip ci]`,
+                  content: Buffer.from(updated).toString('base64'),
+                  sha: file.sha,
+                  branch: 'main',
+                  committer: {
+                    name: 'github-actions[bot]',
+                    email: '41898282+github-actions[bot]@users.noreply.github.com',
+                  },
+                });
+
+                core.info(`CLA signature recorded for @${author} on attempt ${attempt}.`);
+                core.setOutput('cla_pass', 'true');
+
+                // Confirm on PR
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.issue.number,
+                  body: `Thank you @${author}! Your CLA signature has been recorded in [contributors.json](.github/contributors.json). This PR can now be reviewed and merged.`,
+                });
+
+                break;
+              } catch (err) {
+                if (err.status === 409 && attempt < maxRetries) {
+                  // SHA conflict: someone else committed. Retry with fresh SHA.
+                  core.warning(`Conflict on attempt ${attempt}, retrying...`);
+                  await new Promise(r => setTimeout(r, 1000 * attempt));
+                  continue;
+                }
+                throw err;
+              }
             }
-
-            // Add signature
-            contributors.signed.push({ name: author, github: author, date });
-            fs.writeFileSync(filePath, JSON.stringify(contributors, null, 2) + '\n');
-
-            // Commit and push
-            execSync('git config user.name "github-actions[bot]"');
-            execSync('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
-            execSync(`git add ${filePath}`);
-            execSync(`git commit -m "chore: record CLA signature for @${author} [skip ci]"`);
-            execSync('git push origin main');
-
-            core.info(`CLA signature recorded and committed for @${author}`);
-            core.setOutput('cla_pass', 'true');
-
-            // Confirm on PR
-            const prNumber = context.payload.issue.number;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: `Thank you @${author}! Your CLA signature has been recorded in [contributors.json](.github/contributors.json). This PR can now be reviewed and merged.`,
-            });
 
       - name: Post status comment
         if: github.event_name == 'pull_request_target'
