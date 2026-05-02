@@ -79,11 +79,6 @@ jobs:
             // Module (by file path)
             for (const file of files) {
               const p = file.filename;
-              if (p.startsWith('src/core/')) labels.add('core');
-              if (p.startsWith('src/data/')) labels.add('data');
-              if (p.startsWith('src/async/')) labels.add('async');
-              if (p.startsWith('src/io/')) labels.add('io');
-              if (p.startsWith('src/runtime/') || p.startsWith('src/server.') || p.startsWith('src/program.')) labels.add('runtime');
               if (p.startsWith('tests/')) labels.add('test');
               if (p.startsWith('docs/') || p.endsWith('.md')) labels.add('docs');
               if (p.startsWith('.github/workflows/')) labels.add('ci');
