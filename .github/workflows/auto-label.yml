@@ -1,0 +1,87 @@
+name: Auto Label PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const labels = new Set();
+
+            // ── Size labels ──────────────────────────────────────
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            const totalChanges = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+
+            if (totalChanges < 10) labels.add('size:xs');
+            else if (totalChanges < 50) labels.add('size:s');
+            else if (totalChanges < 250) labels.add('size:m');
+            else if (totalChanges < 1000) labels.add('size:l');
+            else labels.add('size:xl');
+
+            // ── Module labels (by file path) ─────────────────────
+            for (const file of files) {
+              const p = file.filename;
+              if (p.startsWith('src/core/')) labels.add('core');
+              if (p.startsWith('src/data/')) labels.add('data');
+              if (p.startsWith('src/async/')) labels.add('async');
+              if (p.startsWith('src/io/')) labels.add('io');
+              if (p.startsWith('src/runtime/') || p.startsWith('src/server.') || p.startsWith('src/program.')) labels.add('runtime');
+              if (p.startsWith('tests/')) labels.add('test');
+              if (p.startsWith('docs/') || p.endsWith('.md')) labels.add('docs');
+              if (p.startsWith('.github/workflows/')) labels.add('ci');
+            }
+
+            // ── Type labels (by PR title conventional commit) ────
+            const title = pr.title.toLowerCase();
+            if (title.startsWith('feat')) labels.add('feat');
+            if (title.startsWith('fix')) labels.add('fix');
+            if (title.startsWith('docs')) labels.add('docs');
+            if (title.startsWith('test')) labels.add('test');
+            if (title.startsWith('ci')) labels.add('ci');
+            if (title.startsWith('refactor')) labels.add('refactor');
+            if (title.startsWith('perf')) labels.add('perf');
+            if (title.startsWith('chore')) labels.add('chore');
+            if (title.includes('breaking') || title.includes('BREAKING')) labels.add('breaking');
+
+            // ── Apply labels ─────────────────────────────────────
+            if (labels.size > 0) {
+              // Remove old size labels before adding new one
+              const sizeLabels = ['size:xs', 'size:s', 'size:m', 'size:l', 'size:xl'];
+              const currentLabels = pr.labels.map(l => l.name);
+              for (const sl of sizeLabels) {
+                if (currentLabels.includes(sl) && !labels.has(sl)) {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: sl,
+                  }).catch(() => {});
+                }
+              }
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: [...labels],
+              });
+
+              core.info(`Applied labels: ${[...labels].join(', ')}`);
+            }

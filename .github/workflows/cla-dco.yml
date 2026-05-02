@@ -162,6 +162,21 @@ jobs:
             const author = '${{ steps.cla.outputs.author }}';
             const prNumber = context.payload.pull_request.number;
 
+            // Apply CLA/DCO labels
+            const addLabel = (name) => github.rest.issues.addLabels({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: prNumber, labels: [name],
+            }).catch(() => {});
+            const removeLabel = (name) => github.rest.issues.removeLabel({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: prNumber, name,
+            }).catch(() => {});
+
+            await (dcoPass ? addLabel('dco:passed') : addLabel('dco:failed'));
+            await (dcoPass ? removeLabel('dco:failed') : removeLabel('dco:passed'));
+            await (claPass ? addLabel('cla:signed') : addLabel('cla:needed'));
+            await (claPass ? removeLabel('cla:needed') : removeLabel('cla:signed'));
+
             if (dcoPass && claPass) {
               return;
             }
