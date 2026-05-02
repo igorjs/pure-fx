@@ -2,7 +2,7 @@ name: Lock Closed Issues & PRs
 
 on:
   schedule:
-    - cron: "0 10 1,15 * *"  # 1st and 15th of each month at 10am UTC
+    - cron: "0 10 1 * *"  # 1st of each month at 10am UTC
   workflow_dispatch:
 
 permissions:

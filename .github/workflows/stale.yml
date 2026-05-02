@@ -2,7 +2,7 @@ name: Stale Issues & PRs
 
 on:
   schedule:
-    - cron: "0 9 * * 1"  # Every Monday at 9am UTC
+    - cron: "0 9 1 * *"  # 1st of each month at 9am UTC
   workflow_dispatch:
 
 permissions:
