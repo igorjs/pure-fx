@@ -7,19 +7,60 @@ on:
 permissions:
   pull-requests: write
   contents: read
+  issues: write
 
 jobs:
   label:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Ensure labels exist and apply
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
             const pr = context.payload.pull_request;
+
+            // ── Ensure all labels exist with correct colors ──────
+            const definitions = JSON.parse(fs.readFileSync('.github/labels.json', 'utf-8'));
+            const existing = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const existingMap = new Map(existing.data.map(l => [l.name, l]));
+
+            for (const def of definitions) {
+              const current = existingMap.get(def.name);
+              if (!current) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: def.name,
+                  description: def.description,
+                  color: def.color,
+                });
+                core.info(`Created label: ${def.name}`);
+              } else if (current.color !== def.color || current.description !== def.description) {
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: def.name,
+                  description: def.description,
+                  color: def.color,
+                });
+                core.info(`Updated label: ${def.name}`);
+              }
+            }
+
+            // ── Determine labels to apply ────────────────────────
             const labels = new Set();
 
-            // ── Size labels ──────────────────────────────────────
+            // Size
             const { data: files } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -35,7 +76,7 @@ jobs:
             else if (totalChanges < 1000) labels.add('size:l');
             else labels.add('size:xl');
 
-            // ── Module labels (by file path) ─────────────────────
+            // Module (by file path)
             for (const file of files) {
               const p = file.filename;
               if (p.startsWith('src/core/')) labels.add('core');
@@ -48,7 +89,7 @@ jobs:
               if (p.startsWith('.github/workflows/')) labels.add('ci');
             }
 
-            // ── Type labels (by PR title conventional commit) ────
+            // Type (by PR title)
             const title = pr.title.toLowerCase();
             if (title.startsWith('feat')) labels.add('feat');
             if (title.startsWith('fix')) labels.add('fix');
@@ -61,27 +102,26 @@ jobs:
             if (title.includes('breaking') || title.includes('BREAKING')) labels.add('breaking');
 
             // ── Apply labels ─────────────────────────────────────
-            if (labels.size > 0) {
-              // Remove old size labels before adding new one
-              const sizeLabels = ['size:xs', 'size:s', 'size:m', 'size:l', 'size:xl'];
-              const currentLabels = pr.labels.map(l => l.name);
-              for (const sl of sizeLabels) {
-                if (currentLabels.includes(sl) && !labels.has(sl)) {
-                  await github.rest.issues.removeLabel({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: pr.number,
-                    name: sl,
-                  }).catch(() => {});
-                }
+            // Remove stale size labels
+            const sizeLabels = ['size:xs', 'size:s', 'size:m', 'size:l', 'size:xl'];
+            const currentLabels = pr.labels.map(l => l.name);
+            for (const sl of sizeLabels) {
+              if (currentLabels.includes(sl) && !labels.has(sl)) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  name: sl,
+                }).catch(() => {});
               }
+            }
 
+            if (labels.size > 0) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pr.number,
                 labels: [...labels],
               });
-
               core.info(`Applied labels: ${[...labels].join(', ')}`);
             }
