@@ -99,7 +99,7 @@ FFI requires native library loading capabilities:
 - **Deno**: Run with `--allow-ffi`
 - **Bun**: Works out of the box
 - **Node 25+**: Run with `--allow-ffi` (experimental)
-- **Node 22-24**: Not available. `FFI.open()` returns `Err(FfiError("..."))`. Use `FFI.isAvailable()` to check.
+- **Node 22-24**: Not available. `FFI.open()` returns `Err(FFIError("..."))`. Use `FFI.isAvailable()` to check.
 
 ### Os/Process return None for some values
 

@@ -359,7 +359,7 @@ const libPath = `./target/release/libcalc.${FFI.suffix}`;
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `FFI.open(path, symbols)` | `Result<FfiLibrary, FfiError>` | Load a library and bind symbols |
+| `FFI.open(path, symbols)` | `Result<FfiLibrary, FFIError>` | Load a library and bind symbols |
 | `FFI.isAvailable()` | `boolean` | Check if FFI is supported in this runtime |
 | `FFI.suffix` | `string` | Platform library extension (`dylib`/`so`/`dll`) |
 | `FFI.systemLib(name)` | `string` | Resolve system library path |
@@ -381,7 +381,7 @@ const libPath = `./target/release/libcalc.${FFI.suffix}`;
 
 ### Error handling
 
-`FFI.open()` returns `Result<FfiLibrary, FfiError>`. Common errors:
+`FFI.open()` returns `Result<FfiLibrary, FFIError>`. Common errors:
 
 ```ts
 const result = FFI.open('./missing.so', { fn: { parameters: [], result: 'void' } });

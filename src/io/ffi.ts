@@ -48,7 +48,7 @@ import { ErrType, type ErrTypeConstructor } from "../types/error.js";
 // ── Error type ──────────────────────────────────────────────────────────────
 
 /** FFI operation failed. */
-export const FfiError: ErrTypeConstructor<"FfiError", string> = ErrType("FfiError");
+export const FFIError: ErrTypeConstructor<"FFIError", string> = ErrType("FFIError");
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ const detectSuffix = (): string => {
 const openDeno = <S extends FfiSymbols>(
   path: string,
   symbols: S,
-): Result<FfiLibrary<S>, ErrType<"FfiError">> => {
+): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
   try {
     const deno = getDeno()!;
     const lib = deno.dlopen(path, symbols);
@@ -179,14 +179,14 @@ const openDeno = <S extends FfiSymbols>(
       close: () => lib.close(),
     });
   } catch (e) {
-    return Err(FfiError(e instanceof Error ? e.message : String(e)));
+    return Err(FFIError(e instanceof Error ? e.message : String(e)));
   }
 };
 
 const openBun = <S extends FfiSymbols>(
   path: string,
   symbols: S,
-): Result<FfiLibrary<S>, ErrType<"FfiError">> => {
+): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
   try {
     // Dynamic require to avoid TS errors in non-Bun environments
     const bunFfi = Function('return require("bun:ffi")')() as {
@@ -204,14 +204,14 @@ const openBun = <S extends FfiSymbols>(
       close: () => lib.close(),
     });
   } catch (e) {
-    return Err(FfiError(e instanceof Error ? e.message : String(e)));
+    return Err(FFIError(e instanceof Error ? e.message : String(e)));
   }
 };
 
 const openNode = <S extends FfiSymbols>(
   path: string,
   symbols: S,
-): Result<FfiLibrary<S>, ErrType<"FfiError">> => {
+): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
   try {
     const nodeFfi = Function('return require("node:ffi")')() as {
       dlopen(
@@ -231,10 +231,10 @@ const openNode = <S extends FfiSymbols>(
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("No such built-in module")) {
       return Err(
-        FfiError("FFI not available. Node 25+ with --allow-ffi required, or use Deno/Bun."),
+        FFIError("FFI not available. Node 25+ with --allow-ffi required, or use Deno/Bun."),
       );
     }
-    return Err(FfiError(msg));
+    return Err(FFIError(msg));
   }
 };
 
@@ -269,12 +269,12 @@ export const FFI: {
    * Open a dynamic library and bind symbols.
    *
    * Returns `Ok` with callable symbols and a close function,
-   * or `Err(FfiError)` if the library can't be loaded.
+   * or `Err(FFIError)` if the library can't be loaded.
    */
   readonly open: <S extends FfiSymbols>(
     path: string,
     symbols: S,
-  ) => Result<FfiLibrary<S>, ErrType<"FfiError">>;
+  ) => Result<FfiLibrary<S>, ErrType<"FFIError">>;
 
   /**
    * Platform-specific shared library file extension.
@@ -318,7 +318,7 @@ export const FFI: {
   open: <S extends FfiSymbols>(
     path: string,
     symbols: S,
-  ): Result<FfiLibrary<S>, ErrType<"FfiError">> => {
+  ): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
     if (getDeno()) return openDeno(path, symbols);
     if (isBun()) return openBun(path, symbols);
     return openNode(path, symbols);
