@@ -60,8 +60,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const contributors = JSON.parse(fs.readFileSync('.github/contributors.json', 'utf-8'));
-            const signed = contributors.signed.map(s => s.github.toLowerCase());
+            const content = fs.readFileSync('.github/CONTRIBUTORS.md', 'utf-8');
 
             let author;
             if (context.eventName === 'pull_request_target') {
@@ -70,7 +69,10 @@ jobs:
               author = context.payload.comment.user.login.toLowerCase();
             }
 
-            const hasSigned = signed.includes(author);
+            // Parse table rows between CLA-BOT markers
+            const match = content.match(/CLA-BOT:START[\s\S]*?CLA-BOT:END/);
+            const hasSigned = match ? match[0].toLowerCase().includes(`@${author}`) : false;
+
             core.setOutput('cla_pass', hasSigned ? 'true' : 'false');
             core.setOutput('author', author);
 
@@ -83,9 +85,10 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const filePath = '.github/contributors.json';
+            const filePath = '.github/CONTRIBUTORS.md';
             const author = context.payload.comment.user.login;
             const date = new Date().toISOString().split('T')[0];
+            const newRow = `| @${author} | ${date} |`;
             const maxRetries = 3;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -99,19 +102,20 @@ jobs:
                 });
 
                 const content = Buffer.from(file.content, 'base64').toString('utf-8');
-                const contributors = JSON.parse(content);
 
                 // Already signed (another workflow beat us)
-                if (contributors.signed.some(s => s.github.toLowerCase() === author.toLowerCase())) {
+                if (content.toLowerCase().includes(`@${author.toLowerCase()}`)) {
                   core.info(`@${author} already signed (detected on attempt ${attempt}).`);
                   break;
                 }
 
-                // Add signature
-                contributors.signed.push({ name: author, github: author, date });
-                const updated = JSON.stringify(contributors, null, 2) + '\n';
+                // Insert new row before the CLA-BOT:END marker
+                const updated = content.replace(
+                  '<!-- CLA-BOT:END',
+                  `${newRow}\n<!-- CLA-BOT:END`,
+                );
 
-                // Atomic update via API (fails if SHA changed since we read it)
+                // Atomic update via API (fails with 409 if SHA changed)
                 await github.rest.repos.createOrUpdateFileContents({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -129,18 +133,16 @@ jobs:
                 core.info(`CLA signature recorded for @${author} on attempt ${attempt}.`);
                 core.setOutput('cla_pass', 'true');
 
-                // Confirm on PR
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.payload.issue.number,
-                  body: `Thank you @${author}! Your CLA signature has been recorded in [contributors.json](.github/contributors.json). This PR can now be reviewed and merged.`,
+                  body: `Thank you @${author}! Your CLA signature has been recorded in [CONTRIBUTORS.md](.github/CONTRIBUTORS.md). This PR can now be reviewed and merged.`,
                 });
 
                 break;
               } catch (err) {
                 if (err.status === 409 && attempt < maxRetries) {
-                  // SHA conflict: someone else committed. Retry with fresh SHA.
                   core.warning(`Conflict on attempt ${attempt}, retrying...`);
                   await new Promise(r => setTimeout(r, 1000 * attempt));
                   continue;
