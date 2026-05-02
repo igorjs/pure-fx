@@ -1,0 +1,63 @@
+name: Feature Request
+description: Suggest a new feature or improvement.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your feature request. Please describe what you'd like and why.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this feature solve? What are you trying to do that you can't?
+      placeholder: "I'm trying to... but currently I have to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How should this work? Include API examples if possible.
+      placeholder: |
+        ```ts
+        // What the API could look like:
+        const result = SomeModule.newMethod(...)
+        ```
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches have you considered? What are you doing as a workaround?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Which area does this affect?
+      options:
+        - Core (Result, Option, Validation, pipe, Match, Eq, Ord, State)
+        - Data (Record, List, HashMap, Schema, Codec, ADT, StableVec)
+        - Async (Task, Stream, Retry, CircuitBreaker, Cache, Channel, Pool)
+        - IO (File, Command, Crypto, FFI, Dns, Net, Terminal)
+        - Runtime (Server, Program, Logger, Config, Os, Process, Path)
+        - Types (ErrType, Duration, Cron)
+        - Other / Cross-cutting
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to submit a PR for this feature
