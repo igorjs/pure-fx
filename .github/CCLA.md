@@ -57,7 +57,7 @@ To sign this Corporate CLA:
 3. Have an authorised representative of the Corporation sign it.
 4. Email the signed document to: **oss@mail.igorjs.io**
 
-The Maintainer will add the Corporation and its Designated Employees to the [contributors file](.github/contributors.json).
+The Maintainer will add the Corporation and its Designated Employees to the [contributors file](.github/CONTRIBUTORS.md).
 
 ---
 

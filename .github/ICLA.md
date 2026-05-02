@@ -48,6 +48,6 @@ To sign this CLA, comment on your first pull request with:
 I have read the CLA Document and I hereby sign the CLA.
 ```
 
-The CLA bot will record your agreement. Your GitHub username and the date will be added to the [contributors file](contributors.json).
+The CLA bot will record your agreement. Your GitHub username and the date will be added to the [contributors file](CONTRIBUTORS.md).
 
-Alternatively, you may submit a pull request adding your name to the [contributors file](contributors.json) directly.
+Alternatively, you may submit a pull request adding your name to the [contributors file](CONTRIBUTORS.md) directly.
