@@ -4,9 +4,7 @@
 [![npm](https://img.shields.io/npm/v/@igorjs/pure-fx?color=blue)](https://www.npmjs.com/package/@igorjs/pure-fx)
 [![npm downloads](https://img.shields.io/npm/dm/@igorjs/pure-fx)](https://www.npmjs.com/package/@igorjs/pure-fx)
 [![JSR](https://jsr.io/badges/@igorjs/pure-fx)](https://jsr.io/@igorjs/pure-fx)
-[![JSR Score](https://jsr.io/badges/@igorjs/pure-fx/score)](https://jsr.io/@igorjs/pure-fx)
 [![License](https://img.shields.io/npm/l/@igorjs/pure-fx)](https://github.com/igorjs/pure-fx/blob/main/LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1462_passing-brightgreen)]()
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
 
 Functional application framework for TypeScript. Zero dependencies.
@@ -15,12 +13,7 @@ Functional application framework for TypeScript. Zero dependencies.
 
 Errors are values, not exceptions. Data is immutable, enforced at runtime. Async is lazy and composable.
 
-![Node.js](https://img.shields.io/badge/Node.js_22+-339933?logo=nodedotjs&logoColor=white)
-![Deno](https://img.shields.io/badge/Deno_2.0+-000000?logo=deno&logoColor=white)
-![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)
-![Cloudflare Workers](https://img.shields.io/badge/CF_Workers-F38020?logo=cloudflare&logoColor=white)
-![Browser](https://img.shields.io/badge/Chromium-4285F4?logo=googlechrome&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript_5.5+-3178C6?logo=typescript&logoColor=white)
+Runs on Node.js 22+, Deno 2+, Bun, Cloudflare Workers, and Chromium.
 
 ## Install
 
