@@ -93,5 +93,10 @@
     "name": "size:xl",
     "description": "Very large change (1000+ lines)",
     "color": "b60205"
+  },
+  {
+    "name": "stale",
+    "description": "No activity for extended period",
+    "color": "ededed"
   }
 ]

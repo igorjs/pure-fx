@@ -1,6 +1,8 @@
 # Pure TS
 
+[![CI](https://github.com/igorjs/pure-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/igorjs/pure-ts/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@igorjs/pure-ts?color=blue)](https://www.npmjs.com/package/@igorjs/pure-ts)
+[![npm downloads](https://img.shields.io/npm/dm/@igorjs/pure-ts)](https://www.npmjs.com/package/@igorjs/pure-ts)
 [![JSR](https://jsr.io/badges/@igorjs/pure-ts)](https://jsr.io/@igorjs/pure-ts)
 [![JSR Score](https://jsr.io/badges/@igorjs/pure-ts/score)](https://jsr.io/@igorjs/pure-ts)
 [![License](https://img.shields.io/npm/l/@igorjs/pure-ts)](https://github.com/igorjs/pure-ts/blob/main/LICENSE)
