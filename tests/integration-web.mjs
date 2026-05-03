@@ -930,12 +930,9 @@ export async function runIntegrationWeb(lib) {
     const statMissing = await File.stat("/nonexistent/path").run();
     assert(statMissing.isErr, "File.stat missing path returns Err");
 
-    // File: exists returns false for missing files, not Err
+    // File: exists returns Err when no filesystem is available
     const existsMissing = await File.exists("/nonexistent/path/xyz.txt").run();
-    assert(
-      existsMissing.isOk && existsMissing.value === false,
-      "File.exists missing returns Ok(false)",
-    );
+    assert(existsMissing.isErr, "File.exists without FS returns Err");
 
     // File: write to invalid path
     const writeInvalid = await File.write("/nonexistent/dir/file.txt", "data").run();
