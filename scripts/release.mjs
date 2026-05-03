@@ -80,7 +80,11 @@ try {
 
 log("Verifying npm publish (dry run)...");
 try {
-  run("npm publish --dry-run", { stdio: "inherit" });
+  // Strip pnpm-injected npm_config_ env vars that npm doesn't recognise
+  const cleanEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith("npm_")),
+  );
+  execSync("npm publish --dry-run", { stdio: "inherit", env: cleanEnv });
 } catch {
   die("npm publish dry run failed. Fix packaging issues before releasing.");
 }
