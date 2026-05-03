@@ -70,7 +70,7 @@ if (ciRun.conclusion !== "success") {
 
 log("Running full test matrix (native + Docker)...");
 try {
-  run("pnpm run test:ci", { stdio: "inherit" });
+  execSync("pnpm run test:ci", { stdio: "inherit" });
 } catch {
   die("Test matrix failed. Fix all failures before releasing.");
 }
