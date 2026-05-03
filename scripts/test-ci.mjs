@@ -121,49 +121,31 @@ if (runDocker) {
       }
     }
 
-    // Build all images (parallel by default with BuildKit)
-    process.stdout.write("  building images ... ");
-    try {
-      execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f ${COMPOSE_FILE} build`,
-        { stdio: "pipe" },
-      );
-      log("OK");
-    } catch (e) {
-      log("FAIL");
-      const output = String(e.stderr || e.stdout || e.message);
-      log(output.split("\n").slice(-10).join("\n"));
-      failed = true;
-    }
+    // Discover services, build + run each independently in parallel
+    const services = execSync(
+      `docker compose -p ${COMPOSE_PROJECT} -f ${COMPOSE_FILE} config --services`,
+      { encoding: "utf-8", stdio: "pipe" },
+    ).trim().split("\n");
 
-    if (!failed) {
-      // Discover services and run all in parallel
-      const services = execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f ${COMPOSE_FILE} config --services`,
-        { encoding: "utf-8", stdio: "pipe" },
-      ).trim().split("\n");
+    const runService = (service) => new Promise((resolve) => {
+      const child = spawn("docker", [
+        "compose", "-p", COMPOSE_PROJECT, "-f", COMPOSE_FILE,
+        "run", "--rm", "--build", service,
+      ], { stdio: "pipe" });
+      let output = "";
+      child.stdout.on("data", (d) => { output += d; });
+      child.stderr.on("data", (d) => { output += d; });
+      child.on("close", (code) => resolve({ service, ok: code === 0, output }));
+    });
 
-      log(`  running ${services.length} containers in parallel...`);
+    log(`  running ${services.length} containers in parallel...`);
+    const results = await Promise.all(services.map(runService));
 
-      const runService = (service) => new Promise((resolve) => {
-        const child = spawn("docker", [
-          "compose", "-p", COMPOSE_PROJECT, "-f", COMPOSE_FILE,
-          "run", "--rm", service,
-        ], { stdio: "pipe" });
-        let output = "";
-        child.stdout.on("data", (d) => { output += d; });
-        child.stderr.on("data", (d) => { output += d; });
-        child.on("close", (code) => resolve({ service, ok: code === 0, output }));
-      });
-
-      const results = await Promise.all(services.map(runService));
-
-      for (const r of results.sort((a, b) => a.service.localeCompare(b.service))) {
-        log(`  ${r.service} ... ${r.ok ? "PASS" : "FAIL"}`);
-        if (!r.ok) {
-          dockerErrors.push({ service: r.service, output: r.output });
-          failed = true;
-        }
+    for (const r of results.sort((a, b) => a.service.localeCompare(b.service))) {
+      log(`  ${r.service} ... ${r.ok ? "PASS" : "FAIL"}`);
+      if (!r.ok) {
+        dockerErrors.push({ service: r.service, output: r.output });
+        failed = true;
       }
     }
   }
