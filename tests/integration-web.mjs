@@ -921,22 +921,57 @@ export async function runIntegrationWeb(lib) {
 
   section("Runtime modules (graceful degradation)");
   {
-    // File: read a nonexistent file should return Err, not throw
-    const readMissing = await File.read("/nonexistent/path/xyz.txt").run();
-    assert(readMissing.isErr, "File.read missing file returns Err");
-    assert(readMissing.error.tag === "FileError", "File.read error has FileError tag");
+    // File: methods that always fail on invalid/missing paths
+    const fileErrors = [
+      ["read", await File.read("/x").run()],
+      ["write", await File.write("/x", "d").run()],
+      ["append", await File.append("/x", "d").run()],
+      ["makeDir", await File.makeDir("/x").run()],
+      ["remove", await File.remove("/x").run()],
+      ["list", await File.list("/x").run()],
+      ["stat", await File.stat("/x").run()],
+      ["copy", await File.copy("/x", "/y").run()],
+      ["rename", await File.rename("/x", "/y").run()],
+      ["readBytes", await File.readBytes("/x").run()],
+      ["writeBytes", await File.writeBytes("/x", new Uint8Array()).run()],
+      ["symlink", await File.symlink("/x", "/y").run()],
+      ["link", await File.link("/x", "/y").run()],
+      ["chmod", await File.chmod("/x", 0o644).run()],
+      ["chown", await File.chown("/x", 0, 0).run()],
+      ["truncate", await File.truncate("/x").run()],
+      ["realPath", await File.realPath("/x").run()],
+      ["readLink", await File.readLink("/x").run()],
+      ["lstat", await File.lstat("/x").run()],
+    ];
+    for (const [name, result] of fileErrors) {
+      assert(result.isErr, `File.${name} returns Err`);
+      assert(result.error.tag === "FileError", `File.${name} error has FileError tag`);
+    }
 
-    // File: stat a nonexistent path
-    const statMissing = await File.stat("/nonexistent/path").run();
-    assert(statMissing.isErr, "File.stat missing path returns Err");
+    // File.exists: Ok(false) when FS available, Err(FileError) when not
+    const existsResult = await File.exists("/nonexistent/path/xyz.txt").run();
+    assert(
+      (existsResult.isOk && existsResult.value === false) ||
+        (existsResult.isErr && existsResult.error.tag === "FileError"),
+      "File.exists returns Ok(false) or Err(FileError)",
+    );
 
-    // File: exists returns Err when no filesystem is available
-    const existsMissing = await File.exists("/nonexistent/path/xyz.txt").run();
-    assert(existsMissing.isErr, "File.exists without FS returns Err");
+    // File.removeDir: Ok when path doesn't exist (idempotent), Err when no FS
+    const removeDirResult = await File.removeDir("/nonexistent/path").run();
+    assert(
+      removeDirResult.isOk || (removeDirResult.isErr && removeDirResult.error.tag === "FileError"),
+      "File.removeDir returns Ok or Err(FileError)",
+    );
 
-    // File: write to invalid path
-    const writeInvalid = await File.write("/nonexistent/dir/file.txt", "data").run();
-    assert(writeInvalid.isErr, "File.write invalid path returns Err");
+    // File.tempDir: Ok when FS available, Err when no FS
+    const tempDirResult = await File.tempDir("test-").run();
+    if (tempDirResult.isOk) {
+      await File.removeDir(tempDirResult.value).run();
+    }
+    assert(
+      tempDirResult.isOk || (tempDirResult.isErr && tempDirResult.error.tag === "FileError"),
+      "File.tempDir returns Ok or Err(FileError)",
+    );
 
     // Command: nonexistent command
     const badCmd = await Command.exec("nonexistent-command-xyz-99999").run();
