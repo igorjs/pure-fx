@@ -79,6 +79,8 @@ jobs:
             sleep 15
           done
           exit 1
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-gpr:
     needs: verify
