@@ -20,7 +20,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 // -- Helpers ------------------------------------------------------------------
 
-const run = (cmd, opts) => execSync(cmd, { encoding: "utf-8", stdio: "pipe", ...opts }).trim();
+const run = (cmd, opts) => {
+  const result = execSync(cmd, { encoding: "utf-8", stdio: "pipe", ...opts });
+  return result ? result.trim() : "";
+};
 const log = (msg) => process.stdout.write(`${msg}\n`);
 const die = (msg) => {
   process.stderr.write(`Error: ${msg}\n`);
@@ -70,7 +73,7 @@ if (ciRun.conclusion !== "success") {
 
 log("Running full test matrix (native + Docker)...");
 try {
-  execSync("pnpm run test:ci", { stdio: "inherit" });
+  run("pnpm run test:ci", { stdio: "inherit" });
 } catch {
   die("Test matrix failed. Fix all failures before releasing.");
 }
