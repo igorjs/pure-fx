@@ -17,7 +17,7 @@ RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir /usr/lo
     eval "$(fnm env)" && \
     fnm install ${NODE_VERSION} && \
     fnm default ${NODE_VERSION} && \
-    corepack enable
+    (command -v corepack >/dev/null 2>&1 || npm install -g corepack) && corepack enable
 
 ENV FNM_DIR=/root/.local/share/fnm
 ENV PATH="/root/.local/share/fnm/aliases/default/bin:${PATH}"
