@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1
+# Multi-runtime test image for pure-fx.
+# Installs Node, Deno, and Bun in a single image, then runs the full test suite.
+
+ARG BASE=ubuntu:24.04
+FROM ${BASE}
+
+ARG NODE_VERSION=24
+ARG DENO_VERSION=2
+ARG BUN=true
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+WORKDIR /app
+
+# -- System dependencies (distro-agnostic) ------------------------------------
+
+RUN if command -v apt-get &>/dev/null; then \
+      apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates unzip git xz-utils && \
+      rm -rf /var/lib/apt/lists/*; \
+    elif command -v dnf &>/dev/null; then \
+      dnf install -y curl ca-certificates unzip git xz tar findutils && \
+      dnf clean all; \
+    elif command -v pacman &>/dev/null; then \
+      pacman -Syu --noconfirm curl ca-certificates unzip git; \
+    elif command -v apk &>/dev/null; then \
+      apk add --no-cache curl ca-certificates unzip git bash libstdc++ gcompat; \
+    fi
+
+# -- Node.js via fnm ----------------------------------------------------------
+
+RUN curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir /usr/local/bin --skip-shell && \
+    eval "$(fnm env)" && \
+    fnm install ${NODE_VERSION} && \
+    fnm default ${NODE_VERSION} && \
+    corepack enable
+
+ENV FNM_DIR=/root/.local/share/fnm
+ENV PATH="/root/.local/share/fnm/aliases/default/bin:${PATH}"
+
+# -- Deno ----------------------------------------------------------------------
+
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- --no-modify-path v${DENO_VERSION}
+
+# -- Bun (optional, skipped on Alpine/musl) ------------------------------------
+
+RUN if [ "${BUN}" = "true" ]; then \
+      curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash || \
+      echo "WARN: Bun install failed (expected on musl), skipping"; \
+    fi
+
+# -- Project files -------------------------------------------------------------
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm run build
+
+# -- Test entrypoint -----------------------------------------------------------
+
+ENTRYPOINT ["node", "scripts/test-matrix.mjs"]

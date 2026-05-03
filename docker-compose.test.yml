@@ -1,0 +1,33 @@
+services:
+  ubuntu:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      args:
+        BASE: ubuntu:24.04
+        NODE_VERSION: "24"
+
+  fedora:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      args:
+        BASE: fedora:42
+        NODE_VERSION: "24"
+
+  arch:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      args:
+        BASE: archlinux:latest
+        NODE_VERSION: "24"
+
+  alpine:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      args:
+        BASE: alpine:3.21
+        NODE_VERSION: "24"
+        BUN: "false"

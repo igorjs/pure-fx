@@ -5,9 +5,9 @@ Thank you to everyone who has signed the [Individual CLA](ICLA.md) or [Corporate
 ## Individual Contributors
 
 <!-- CLA-BOT:START - Do not remove this marker -->
-| GitHub Username | Date |
-|-----------------|------|
-| @igorjs | 2026-05-02 |
+| GitHub Username | Date       |
+| --------------- | ---------- |
+| @igorjs         | 2026-03-15 |
 <!-- CLA-BOT:END - Do not remove this marker -->
 
 ## Corporate Contributors

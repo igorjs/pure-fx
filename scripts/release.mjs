@@ -54,6 +54,18 @@ try {
   die("GitHub CLI (gh) is not installed or not in PATH.");
 }
 
+const ciStatus = run("gh run list --branch main --limit 1 --json conclusion --jq '.[0].conclusion'");
+if (ciStatus !== "success") {
+  die(`Last CI run on main is not green (status: ${ciStatus}). Fix CI before releasing.`);
+}
+
+log("Running full test matrix (native + Docker)...");
+try {
+  run("pnpm run test:ci", { stdio: "inherit" });
+} catch {
+  die("Test matrix failed. Fix all failures before releasing.");
+}
+
 // -- Detect repo URL from git remote ------------------------------------------
 
 const repoUrl = run("git remote get-url origin")
@@ -104,6 +116,13 @@ const CATEGORIES = [
   { prefix: "ci", label: "CI" },
   { prefix: "build", label: "Build" },
   { prefix: "chore", label: "Chores" },
+];
+
+// Keep a Changelog categories (user-facing only)
+const CHANGELOG_CATEGORIES = [
+  { prefixes: ["feat"], label: "Added" },
+  { prefixes: ["fix"], label: "Fixed" },
+  { prefixes: ["perf"], label: "Changed" },
 ];
 
 const range = hasLastTag ? `${lastTag}..HEAD` : "HEAD";
@@ -165,9 +184,36 @@ if (uncategorized.length > 0) {
 }
 changelog += `**Full Changelog**: ${repoUrl}/compare/v${currentVersion}...v${newVersion}\n`;
 
-log("\n--- Changelog ---");
+// -- Generate CHANGELOG.md section (Keep a Changelog format) ------------------
+
+const today = new Date().toISOString().slice(0, 10);
+const keepSections = [];
+
+for (const cat of CHANGELOG_CATEGORIES) {
+  const matching = commits.filter((c) => {
+    const msg = c.slice(c.indexOf(" ") + 1);
+    return cat.prefixes.some((p) => msg.startsWith(`${p}:`) || msg.startsWith(`${p}(`));
+  });
+  if (matching.length === 0) continue;
+  const entries = matching.map((c) => {
+    const msg = c.slice(c.indexOf(" ") + 1);
+    const clean = msg.replace(/^\w+(\([^)]*\))?:\s*/, "");
+    return `- ${clean.charAt(0).toUpperCase()}${clean.slice(1)}`;
+  });
+  keepSections.push(`### ${cat.label}\n${entries.join("\n")}`);
+}
+
+const changelogEntry = keepSections.length > 0
+  ? `## [${newVersion}] - ${today}\n\n${keepSections.join("\n\n")}`
+  : null;
+
+log("\n--- GitHub Release Notes ---");
 log(changelog);
-log("-----------------\n");
+if (changelogEntry) {
+  log("--- CHANGELOG.md ---");
+  log(changelogEntry);
+}
+log("----------------------------\n");
 
 // -- Confirm ------------------------------------------------------------------
 
@@ -229,10 +275,54 @@ try {
   // Non-critical: skip if SECURITY.md doesn't exist
 }
 
+// -- Update CHANGELOG.md ------------------------------------------------------
+
+if (changelogEntry) {
+  const changelogPath = "CHANGELOG.md";
+  let content;
+  try {
+    content = readFileSync(changelogPath, "utf8");
+  } catch {
+    content = [
+      "# Changelog",
+      "",
+      "All notable changes to this project will be documented in this file.",
+      "",
+      "The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).",
+      "",
+    ].join("\n");
+  }
+
+  // Insert new section after header, before first version entry
+  const firstVersion = content.indexOf("\n## [");
+  if (firstVersion !== -1) {
+    content = `${content.slice(0, firstVersion)}\n${changelogEntry}\n${content.slice(firstVersion)}`;
+  } else {
+    content = `${content.trimEnd()}\n\n${changelogEntry}\n`;
+  }
+
+  // Add comparison link at the top of the links block
+  const versionLink = hasLastTag
+    ? `[${newVersion}]: ${repoUrl}/compare/v${currentVersion}...v${newVersion}`
+    : `[${newVersion}]: ${repoUrl}/releases/tag/v${newVersion}`;
+
+  if (!content.includes(`[${newVersion}]:`)) {
+    const firstLink = content.search(/\n\[[^\]]+\]: https?:\/\//);
+    if (firstLink !== -1) {
+      content = `${content.slice(0, firstLink + 1)}${versionLink}\n${content.slice(firstLink + 1)}`;
+    } else {
+      content = `${content.trimEnd()}\n\n${versionLink}\n`;
+    }
+  }
+
+  writeFileSync(changelogPath, content);
+  log("Updated CHANGELOG.md");
+}
+
 // -- Commit, tag, push --------------------------------------------------------
 
 log("Committing...");
-run("git add package.json jsr.json README.md SECURITY.md");
+run("git add package.json jsr.json README.md SECURITY.md CHANGELOG.md");
 const commitMsg = `chore: bump to ${newVersion}\n\n${changelog}`;
 writeFileSync(".git/.release-msg.tmp", commitMsg);
 run('git commit --signoff --gpg-sign --file .git/.release-msg.tmp');
