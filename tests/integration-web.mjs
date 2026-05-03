@@ -956,12 +956,10 @@ export async function runIntegrationWeb(lib) {
       "File.exists returns Ok(false) or Err(FileError)",
     );
 
-    // File.removeDir: Ok when path doesn't exist (idempotent), Err when no FS
+    // File.removeDir: Err for nonexistent path
     const removeDirResult = await File.removeDir("/nonexistent/path").run();
-    assert(
-      removeDirResult.isOk || (removeDirResult.isErr && removeDirResult.error.tag === "FileError"),
-      "File.removeDir returns Ok or Err(FileError)",
-    );
+    assert(removeDirResult.isErr, "File.removeDir nonexistent returns Err");
+    assert(removeDirResult.error.tag === "FileError", "File.removeDir error has FileError tag");
 
     // File.tempDir: Ok when FS available, Err when no FS
     const tempDirResult = await File.tempDir("test-").run();

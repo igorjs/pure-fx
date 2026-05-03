@@ -133,7 +133,7 @@ const createNodeFs = async (): Promise<Fs | null> => {
       return { isFile: s.isFile(), isDirectory: s.isDirectory(), size: s.size, mtime: s.mtime };
     },
     remove: path => nfs.unlink(path),
-    removeDir: path => nfs.rm(path, { recursive: true, force: true }),
+    removeDir: path => nfs.rm(path, { recursive: true, force: false }),
     readDir: path => nfs.readdir(path),
     copyFile: (src, dest) => nfs.copyFile(src, dest),
     rename: (oldPath, newPath) => nfs.rename(oldPath, newPath),
