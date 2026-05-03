@@ -36,17 +36,18 @@ const NODE_VERSIONS = ["22", "24", "25"];
 let failed = false;
 const dockerErrors = [];
 
+let cleaned = false;
 const cleanup = () => {
-  if (runDocker && hasCommand("docker")) {
-    log("\nCleaning up Docker resources...");
-    try {
-      execSync(
-        `docker compose -p ${COMPOSE_PROJECT} -f ${COMPOSE_FILE} down --rmi local --volumes --remove-orphans`,
-        { stdio: "pipe" },
-      );
-    } catch {
-      // best-effort cleanup
-    }
+  if (cleaned || !runDocker || !hasCommand("docker")) return;
+  cleaned = true;
+  log("\nCleaning up Docker resources...");
+  try {
+    execSync(
+      `docker compose -p ${COMPOSE_PROJECT} -f ${COMPOSE_FILE} down --rmi local --volumes --remove-orphans 2>/dev/null`,
+      { stdio: "ignore", shell: true },
+    );
+  } catch {
+    // best-effort
   }
 };
 
