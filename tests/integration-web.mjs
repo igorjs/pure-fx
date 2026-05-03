@@ -94,7 +94,10 @@ export async function runIntegrationWeb(lib) {
     isImmutable,
     makeTask,
     File,
+    FileError,
     Command,
+    CommandError,
+    CryptoError,
     Process,
     Os,
     Dns,
@@ -945,21 +948,21 @@ export async function runIntegrationWeb(lib) {
     ];
     for (const [name, result] of fileErrors) {
       assert(result.isErr, `File.${name} returns Err`);
-      assert(result.error.tag === "FileError", `File.${name} error has FileError tag`);
+      assert(FileError.is(result.error), `File.${name} error has FileError tag`);
     }
 
     // File.exists: Ok(false) when FS available, Err(FileError) when not
     const existsResult = await File.exists("/nonexistent/path/xyz.txt").run();
     assert(
       (existsResult.isOk && existsResult.value === false) ||
-        (existsResult.isErr && existsResult.error.tag === "FileError"),
+        (existsResult.isErr && FileError.is(existsResult.error)),
       "File.exists returns Ok(false) or Err(FileError)",
     );
 
     // File.removeDir: Err for nonexistent path
     const removeDirResult = await File.removeDir("/nonexistent/path").run();
     assert(removeDirResult.isErr, "File.removeDir nonexistent returns Err");
-    assert(removeDirResult.error.tag === "FileError", "File.removeDir error has FileError tag");
+    assert(FileError.is(removeDirResult.error), "File.removeDir error has FileError tag");
 
     // File.tempDir: Ok when FS available, Err when no FS
     const tempDirResult = await File.tempDir("test-").run();
@@ -967,14 +970,14 @@ export async function runIntegrationWeb(lib) {
       await File.removeDir(tempDirResult.value).run();
     }
     assert(
-      tempDirResult.isOk || (tempDirResult.isErr && tempDirResult.error.tag === "FileError"),
+      tempDirResult.isOk || (tempDirResult.isErr && FileError.is(tempDirResult.error)),
       "File.tempDir returns Ok or Err(FileError)",
     );
 
     // Command: nonexistent command
     const badCmd = await Command.exec("nonexistent-command-xyz-99999").run();
     assert(badCmd.isErr, "Command.exec nonexistent returns Err");
-    assert(badCmd.error.tag === "CommandError", "Command error has CommandError tag");
+    assert(CommandError.is(badCmd.error), "Command error has CommandError tag");
 
     // Process: should always have pid and cwd
     const pid = Process.pid();
@@ -1019,13 +1022,13 @@ export async function runIntegrationWeb(lib) {
   {
     // Verify all error types have correct tags when returned
     const fileErr = await File.read("/nonexistent").run();
-    if (fileErr.isErr) assert(fileErr.error.tag === "FileError", "FileError.tag");
+    if (fileErr.isErr) assert(FileError.is(fileErr.error), "FileError.tag");
 
     const cmdErr = await Command.exec("nonexistent-xyz").run();
-    if (cmdErr.isErr) assert(cmdErr.error.tag === "CommandError", "CommandError.tag");
+    if (cmdErr.isErr) assert(CommandError.is(cmdErr.error), "CommandError.tag");
 
     const cryptoBytes = Crypto.randomBytes(-1);
-    if (cryptoBytes.isErr) assert(cryptoBytes.error.tag === "CryptoError", "CryptoError.tag");
+    if (cryptoBytes.isErr) assert(CryptoError.is(cryptoBytes.error), "CryptoError.tag");
   }
 
   // ── Summary ────────────────────────────────────────────────────────────

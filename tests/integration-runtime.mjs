@@ -15,6 +15,7 @@
 const {
   File,
   Command,
+  CommandError,
   Process,
   Os,
   Path,
@@ -175,7 +176,7 @@ section("Command.exec");
   // Nonexistent command
   const badResult = await Command.exec("nonexistent-command-xyz-12345").run();
   assert(badResult.isErr, "exec nonexistent command returns Err");
-  assert(badResult.error.tag === "CommandError", "error tag is CommandError");
+  assert(CommandError.is(badResult.error), "error tag is CommandError");
 }
 
 section("Command.exec with stdin");
