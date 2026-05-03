@@ -95,6 +95,8 @@ export interface Valid<T, E> {
    * **accumulating** errors from both sides.
    */
   ap<U>(fnValidation: Validation<(value: T) => U, E>): Validation<U, E>;
+  /** Check whether this value's tag matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   /** Serialize as `{ tag: 'Valid', value: T }`. */
   toJSON(): { tag: "Valid"; value: T };
   /** Human-readable string representation. */
@@ -147,6 +149,8 @@ export interface Invalid<T, E> {
   zip<U>(other: Validation<U, E>): Validation<[T, U], E>;
   /** Accumulate errors from both sides. */
   ap<U>(fnValidation: Validation<(value: T) => U, E>): Validation<U, E>;
+  /** Check whether this value's tag matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   /** Serialize as `{ tag: 'Invalid', errors: E[] }`. */
   toJSON(): { tag: "Invalid"; errors: readonly E[] };
   /** Human-readable string representation. */
@@ -188,6 +192,7 @@ interface ValidationMethods<T, E> {
   toResult(): Result<T, readonly E[]>;
   zip<U>(other: Validation<U, E>): Validation<[T, U], E>;
   ap<U>(fnValidation: Validation<(value: T) => U, E>): Validation<U, E>;
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   toJSON(): { tag: "Valid"; value: T } | { tag: "Invalid"; errors: readonly E[] };
   toString(): string;
 }
@@ -247,6 +252,9 @@ class ValidImpl<T, E> implements Valid<T, E>, ValidationMethods<T, E> {
     return fnValidation.isValid
       ? new ValidImpl(fnValidation.value(this.value))
       : castInvalid(fnValidation);
+  }
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
   }
   toJSON(): { tag: "Valid"; value: T } {
     return { tag: "Valid", value: this.value };
@@ -312,6 +320,9 @@ class InvalidImpl<T, E> implements Invalid<T, E>, ValidationMethods<T, E> {
       ? new InvalidImpl([...this.errors, ...fnValidation.errors])
       : castInvalid(this);
   }
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
+  }
   toJSON(): { tag: "Invalid"; errors: readonly E[] } {
     return { tag: "Invalid", errors: this.errors };
   }
@@ -342,7 +353,12 @@ const castValid = <T, E>(r: Valid<T, E>): Validation<T, never> =>
  * v.unwrap();            // 42
  * ```
  */
-export const Valid = <T>(value: T): Validation<T, never> => new ValidImpl(value);
+export const Valid: {
+  <T>(value: T): Validation<T, never>;
+  readonly tag: "Valid";
+} = Object.assign(<T>(value: T): Validation<T, never> => new ValidImpl(value), {
+  tag: "Valid" as const,
+});
 
 /**
  * Create a failed {@link Validation} with one or more errors.
@@ -353,8 +369,14 @@ export const Valid = <T>(value: T): Validation<T, never> => new ValidImpl(value)
  * Invalid(['too short', 'no @']);   // Validation<never, string>
  * ```
  */
-export const Invalid = <E>(errorOrErrors: E | readonly E[]): Validation<never, E> =>
-  new InvalidImpl(Array.isArray(errorOrErrors) ? errorOrErrors : [errorOrErrors]);
+export const Invalid: {
+  <E>(errorOrErrors: E | readonly E[]): Validation<never, E>;
+  readonly tag: "Invalid";
+} = Object.assign(
+  <E>(errorOrErrors: E | readonly E[]): Validation<never, E> =>
+    new InvalidImpl(Array.isArray(errorOrErrors) ? errorOrErrors : [errorOrErrors]),
+  { tag: "Invalid" as const },
+);
 
 /**
  * Collect an array of Validations into a single Validation of an array.

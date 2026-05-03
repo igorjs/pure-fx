@@ -103,6 +103,9 @@ interface ErrTypeInstance<Tag extends string, Code extends string> {
   /** Stack trace captured at construction time, if available. */
   readonly stack: string | undefined;
 
+  /** Check whether this error matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
+
   /** Wrap this error in `Err(this)` to create a `Result`. */
   toResult<T>(): Result<T, ErrType<Tag, Code>>;
 
@@ -167,6 +170,10 @@ class ErrTypeImpl<Tag extends string, Code extends string> implements ErrTypeIns
     this.stack = stack;
     deepFreezeRaw(metadata);
     Object.freeze(this);
+  }
+
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
   }
 
   toResult<T>(): Result<T, ErrType<Tag, Code>> {
@@ -290,6 +297,9 @@ export interface ErrType<Tag extends string, Code extends string = string> {
   readonly timestamp: number;
   /** Stack trace captured at construction time, if available. */
   readonly stack: string | undefined;
+
+  /** Check whether this error matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
 
   /** Wrap this error in `Err(this)` to create a `Result`. */
   toResult<T>(): Result<T, ErrType<Tag, Code>>;

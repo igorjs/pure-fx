@@ -72,6 +72,8 @@ export interface SomeVariant<T> {
   ap<U>(fnOption: Option<(value: T) => U>): Option<U>;
   /** Return this `Some`, ignoring the alternative. */
   or(_other: Option<T>): Option<T>;
+  /** Check whether this value's tag matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   /** Serialize as `{ tag: 'Some', value: T }`. */
   toJSON(): { tag: "Some"; value: T };
   /** Human-readable string representation. */
@@ -117,6 +119,8 @@ export interface NoneVariant<T> {
   ap<U>(_fnOption: Option<(value: T) => U>): Option<U>;
   /** Return the alternative since this is `None`. */
   or(other: Option<T>): Option<T>;
+  /** Check whether this value's tag matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   /** Serialize as `{ tag: 'None' }`. */
   toJSON(): { tag: "None" };
   /** Human-readable string representation. */
@@ -206,6 +210,9 @@ class SomeImpl<T> implements SomeVariant<T> {
   or(_other: Option<T>): Option<T> {
     return this;
   }
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
+  }
   /** Serialize as `{ tag: 'Some', value: T }`. */
   toJSON(): { tag: "Some"; value: T } {
     return { tag: "Some", value: this.value };
@@ -278,6 +285,9 @@ class NoneImpl<T> implements NoneVariant<T> {
   or(other: Option<T>): Option<T> {
     return other;
   }
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
+  }
   /** Serialize as `{ tag: 'None' }`. */
   toJSON(): { tag: "None" } {
     return { tag: "None" };
@@ -297,7 +307,10 @@ class NoneImpl<T> implements NoneVariant<T> {
  * opt.unwrap();           // 42
  * ```
  */
-export const Some = <T>(value: T): Option<T> => new SomeImpl(value);
+export const Some: {
+  <T>(value: T): Option<T>;
+  readonly tag: "Some";
+} = Object.assign(<T>(value: T): Option<T> => new SomeImpl(value), { tag: "Some" as const });
 
 /** Singleton `None` value representing absence. */
 export const None: Option<never> = new NoneImpl();

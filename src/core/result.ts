@@ -78,6 +78,8 @@ export interface Ok<T, E> {
    * If `fnResult` is `Err`, propagates the error.
    */
   ap<U>(fnResult: Result<(value: T) => U, E>): Result<U, E>;
+  /** Check whether this value's tag matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   /** Serialize as `{ tag: 'Ok', value: T }`. */
   toJSON(): { tag: "Ok"; value: T };
   /** Human-readable string representation. */
@@ -128,6 +130,8 @@ export interface Err<T, E> {
   zip<U>(other: Result<U, E>): Result<[T, U], E>;
   /** Short-circuit: propagate this `Err`. */
   ap<U>(fnResult: Result<(value: T) => U, E>): Result<U, E>;
+  /** Check whether this value's tag matches the given constructor or tagged value. */
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   /** Serialize as `{ tag: 'Err', error: E }`. */
   toJSON(): { tag: "Err"; error: E };
   /** Human-readable string representation. */
@@ -172,6 +176,7 @@ interface ResultMethods<T, E> {
   toOption(): Option<T>;
   zip<U>(other: Result<U, E>): Result<[T, U], E>;
   ap<U>(fnResult: Result<(value: T) => U, E>): Result<U, E>;
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean;
   toJSON(): { tag: "Ok"; value: T } | { tag: "Err"; error: E };
   toString(): string;
 }
@@ -226,6 +231,9 @@ class OkImpl<T, E> implements Ok<T, E>, ResultMethods<T, E> {
   }
   ap<U>(fnResult: Result<(value: T) => U, E>): Result<U, E> {
     return fnResult.isOk ? new OkImpl(fnResult.value(this.value)) : castErr(fnResult);
+  }
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
   }
   toJSON(): { tag: "Ok"; value: T } {
     return { tag: "Ok", value: this.value };
@@ -286,6 +294,9 @@ class ErrImpl<T, E> implements Err<T, E>, ResultMethods<T, E> {
   ap<U>(_fnResult: Result<(value: T) => U, E>): Result<U, E> {
     return castErr(this);
   }
+  is(target: { readonly tag: string; is?(value: unknown): boolean }): boolean {
+    return this.tag === target.tag;
+  }
   toJSON(): { tag: "Err"; error: E } {
     return { tag: "Err", error: this.error };
   }
@@ -323,7 +334,10 @@ export const castOk = <T, E>(r: Ok<T, E>): Result<T, never> => r as unknown as R
  * result.unwrap();          // 42
  * ```
  */
-export const Ok = <T>(value: T): Result<T, never> => new OkImpl(value);
+export const Ok: {
+  <T>(value: T): Result<T, never>;
+  readonly tag: "Ok";
+} = Object.assign(<T>(value: T): Result<T, never> => new OkImpl(value), { tag: "Ok" as const });
 
 /**
  * Create a failed {@link Result} wrapping `error`.
@@ -334,7 +348,10 @@ export const Ok = <T>(value: T): Result<T, never> => new OkImpl(value);
  * result.unwrapErr();                // 'not found'
  * ```
  */
-export const Err = <E>(error: E): Result<never, E> => new ErrImpl(error);
+export const Err: {
+  <E>(error: E): Result<never, E>;
+  readonly tag: "Err";
+} = Object.assign(<E>(error: E): Result<never, E> => new ErrImpl(error), { tag: "Err" as const });
 
 /**
  * Collect an array of Results into a single Result of an array.
