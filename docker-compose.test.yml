@@ -9,14 +9,17 @@ services:
   node-alpine:
     build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: alpine } }
 
-  # ── Deno ────────────────────────────────────────────────────────────────
+  # ── Deno (official images) ───────────────────────────────────────────────
   deno-debian:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: debian:bookworm-slim } }
-  # No deno-alpine: Deno requires glibc (not musl)
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: debian } }
+    entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
+  deno-alpine:
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: alpine } }
+    entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
 
-  # ── Bun ─────────────────────────────────────────────────────────────────
+  # ── Bun (official images) ───────────────────────────────────────────────
   bun-debian:
-    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: debian:bookworm-slim } }
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: debian } }
 
   # ── Distroless (production runtime) ──────────────────────────────────────
   distroless:

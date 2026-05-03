@@ -1,17 +1,8 @@
 # Bun: install + build + test (fully independent)
-ARG BASE=debian:bookworm-slim
-FROM ${BASE}
+ARG VARIANT=debian
+FROM oven/bun:${VARIANT}
 
-ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates unzip && \
-    rm -rf /var/lib/apt/lists/*
-
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-
-RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
 
 COPY package.json ./
 RUN bun install
