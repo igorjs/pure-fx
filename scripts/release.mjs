@@ -78,6 +78,13 @@ try {
   die("Test matrix failed. Fix all failures before releasing.");
 }
 
+log("Verifying npm publish (dry run)...");
+try {
+  run("npm publish --dry-run", { stdio: "inherit" });
+} catch {
+  die("npm publish dry run failed. Fix packaging issues before releasing.");
+}
+
 // -- Detect repo URL from git remote ------------------------------------------
 
 const repoUrl = run("git remote get-url origin")
