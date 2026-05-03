@@ -1,34 +1,26 @@
 services:
-  # ── Ubuntu ──────────────────────────────────────────────────────────────
-  ubuntu-node:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: ubuntu:24.04 } }
-  ubuntu-deno:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: ubuntu:24.04 } }
-  ubuntu-bun:
-    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: ubuntu:24.04 } }
-  ubuntu-browser:
-    build: { context: ., dockerfile: docker/browser.Dockerfile, args: { BASE: ubuntu:24.04 } }
-  ubuntu-workers:
-    build: { context: ., dockerfile: docker/workers.Dockerfile, args: { BASE: ubuntu:24.04 } }
+  # ── Node (official images) ──────────────────────────────────────────────
+  node-22:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "22" } }
+  node-24:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24" } }
+  node-25:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25" } }
+  node-alpine:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: alpine } }
 
-  # ── Fedora ──────────────────────────────────────────────────────────────
-  fedora-node:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: fedora:42 } }
-  fedora-deno:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: fedora:42 } }
-  fedora-bun:
-    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: fedora:42 } }
-
-  # ── Arch ────────────────────────────────────────────────────────────────
-  arch-node:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: archlinux:latest } }
-  arch-deno:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: archlinux:latest } }
-  arch-bun:
-    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: archlinux:latest } }
-
-  # ── Alpine (no Bun, musl not supported) ─────────────────────────────────
-  alpine-node:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: alpine:3.21 } }
-  alpine-deno:
+  # ── Deno ────────────────────────────────────────────────────────────────
+  deno-debian:
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: debian:bookworm-slim } }
+  deno-alpine:
     build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: alpine:3.21 } }
+
+  # ── Bun ─────────────────────────────────────────────────────────────────
+  bun-debian:
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: debian:bookworm-slim } }
+
+  # ── Browser + Workers (Debian only) ─────────────────────────────────────
+  browser:
+    build: { context: ., dockerfile: docker/browser.Dockerfile }
+  workers:
+    build: { context: ., dockerfile: docker/workers.Dockerfile }

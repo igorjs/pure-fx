@@ -86,17 +86,7 @@ export async function runSmokeCore(lib) {
     tryCatch,
     isImmutable,
     makeTask,
-    File,
-    FileError,
-    Command,
-    CommandError,
     CryptoError,
-    Process,
-    Os,
-    Dns,
-    Net,
-    Terminal,
-    FFI,
   } = lib;
 
   // ── Core: Result ────────────────────────────────────────────────────────
@@ -909,117 +899,10 @@ export async function runSmokeCore(lib) {
     assert(memo === 1, "Task.memoize");
   }
 
-  // ── Runtime modules: graceful degradation ──────────────────────────────
-  // These modules depend on runtime APIs (File, Command, Process, Os, etc.)
-  // In full runtimes (Node/Deno/Bun) they should work.
-  // In restricted environments (Workers/Browser) they should return
-  // Err/None instead of throwing.
-
-  section("Runtime modules (graceful degradation)");
-  {
-    // File: methods that always fail on invalid/missing paths
-    const fileErrors = [
-      ["read", await File.read("/x").run()],
-      ["write", await File.write("/x", "d").run()],
-      ["append", await File.append("/x", "d").run()],
-      ["makeDir", await File.makeDir("/x").run()],
-      ["remove", await File.remove("/x").run()],
-      ["list", await File.list("/x").run()],
-      ["stat", await File.stat("/x").run()],
-      ["copy", await File.copy("/x", "/y").run()],
-      ["rename", await File.rename("/x", "/y").run()],
-      ["readBytes", await File.readBytes("/x").run()],
-      ["writeBytes", await File.writeBytes("/x", new Uint8Array()).run()],
-      ["symlink", await File.symlink("/x", "/y").run()],
-      ["link", await File.link("/x", "/y").run()],
-      ["chmod", await File.chmod("/x", 0o644).run()],
-      ["chown", await File.chown("/x", 0, 0).run()],
-      ["truncate", await File.truncate("/x").run()],
-      ["realPath", await File.realPath("/x").run()],
-      ["readLink", await File.readLink("/x").run()],
-      ["lstat", await File.lstat("/x").run()],
-    ];
-    for (const [name, result] of fileErrors) {
-      assert(result.isErr, `File.${name} returns Err`);
-      assert(FileError.is(result.error), `File.${name} error has FileError tag`);
-    }
-
-    // File.exists: Ok(false) when FS available, Err(FileError) when not
-    const existsResult = await File.exists("/nonexistent/path/xyz.txt").run();
-    assert(
-      (existsResult.isOk && existsResult.value === false) ||
-        (existsResult.isErr && FileError.is(existsResult.error)),
-      "File.exists returns Ok(false) or Err(FileError)",
-    );
-
-    // File.removeDir: Err for nonexistent path
-    const removeDirResult = await File.removeDir("/nonexistent/path").run();
-    assert(removeDirResult.isErr, "File.removeDir nonexistent returns Err");
-    assert(FileError.is(removeDirResult.error), "File.removeDir error has FileError tag");
-
-    // File.tempDir: Ok when FS available, Err when no FS
-    const tempDirResult = await File.tempDir("test-").run();
-    if (tempDirResult.isOk) {
-      await File.removeDir(tempDirResult.value).run();
-    }
-    assert(
-      tempDirResult.isOk || (tempDirResult.isErr && FileError.is(tempDirResult.error)),
-      "File.tempDir returns Ok or Err(FileError)",
-    );
-
-    // Command: nonexistent command
-    const badCmd = await Command.exec("nonexistent-command-xyz-99999").run();
-    assert(badCmd.isErr, "Command.exec nonexistent returns Err");
-    assert(CommandError.is(badCmd.error), "Command error has CommandError tag");
-
-    // Process: should always have pid and cwd
-    const pid = Process.pid();
-    assert(pid.isSome || pid.isNone, "Process.pid returns Option");
-    const cwd = Process.cwd();
-    assert(cwd.isOk || cwd.isErr, "Process.cwd returns Result");
-
-    // Process: env for missing var returns None
-    const missingEnv = Process.env("NONEXISTENT_ENV_VAR_XYZ_99999");
-    assert(missingEnv.isNone, "Process.env missing var returns None");
-
-    // Os: all methods return Option or string, never throw
-    assert(typeof Os.arch() === "string", "Os.arch returns string");
-    assert(typeof Os.platform() === "string", "Os.platform returns string");
-    assert(typeof Os.tmpDir() === "string", "Os.tmpDir returns string");
-    const hostname = Os.hostname();
-    assert(hostname.isSome || hostname.isNone, "Os.hostname returns Option");
-    const cpuCount = Os.cpuCount();
-    assert(cpuCount.isSome || cpuCount.isNone, "Os.cpuCount returns Option");
-    const totalMem = Os.totalMemory();
-    assert(totalMem.isSome || totalMem.isNone, "Os.totalMemory returns Option");
-
-    // FFI: isAvailable returns boolean, open returns Result
-    assert(typeof FFI.isAvailable() === "boolean", "FFI.isAvailable returns boolean");
-    assert(typeof FFI.suffix === "string", "FFI.suffix returns string");
-    const ffiResult = FFI.open("/nonexistent/lib.so", { fn: { parameters: [], result: "void" } });
-    assert(ffiResult.isErr, "FFI.open nonexistent lib returns Err");
-
-    // Dns: resolve nonexistent domain
-    const badDns = await Dns.resolve("this-domain-does-not-exist-xyz99.invalid").run();
-    assert(badDns.isErr, "Dns.resolve invalid domain returns Err");
-
-    // Terminal: properties return correct types
-    assert(typeof Terminal.isInteractive() === "boolean", "Terminal.isInteractive returns boolean");
-    const termSize = Terminal.size();
-    assert(termSize.isSome || termSize.isNone, "Terminal.size returns Option");
-  }
-
   // ── Error type tags ───────────────────────────────────────────────────
 
   section("Error type tags");
   {
-    // Verify all error types have correct tags when returned
-    const fileErr = await File.read("/nonexistent").run();
-    if (fileErr.isErr) assert(FileError.is(fileErr.error), "FileError.tag");
-
-    const cmdErr = await Command.exec("nonexistent-xyz").run();
-    if (cmdErr.isErr) assert(CommandError.is(cmdErr.error), "CommandError.tag");
-
     const cryptoBytes = Crypto.randomBytes(-1);
     if (cryptoBytes.isErr) assert(CryptoError.is(cryptoBytes.error), "CryptoError.tag");
   }

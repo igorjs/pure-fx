@@ -50,7 +50,7 @@ const runTest = (name, cmd, args) => {
   } catch (e) {
     if (!verbose) log("FAIL");
     results.push(`FAIL  ${name}`);
-    errors.push({ name, output: e.stderr || e.stdout || e.message });
+    errors.push({ name, output: String(e.stderr || e.stdout || e.message) });
     fail++;
   }
 };
@@ -66,7 +66,7 @@ const runPnpm = (name, scriptArgs) => {
   } catch (e) {
     if (!verbose) log("FAIL");
     results.push(`FAIL  ${name}`);
-    errors.push({ name, output: e.stderr || e.stdout || e.message });
+    errors.push({ name, output: String(e.stderr || e.stdout || e.message) });
     fail++;
   }
 };

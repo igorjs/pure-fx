@@ -63,7 +63,7 @@ if (runNative) {
     log("OK");
   } catch (e) {
     log("FAIL");
-    log(e.stderr || e.stdout || e.message);
+    log(String(e.stderr || e.stdout || e.message));
     process.exit(1);
   }
 
@@ -104,7 +104,7 @@ if (runDocker) {
         log("OK");
       } catch (e) {
         log("FAIL");
-        log(e.stderr || e.stdout || e.message);
+        log(String(e.stderr || e.stdout || e.message));
         process.exit(1);
       }
     }
@@ -119,8 +119,8 @@ if (runDocker) {
       log("OK");
     } catch (e) {
       log("FAIL");
-      const lines = (e.stderr || e.message).split("\n").slice(-10);
-      log(lines.join("\n"));
+      const output = String(e.stderr || e.stdout || e.message);
+      log(output.split("\n").slice(-10).join("\n"));
       failed = true;
     }
 
