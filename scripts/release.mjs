@@ -54,9 +54,18 @@ try {
   die("GitHub CLI (gh) is not installed or not in PATH.");
 }
 
-const ciStatus = run("gh run list --branch main --limit 1 --json conclusion --jq '.[0].conclusion'");
-if (ciStatus !== "success") {
-  die(`Last CI run on main is not green (status: ${ciStatus}). Fix CI before releasing.`);
+// Wait for any in-progress CI runs to finish, then check result
+const ciCheckCmd = "gh run list --branch main --workflow ci.yml --limit 1 --json status,conclusion --jq '.[0]'";
+let ciRun = JSON.parse(run(ciCheckCmd));
+if (ciRun.status !== "completed") {
+  log(`CI run is ${ciRun.status}. Waiting for it to finish...`);
+  while (ciRun.status !== "completed") {
+    run("sleep 10");
+    ciRun = JSON.parse(run(ciCheckCmd));
+  }
+}
+if (ciRun.conclusion !== "success") {
+  die(`Last CI run on main failed (conclusion: ${ciRun.conclusion}). Fix CI before releasing.`);
 }
 
 log("Running full test matrix (native + Docker)...");

@@ -97,7 +97,10 @@ if (runDocker) {
     log("\n── Docker ──");
 
     // Ensure dist/ exists for Deno containers (they COPY it from build context)
-    if (!runNative) {
+    try {
+      const { statSync } = await import("node:fs");
+      statSync("./dist/index.js");
+    } catch {
       process.stdout.write("  building dist/ ... ");
       try {
         execSync("pnpm run build", { stdio: "pipe" });
