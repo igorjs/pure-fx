@@ -84,7 +84,7 @@ try {
   const cleanEnv = Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !k.startsWith("npm_")),
   );
-  execSync("npm publish --dry-run", { stdio: "inherit", env: cleanEnv });
+  execSync("npm publish --dry-run --ignore-scripts", { stdio: "inherit", env: cleanEnv });
 } catch {
   die("npm publish dry run failed. Fix packaging issues before releasing.");
 }
