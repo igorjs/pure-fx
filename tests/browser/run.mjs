@@ -27,10 +27,10 @@ const HTML = `<!DOCTYPE html>
 <head><title>pure-fx browser smoke test</title></head>
 <body>
 <script type="module">
-import { runIntegrationWeb } from "./tests/integration-web.mjs";
+import { runSmokeCore } from "./tests/smoke-core.mjs";
 import * as lib from "./dist/index.js";
 
-const result = await runIntegrationWeb(lib);
+const result = await runSmokeCore(lib);
 window.__testResult = result;
 </script>
 </body>

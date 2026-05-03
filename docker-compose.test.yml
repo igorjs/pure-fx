@@ -1,34 +1,34 @@
-x-common: &common
-  context: .
-  dockerfile: Dockerfile.test
-
 services:
   # ── Ubuntu ──────────────────────────────────────────────────────────────
   ubuntu-node:
-    build: { <<: *common, target: test-node, args: { BASE: ubuntu:24.04 } }
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: ubuntu:24.04 } }
   ubuntu-deno:
-    build: { <<: *common, target: test-deno, args: { BASE: ubuntu:24.04 } }
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: ubuntu:24.04 } }
   ubuntu-bun:
-    build: { <<: *common, target: test-bun, args: { BASE: ubuntu:24.04 } }
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: ubuntu:24.04 } }
+  ubuntu-browser:
+    build: { context: ., dockerfile: docker/browser.Dockerfile, args: { BASE: ubuntu:24.04 } }
+  ubuntu-workers:
+    build: { context: ., dockerfile: docker/workers.Dockerfile, args: { BASE: ubuntu:24.04 } }
 
   # ── Fedora ──────────────────────────────────────────────────────────────
   fedora-node:
-    build: { <<: *common, target: test-node, args: { BASE: fedora:42 } }
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: fedora:42 } }
   fedora-deno:
-    build: { <<: *common, target: test-deno, args: { BASE: fedora:42 } }
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: fedora:42 } }
   fedora-bun:
-    build: { <<: *common, target: test-bun, args: { BASE: fedora:42 } }
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: fedora:42 } }
 
   # ── Arch ────────────────────────────────────────────────────────────────
   arch-node:
-    build: { <<: *common, target: test-node, args: { BASE: archlinux:latest } }
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: archlinux:latest } }
   arch-deno:
-    build: { <<: *common, target: test-deno, args: { BASE: archlinux:latest } }
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: archlinux:latest } }
   arch-bun:
-    build: { <<: *common, target: test-bun, args: { BASE: archlinux:latest } }
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: archlinux:latest } }
 
   # ── Alpine (no Bun, musl not supported) ─────────────────────────────────
   alpine-node:
-    build: { <<: *common, target: test-node, args: { BASE: alpine:3.21 } }
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { BASE: alpine:3.21 } }
   alpine-deno:
-    build: { <<: *common, target: test-deno, args: { BASE: alpine:3.21 } }
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: alpine:3.21 } }

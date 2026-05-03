@@ -61,9 +61,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
       - name: Runtime integration test
-        run: node tests/integration-runtime.mjs
+        run: node tests/smoke-platform.mjs
       - name: Web integration test
-        run: node tests/integration-web.mjs
+        run: node tests/smoke-core.mjs
 
   integration-deno:
     needs: lint-and-test
@@ -80,9 +80,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Runtime integration test
-        run: deno run --allow-all tests/integration-runtime.mjs
+        run: deno run --allow-all tests/smoke-platform.mjs
       - name: Web integration test
-        run: deno run --allow-all tests/integration-web.mjs
+        run: deno run --allow-all tests/smoke-core.mjs
 
   integration-bun:
     needs: lint-and-test
@@ -99,9 +99,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Runtime integration test
-        run: bun tests/integration-runtime.mjs
+        run: bun tests/smoke-platform.mjs
       - name: Web integration test
-        run: bun tests/integration-web.mjs
+        run: bun tests/smoke-core.mjs
 
   integration-workers:
     needs: lint-and-test

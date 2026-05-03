@@ -14,7 +14,7 @@ import { Miniflare } from "miniflare";
 const ROOT = resolve(new URL("../../", import.meta.url).pathname);
 
 // Build a temporary worker entry that inlines the smoke test function
-const webSmokeSrc = await readFile(resolve(ROOT, "tests/integration-web.mjs"), "utf-8");
+const webSmokeSrc = await readFile(resolve(ROOT, "tests/smoke-core.mjs"), "utf-8");
 const smokeFnOnly = webSmokeSrc.replace(/\/\/ Self-execute when run directly[\s\S]*$/, "");
 
 const workerSrc = `
@@ -24,7 +24,7 @@ ${smokeFnOnly}
 
 export default {
   async fetch() {
-    const { passed, failed, logs } = await runIntegrationWeb(lib);
+    const { passed, failed, logs } = await runSmokeCore(lib);
     return new Response(JSON.stringify({ passed, failed, logs }), {
       headers: { 'Content-Type': 'application/json' },
     });

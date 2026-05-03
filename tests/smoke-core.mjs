@@ -1,25 +1,18 @@
 /**
- * integration-web.mjs - Comprehensive cross-runtime smoke test for all pure and
- * web-standard modules.
+ * smoke-core.mjs - Cross-runtime smoke test for all pure and
+ * web-standard modules (no runtime-specific APIs).
  *
- * Tests every module that requires no runtime-specific APIs: core (Result,
- * Option, Validation, pipe, Match, Eq, Ord, State, Lens, Prism), data
- * (Schema, Codec, Record, List, HashMap, NonEmptyList, StableVec, ADT),
- * async (Task, Stream, Lazy, Retry, Semaphore, Cache, Channel, Queue,
- * EventEmitter, StateMachine, CircuitBreaker, Pool, Timer, Env),
- * types (Duration, Cron, ErrType), and io (Json, Crypto, Encoding, Url,
- * Clone, Compression).
+ * Also used as the test payload for browser (Playwright) and
+ * Cloudflare Workers (miniflare) integration tests.
  *
- * Designed to run in restricted environments: Cloudflare Workers (miniflare)
- * and browsers (Playwright). Uses only console.log for output.
- *
- * Run directly:    node tests/integration-web.mjs
- * Via miniflare:   see tests/workers/worker.mjs
- * Via Playwright:  see tests/browser/browser.test.mjs
+ * Run:
+ *   node tests/smoke-core.mjs
+ *   deno run --allow-all tests/smoke-core.mjs
+ *   bun tests/smoke-core.mjs
  */
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: smoke test is intentionally a single large function
-export async function runIntegrationWeb(lib) {
+export async function runSmokeCore(lib) {
   let passed = 0;
   let failed = 0;
   const logs = [];
@@ -1043,7 +1036,7 @@ export async function runIntegrationWeb(lib) {
 // Self-execute when run directly (Node/Deno/Bun)
 if (typeof process !== "undefined" || typeof Deno !== "undefined") {
   const lib = await import("../dist/index.js");
-  const { passed, failed, logs } = await runIntegrationWeb(lib);
+  const { passed, failed, logs } = await runSmokeCore(lib);
   for (const line of logs) {
     console.log(line);
   }

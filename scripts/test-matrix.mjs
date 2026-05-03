@@ -87,8 +87,8 @@ if (runtimeFilter && runtimeFilter !== "node") {
   runPnpm(`node ${v} / unit tests`, "test");
   runPnpm(`node ${v} / type tests`, "run test:types");
   runTest(`node ${v} / bundle size`, "node", ["tests/bundle-size.mjs"]);
-  runTest(`node ${v} / integration-runtime`, "node", ["tests/integration-runtime.mjs"]);
-  runTest(`node ${v} / integration-web`, "node", ["tests/integration-web.mjs"]);
+  runTest(`node ${v} / smoke-platform`, "node", ["tests/smoke-platform.mjs"]);
+  runTest(`node ${v} / smoke-core`, "node", ["tests/smoke-core.mjs"]);
 } else {
   skipTest("node", "not installed");
 }
@@ -99,8 +99,8 @@ if (runtimeFilter && runtimeFilter !== "deno") {
   // skip
 } else if (hasCommand("deno")) {
   const v = getVersion("deno");
-  runTest(`${v} / integration-runtime`, "deno", ["run", "--allow-all", "tests/integration-runtime.mjs"]);
-  runTest(`${v} / integration-web`, "deno", ["run", "--allow-all", "tests/integration-web.mjs"]);
+  runTest(`${v} / smoke-platform`, "deno", ["run", "--allow-all", "tests/smoke-platform.mjs"]);
+  runTest(`${v} / smoke-core`, "deno", ["run", "--allow-all", "tests/smoke-core.mjs"]);
 } else {
   skipTest("deno", "not installed");
 }
@@ -111,26 +111,41 @@ if (runtimeFilter && runtimeFilter !== "bun") {
   // skip
 } else if (hasCommand("bun")) {
   const v = `bun ${getVersion("bun")}`;
-  runTest(`${v} / integration-runtime`, "bun", ["tests/integration-runtime.mjs"]);
-  runTest(`${v} / integration-web`, "bun", ["tests/integration-web.mjs"]);
+  runTest(`${v} / smoke-platform`, "bun", ["tests/smoke-platform.mjs"]);
+  runTest(`${v} / smoke-core`, "bun", ["tests/smoke-core.mjs"]);
 } else {
   skipTest("bun", "not installed");
 }
 
+// -- Browser (Playwright) -----------------------------------------------------
+
+if (runtimeFilter && runtimeFilter !== "browser") {
+  // skip
+} else {
+  try {
+    execSync("node -e \"require.resolve('playwright')\"", { stdio: "pipe" });
+    runTest("browser (chromium)", "node", ["tests/browser/run.mjs"]);
+  } catch {
+    skipTest("browser", "playwright not installed");
+  }
+}
+
+// -- Workers (miniflare) ------------------------------------------------------
+
+if (runtimeFilter && runtimeFilter !== "workers") {
+  // skip
+} else {
+  try {
+    execSync("node -e \"require.resolve('miniflare')\"", { stdio: "pipe" });
+    runTest("workers (miniflare)", "node", ["tests/workers/run.mjs"]);
+  } catch {
+    skipTest("workers", "miniflare not installed");
+  }
+}
+
 // -- Summary ------------------------------------------------------------------
 
-const W = 42;
-const pad = (s) => s.padEnd(W - 4);
-
-log(`\n${"╔" + "═".repeat(W) + "╗"}`);
-log(`║${" ".repeat(7)}TEST MATRIX RESULTS${" ".repeat(W - 26)}║`);
-log(`${"╠" + "═".repeat(W) + "╣"}`);
-for (const r of results) {
-  log(`║  ${pad(r)} ║`);
-}
-log(`${"╠" + "═".repeat(W) + "╣"}`);
-log(`║  ${pad(`PASS: ${pass}  FAIL: ${fail}  SKIP: ${skip}`)} ║`);
-log(`${"╚" + "═".repeat(W) + "╝"}`);
+log(`\n  PASS: ${pass}  FAIL: ${fail}  SKIP: ${skip}`);
 
 if (errors.length > 0) {
   log("\n── ERRORS ──");

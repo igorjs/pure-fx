@@ -1,5 +1,5 @@
 /**
- * integration-runtime.mjs - Cross-runtime smoke test for runtime-dependent modules.
+ * smoke-platform.mjs - Cross-runtime smoke test for runtime-dependent modules.
  *
  * Validates File, Command, Process, Os, Path, Platform, Eol, Logger, Config,
  * Terminal, Dns, and Net on every supported runtime.
@@ -7,9 +7,9 @@
  * no node:assert) so it runs identically on Node, Deno, Bun, and QuickJS.
  *
  * Run:
- *   node tests/integration-runtime.mjs
- *   deno run --allow-all tests/integration-runtime.mjs
- *   bun tests/integration-runtime.mjs
+ *   node tests/smoke-platform.mjs
+ *   deno run --allow-all tests/smoke-platform.mjs
+ *   bun tests/smoke-platform.mjs
  */
 
 const {

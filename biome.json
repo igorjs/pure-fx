@@ -177,8 +177,8 @@
     },
     {
       "includes": [
-        "tests/integration-runtime.mjs",
-        "tests/integration-web.mjs",
+        "tests/smoke-platform.mjs",
+        "tests/smoke-core.mjs",
         "tests/bundle-size.mjs",
         "tests/workers/*.mjs",
         "tests/browser/*.mjs"

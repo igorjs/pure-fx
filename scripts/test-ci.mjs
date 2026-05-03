@@ -96,6 +96,19 @@ if (runDocker) {
   } else {
     log("\n── Docker ──");
 
+    // Ensure dist/ exists for Deno containers (they COPY it from build context)
+    if (!runNative) {
+      process.stdout.write("  building dist/ ... ");
+      try {
+        execSync("pnpm run build", { stdio: "pipe" });
+        log("OK");
+      } catch (e) {
+        log("FAIL");
+        log(e.stderr || e.stdout || e.message);
+        process.exit(1);
+      }
+    }
+
     // Build all images (parallel by default with BuildKit)
     process.stdout.write("  building images ... ");
     try {
