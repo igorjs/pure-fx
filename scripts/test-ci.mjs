@@ -127,6 +127,10 @@ if (runDocker) {
       { encoding: "utf-8", stdio: "pipe" },
     ).trim().split("\n");
 
+    let completed = 0;
+    const total = services.length;
+    const dockerResults = [];
+
     const runService = (service) => new Promise((resolve) => {
       const child = spawn("docker", [
         "compose", "-p", COMPOSE_PROJECT, "-f", COMPOSE_FILE,
@@ -135,29 +139,20 @@ if (runDocker) {
       let output = "";
       child.stdout.on("data", (d) => { output += d; });
       child.stderr.on("data", (d) => { output += d; });
-      child.on("close", (code) => resolve({ service, ok: code === 0, output }));
+      child.on("close", (code) => {
+        completed++;
+        const ok = code === 0;
+        log(`  ${service} ... ${ok ? "PASS" : "FAIL"}  (${completed}/${total})`);
+        if (!ok) {
+          dockerErrors.push({ service, output });
+          failed = true;
+        }
+        resolve({ service, ok, output });
+      });
     });
 
-    log(`  running ${services.length} containers in parallel...`);
-    const results = await Promise.allSettled(services.map(runService));
-
-    for (const entry of results.sort((a, b) => {
-      const sa = a.status === "fulfilled" ? a.value.service : "";
-      const sb = b.status === "fulfilled" ? b.value.service : "";
-      return sa.localeCompare(sb);
-    })) {
-      if (entry.status === "rejected") {
-        log(`  unknown ... FAIL (${entry.reason})`);
-        failed = true;
-        continue;
-      }
-      const r = entry.value;
-      log(`  ${r.service} ... ${r.ok ? "PASS" : "FAIL"}`);
-      if (!r.ok) {
-        dockerErrors.push({ service: r.service, output: r.output });
-        failed = true;
-      }
-    }
+    log(`  building and running ${total} containers in parallel...`);
+    await Promise.allSettled(services.map(runService));
   }
 }
 
