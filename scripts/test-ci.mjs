@@ -50,7 +50,6 @@ const cleanup = () => {
   }
 };
 
-process.on("exit", cleanup);
 process.on("SIGINT", () => { cleanup(); process.exit(130); });
 process.on("SIGTERM", () => { cleanup(); process.exit(143); });
 
@@ -169,10 +168,12 @@ if (dockerErrors.length > 0) {
   }
 }
 
+cleanup();
+
 log("");
 if (failed) {
   log("RESULT: SOME TESTS FAILED");
   process.exit(1);
-} else {
-  log("RESULT: ALL TESTS PASSED");
 }
+log("RESULT: ALL TESTS PASSED");
+process.exit(0);
