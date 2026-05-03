@@ -139,9 +139,19 @@ if (runDocker) {
     });
 
     log(`  running ${services.length} containers in parallel...`);
-    const results = await Promise.all(services.map(runService));
+    const results = await Promise.allSettled(services.map(runService));
 
-    for (const r of results.sort((a, b) => a.service.localeCompare(b.service))) {
+    for (const entry of results.sort((a, b) => {
+      const sa = a.status === "fulfilled" ? a.value.service : "";
+      const sb = b.status === "fulfilled" ? b.value.service : "";
+      return sa.localeCompare(sb);
+    })) {
+      if (entry.status === "rejected") {
+        log(`  unknown ... FAIL (${entry.reason})`);
+        failed = true;
+        continue;
+      }
+      const r = entry.value;
       log(`  ${r.service} ... ${r.ok ? "PASS" : "FAIL"}`);
       if (!r.ok) {
         dockerErrors.push({ service: r.service, output: r.output });
