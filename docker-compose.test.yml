@@ -15,6 +15,10 @@ services:
   node-25-alpine:
     build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25", VARIANT: alpine } }
 
+  # ── Distroless Node (production runtime) ────────────────────────────────
+  node-distroless:
+    build: { context: ., dockerfile: docker/distroless.Dockerfile }
+
   # ── Deno (official: denoland/deno:VARIANT) ──────────────────────────────
   deno-debian:
     build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: debian } }
@@ -36,12 +40,6 @@ services:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: slim } }
   bun-alpine:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: alpine } }
-  bun-distroless:
-    build: { context: ., dockerfile: docker/bun-distroless.Dockerfile }
-
-  # ── Distroless Node (production runtime) ────────────────────────────────
-  distroless-node:
-    build: { context: ., dockerfile: docker/distroless.Dockerfile }
 
   # ── Browser + Workers ───────────────────────────────────────────────────
   browser:
