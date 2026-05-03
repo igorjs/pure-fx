@@ -5,7 +5,7 @@ FROM node:${NODE_VERSION}-bookworm-slim AS build
 
 WORKDIR /app
 
-RUN command -v corepack >/dev/null 2>&1 || npm install -g corepack && corepack enable
+RUN (command -v corepack >/dev/null 2>&1 || npm install -g corepack) && corepack enable
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
