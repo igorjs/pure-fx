@@ -19,6 +19,10 @@ services:
   bun-debian:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { BASE: debian:bookworm-slim } }
 
+  # ── Distroless (production runtime) ──────────────────────────────────────
+  distroless:
+    build: { context: ., dockerfile: docker/distroless.Dockerfile }
+
   # ── Browser + Workers (Debian only) ─────────────────────────────────────
   browser:
     build: { context: ., dockerfile: docker/browser.Dockerfile }
