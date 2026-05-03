@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.10.x (latest) | Yes |
-| < 0.10 | No |
+| 0.1.x (latest) | Yes |
+| < 0.1 | No |
 
 Only the latest minor version receives security patches. Upgrade to the latest version before reporting.
 
