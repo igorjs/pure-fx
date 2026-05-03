@@ -215,7 +215,7 @@ for (const cat of CHANGELOG_CATEGORIES) {
   keepSections.push(`### ${cat.label}\n${entries.join("\n")}`);
 }
 
-const changelogEntry = keepSections.length > 0
+let changelogEntry = keepSections.length > 0
   ? `## [${newVersion}] - ${today}\n\n${keepSections.join("\n\n")}`
   : null;
 
@@ -305,30 +305,35 @@ if (changelogEntry) {
     ].join("\n");
   }
 
-  // Insert new section after header, before first version entry
-  const firstVersion = content.indexOf("\n## [");
-  if (firstVersion !== -1) {
-    content = `${content.slice(0, firstVersion)}\n${changelogEntry}\n${content.slice(firstVersion)}`;
+  // Skip if this version already has an entry (e.g. hand-written for initial release)
+  if (content.includes(`## [${newVersion}]`)) {
+    log("CHANGELOG.md already has an entry for this version, skipping.");
   } else {
-    content = `${content.trimEnd()}\n\n${changelogEntry}\n`;
-  }
-
-  // Add comparison link at the top of the links block
-  const versionLink = hasLastTag
-    ? `[${newVersion}]: ${repoUrl}/compare/v${currentVersion}...v${newVersion}`
-    : `[${newVersion}]: ${repoUrl}/releases/tag/v${newVersion}`;
-
-  if (!content.includes(`[${newVersion}]:`)) {
-    const firstLink = content.search(/\n\[[^\]]+\]: https?:\/\//);
-    if (firstLink !== -1) {
-      content = `${content.slice(0, firstLink + 1)}${versionLink}\n${content.slice(firstLink + 1)}`;
+    // Insert new section after header, before first version entry
+    const firstVersion = content.indexOf("\n## [");
+    if (firstVersion !== -1) {
+      content = `${content.slice(0, firstVersion)}\n${changelogEntry}\n${content.slice(firstVersion)}`;
     } else {
-      content = `${content.trimEnd()}\n\n${versionLink}\n`;
+      content = `${content.trimEnd()}\n\n${changelogEntry}\n`;
     }
-  }
 
-  writeFileSync(changelogPath, content);
-  log("Updated CHANGELOG.md");
+    // Add comparison link at the top of the links block
+    const versionLink = hasLastTag
+      ? `[${newVersion}]: ${repoUrl}/compare/v${currentVersion}...v${newVersion}`
+      : `[${newVersion}]: ${repoUrl}/releases/tag/v${newVersion}`;
+
+    if (!content.includes(`[${newVersion}]:`)) {
+      const firstLink = content.search(/\n\[[^\]]+\]: https?:\/\//);
+      if (firstLink !== -1) {
+        content = `${content.slice(0, firstLink + 1)}${versionLink}\n${content.slice(firstLink + 1)}`;
+      } else {
+        content = `${content.trimEnd()}\n\n${versionLink}\n`;
+      }
+    }
+
+    writeFileSync(changelogPath, content);
+    log("Updated CHANGELOG.md");
+  }
 }
 
 // -- Commit, tag, push --------------------------------------------------------
