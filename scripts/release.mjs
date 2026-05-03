@@ -34,9 +34,10 @@ const die = (msg) => {
 
 const args = process.argv.slice(2);
 const yesFlag = args.includes("--yes") || args.includes("-y");
+const skipTestCi = args.includes("--skip-test-ci");
 const bump = args.find((a) => !a.startsWith("-"));
 if (!bump) {
-  die("Usage: node scripts/release.mjs <patch|minor|major|x.y.z> [--yes]");
+  die("Usage: node scripts/release.mjs <patch|minor|major|x.y.z> [--yes] [--skip-test-ci]");
 }
 
 // -- Pre-flight checks --------------------------------------------------------
@@ -71,22 +72,26 @@ if (ciRun.conclusion !== "success") {
   die(`Last CI run on main failed (conclusion: ${ciRun.conclusion}). Fix CI before releasing.`);
 }
 
-log("Running full test matrix (native + Docker)...");
-try {
-  run("pnpm run test:ci", { stdio: "inherit" });
-} catch {
-  die("Test matrix failed. Fix all failures before releasing.");
-}
+if (skipTestCi) {
+  log("Skipping test:ci and publish dry run (--skip-test-ci).");
+} else {
+  log("Running full test matrix (native + Docker)...");
+  try {
+    run("pnpm run test:ci", { stdio: "inherit" });
+  } catch {
+    die("Test matrix failed. Fix all failures before releasing.");
+  }
 
-log("Verifying npm publish (dry run)...");
-try {
-  // Strip pnpm-injected npm_config_ env vars that npm doesn't recognise
-  const cleanEnv = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("npm_")),
-  );
-  execSync("npm publish --dry-run --ignore-scripts", { stdio: "inherit", env: cleanEnv });
-} catch {
-  die("npm publish dry run failed. Fix packaging issues before releasing.");
+  log("Verifying npm publish (dry run)...");
+  try {
+    // Strip pnpm-injected npm_config_ env vars that npm doesn't recognise
+    const cleanEnv = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => !k.startsWith("npm_")),
+    );
+    execSync("npm publish --dry-run --ignore-scripts", { stdio: "inherit", env: cleanEnv });
+  } catch {
+    die("npm publish dry run failed. Fix packaging issues before releasing.");
+  }
 }
 
 // -- Detect repo URL from git remote ------------------------------------------
@@ -353,11 +358,13 @@ log("Committing...");
 run("git add package.json jsr.json README.md SECURITY.md CHANGELOG.md");
 const commitMsg = `chore: bump to ${newVersion}\n\n${changelog}`;
 writeFileSync(".git/.release-msg.tmp", commitMsg);
-run('git commit --signoff --gpg-sign --file .git/.release-msg.tmp');
+const canSign = !!run("git config user.signingkey || true");
+const signFlag = canSign ? "--gpg-sign" : "";
+run(`git commit --signoff ${signFlag} --file .git/.release-msg.tmp`);
 run("rm -f .git/.release-msg.tmp");
 
 log("Tagging...");
-run(`git tag -s v${newVersion} -m "v${newVersion}"`);
+run(canSign ? `git tag -s v${newVersion} -m "v${newVersion}"` : `git tag v${newVersion} -m "v${newVersion}"`);
 
 log("Pushing...");
 run("git push origin HEAD:refs/heads/main");
