@@ -121,7 +121,7 @@
     "@typescript/native-preview": "latest"
   },
   "peerDependencies": {
-    "typescript": ">=5.5.0"
+    "typescript": ">=5.7.0"
   },
   "peerDependenciesMeta": {
     "typescript": {
