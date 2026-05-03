@@ -14,6 +14,7 @@ const argv = process.argv.slice(2);
 const verbose = argv.includes("--verbose") || !!process.env.CI;
 const runtimeIdx = argv.indexOf("--runtime");
 const runtimeFilter = runtimeIdx !== -1 ? argv[runtimeIdx + 1] : null;
+const noSummary = argv.includes("--no-summary");
 const log = (msg) => process.stdout.write(`${msg}\n`);
 
 const hasCommand = (cmd) => {
@@ -145,14 +146,19 @@ if (runtimeFilter && runtimeFilter !== "workers") {
 
 // -- Summary ------------------------------------------------------------------
 
-log(`\n  PASS: ${pass}  FAIL: ${fail}  SKIP: ${skip}`);
+if (!noSummary) {
+  log(`\n  PASS: ${pass}  FAIL: ${fail}  SKIP: ${skip}`);
 
-if (errors.length > 0) {
-  log("\n── ERRORS ──");
-  for (const err of errors) {
-    log(`\n✗ ${err.name}:`);
-    const lines = err.output.split("\n").slice(-20);
-    log(lines.join("\n"));
+  if (errors.length > 0) {
+    log("\n── ERRORS ──");
+    for (const err of errors) {
+      log(`\n✗ ${err.name}:`);
+      const lines = err.output.split("\n").slice(-20);
+      log(lines.join("\n"));
+    }
   }
+}
+
+if (fail > 0) {
   process.exit(1);
 }

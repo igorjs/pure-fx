@@ -73,12 +73,12 @@ if (runNative) {
   for (const nodeVersion of NODE_VERSIONS) {
     try {
       if (hasFnm) {
-        execSync(`fnm install ${nodeVersion} 2>/dev/null; fnm exec --using ${nodeVersion} node scripts/test-matrix.mjs --runtime node`, {
+        execSync(`fnm install ${nodeVersion} 2>/dev/null; fnm exec --using ${nodeVersion} node scripts/test-matrix.mjs --no-summary --runtime node`, {
           stdio: "inherit",
           shell: true,
         });
       } else if (nodeVersion === process.versions.node.split(".")[0]) {
-        execSync("node scripts/test-matrix.mjs --runtime node", { stdio: "inherit" });
+        execSync("node scripts/test-matrix.mjs --no-summary --runtime node", { stdio: "inherit" });
       } else {
         log(`  node ${nodeVersion} ... SKIP (fnm not available)`);
       }
@@ -90,7 +90,7 @@ if (runNative) {
   // Run Deno, Bun, browser, workers once
   for (const runtime of ["deno", "bun", "browser", "workers"]) {
     try {
-      execSync(`node scripts/test-matrix.mjs --runtime ${runtime}`, { stdio: "inherit" });
+      execSync(`node scripts/test-matrix.mjs --no-summary --runtime ${runtime}`, { stdio: "inherit" });
     } catch {
       failed = true;
     }
