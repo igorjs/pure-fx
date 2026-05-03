@@ -30,7 +30,7 @@ jobs:
       - name: Check DCO (Signed-off-by on all commits)
         if: github.event_name == 'pull_request_target'
         id: dco
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const commits = await github.rest.pulls.listCommits({
@@ -57,7 +57,7 @@ jobs:
 
       - name: Check CLA signature
         id: cla
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -82,7 +82,7 @@ jobs:
           github.event_name == 'issue_comment' &&
           steps.cla.outputs.cla_pass == 'false' &&
           contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA')
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -154,7 +154,7 @@ jobs:
 
       - name: Post status comment
         if: github.event_name == 'pull_request_target'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

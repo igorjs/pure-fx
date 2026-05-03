@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.14/schema.json",
   "files": {
     "includes": ["src/**/*.ts", "!src/**/*.d.ts", "tests/**"]
   },
@@ -81,6 +81,7 @@
         "useNullishCoalescing": "off",
         "useSpread": "error",
         "noExcessiveClassesPerFile": "off",
+        "noImpliedEval": "off",
         "noExcessiveLinesPerFile": "off",
         "noScriptUrl": "error",
         "noFloatingPromises": "error",

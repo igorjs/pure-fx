@@ -117,7 +117,7 @@
   },
   "homepage": "https://github.com/igorjs/pure-fx#readme",
   "devDependencies": {
-    "@biomejs/biome": "2.4.7",
+    "@biomejs/biome": "2.4.14",
     "@typescript/native-preview": "latest"
   },
   "peerDependencies": {
