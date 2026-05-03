@@ -133,7 +133,7 @@ export const File: {
   exists: path =>
     makeTask(async () => {
       const fs = await getFs();
-      if (fs === null) return Err(FileError(NO_FS));
+      if (fs === null) return Ok(false);
       try {
         const s = await fs.stat(path);
         return Ok(s.isFile);
