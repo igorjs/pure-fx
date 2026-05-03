@@ -20,6 +20,8 @@ services:
   # ── Bun (official images) ───────────────────────────────────────────────
   bun-debian:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: debian } }
+  bun-alpine:
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: alpine } }
 
   # ── Distroless (production runtime) ──────────────────────────────────────
   distroless:
