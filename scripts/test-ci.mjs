@@ -57,7 +57,8 @@ process.on("SIGTERM", () => { cleanup(); process.exit(143); });
 // -- Native tests -------------------------------------------------------------
 
 if (runNative) {
-  process.stdout.write("lint + check + build ... ");
+  log("\n── Checks ──");
+  process.stdout.write("  lint + check + build ... ");
   try {
     execSync("pnpm run lint && pnpm run check && pnpm run build", { stdio: "pipe" });
     log("OK");
@@ -67,6 +68,7 @@ if (runNative) {
     process.exit(1);
   }
 
+  log("\n── Native ──");
   const hasFnm = hasCommand("fnm");
 
   // Run Node tests for each version

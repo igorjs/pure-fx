@@ -16,6 +16,8 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
 COPY package.json ./
 RUN bun install
 
+ENV PATH="/app/node_modules/.bin:${PATH}"
+
 COPY . .
 RUN bun scripts/build.mjs
 

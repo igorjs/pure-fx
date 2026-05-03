@@ -12,8 +12,7 @@ services:
   # ── Deno ────────────────────────────────────────────────────────────────
   deno-debian:
     build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: debian:bookworm-slim } }
-  deno-alpine:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { BASE: alpine:3.21 } }
+  # No deno-alpine: Deno requires glibc (not musl)
 
   # ── Bun ─────────────────────────────────────────────────────────────────
   bun-debian:
