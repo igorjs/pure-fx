@@ -56,8 +56,8 @@ type BunServeFn = (options: BunServeOptions) => BunServer;
  *
  * @example
  * ```ts
- * import { Server, json } from "@igorjs/pure-ts";
- * import { bunAdapter } from "@igorjs/pure-ts/runtime/adapter/bun";
+ * import { Server, json } from "@igorjs/pure-fx";
+ * import { bunAdapter } from "@igorjs/pure-fx/runtime/adapter/bun";
  *
  * const app = Server("api")
  *   .get("/health", () => json({ ok: true }))

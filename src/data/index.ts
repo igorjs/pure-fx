@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * import { Schema, Record, ADT } from '@igorjs/pure-ts/data'
+ * import { Schema, Record, ADT } from '@igorjs/pure-fx/data'
  *
  * const UserSchema = Schema.object({ name: Schema.string, age: Schema.number });
  * const user = Record({ name: 'Alice', age: 30 });

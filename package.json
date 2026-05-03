@@ -1,7 +1,7 @@
 {
-  "name": "@igorjs/pure-ts",
-  "version": "0.10.0",
-  "description": "Pure TS: functional application framework for TypeScript. Result, Option, Task, Stream, immutable Record/List, Schema, Codec, Lens, Retry, CircuitBreaker, HTTP Server. Zero dependencies.",
+  "name": "@igorjs/pure-fx",
+  "version": "0.1.0",
+  "description": "Pure FX: functional application framework for TypeScript. Result, Option, Task, Stream, immutable Record/List, Schema, Codec, Lens, Retry, CircuitBreaker, HTTP Server. Zero dependencies.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -110,12 +110,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/igorjs/pure-ts.git"
+    "url": "git+https://github.com/igorjs/pure-fx.git"
   },
   "bugs": {
-    "url": "https://github.com/igorjs/pure-ts/issues"
+    "url": "https://github.com/igorjs/pure-fx/issues"
   },
-  "homepage": "https://github.com/igorjs/pure-ts#readme",
+  "homepage": "https://github.com/igorjs/pure-fx#readme",
   "devDependencies": {
     "@biomejs/biome": "2.4.7",
     "@typescript/native-preview": "latest"

@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(new URL("../", import.meta.url).pathname);
 const dist = join(ROOT, "dist");
-const tmp = mkdtempSync(join(tmpdir(), "pure-ts-bundle-"));
+const tmp = mkdtempSync(join(tmpdir(), "pure-fx-bundle-"));
 
 const bundle = (name, code) => {
   const entry = join(tmp, `${name}.mjs`);

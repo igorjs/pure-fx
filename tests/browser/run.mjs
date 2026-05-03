@@ -24,7 +24,7 @@ const MIME = {
 
 const HTML = `<!DOCTYPE html>
 <html>
-<head><title>pure-ts browser smoke test</title></head>
+<head><title>pure-fx browser smoke test</title></head>
 <body>
 <script type="module">
 import { runIntegrationWeb } from "./tests/integration-web.mjs";

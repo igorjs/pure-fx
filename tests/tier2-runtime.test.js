@@ -528,7 +528,7 @@ describe("File", () => {
   let tmpDir;
 
   it("setup: create temp directory", async () => {
-    tmpDir = await mkdtemp(nodePath.join(nodeOs.tmpdir(), "pure-ts-tier2-"));
+    tmpDir = await mkdtemp(nodePath.join(nodeOs.tmpdir(), "pure-fx-tier2-"));
   });
 
   it("write then read: roundtrip on Node", async () => {
@@ -621,7 +621,7 @@ describe("File", () => {
   });
 
   it("tempDir: creates a directory that exists", async () => {
-    const result = await File.tempDir("pure-ts-test-").run();
+    const result = await File.tempDir("pure-fx-test-").run();
     assert.equal(result.isOk, true);
     const dir = result.value;
     assert.equal(typeof dir, "string");

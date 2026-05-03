@@ -24,7 +24,7 @@ body:
       description: Provide the smallest possible code that reproduces the bug.
       placeholder: |
         ```ts
-        import { Ok } from '@igorjs/pure-ts'
+        import { Ok } from '@igorjs/pure-fx'
         // steps to reproduce...
         ```
       render: typescript

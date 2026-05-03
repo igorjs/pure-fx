@@ -137,7 +137,7 @@ export interface Err<T, E> {
 /**
  * A discriminated union representing either success (`Ok<T>`) or failure (`Err<E>`).
  *
- * Result is the primary error-handling primitive in pure-ts: errors are values,
+ * Result is the primary error-handling primitive in pure-fx: errors are values,
  * never thrown. Use `.isOk` / `.isErr` to narrow, or `.match()` for exhaustive
  * pattern matching.
  *

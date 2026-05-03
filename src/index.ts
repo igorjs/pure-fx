@@ -1,9 +1,9 @@
 // Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
 
 /**
- * @module @igorjs/pure-ts
+ * @module @igorjs/pure-fx
  *
- * Pure TS: a functional application framework for TypeScript.
+ * Pure FX: a functional application framework for TypeScript.
  * Zero dependencies. Errors as values. Immutability enforced at runtime.
  *
  * Core:

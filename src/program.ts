@@ -212,7 +212,7 @@ export interface ProgramOptions {
  *
  * @example Custom logger
  * ```ts
- * import { Logger } from '@igorjs/pure-ts';
+ * import { Logger } from '@igorjs/pure-fx';
  * const log = Logger.create({ name: 'api', sink: Logger.json });
  * const main = Program('api', (signal) => startServer(signal), { logger: log });
  * await main.run();

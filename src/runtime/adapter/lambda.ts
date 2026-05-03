@@ -3,7 +3,7 @@
 /**
  * @module runtime/adapter/lambda
  *
- * AWS Lambda adapter for the pure-ts server module.
+ * AWS Lambda adapter for the pure-fx server module.
  *
  * Converts between API Gateway HTTP API v2 / Lambda Function URL events
  * and WHATWG Request/Response, so server handlers work unchanged in Lambda.
@@ -157,8 +157,8 @@ const toResult = async (response: Response): Promise<LambdaResult> => {
  *
  * @example
  * ```ts
- * import { Server, json } from "@igorjs/pure-ts";
- * import { toLambdaHandler } from "@igorjs/pure-ts/runtime/adapter/lambda";
+ * import { Server, json } from "@igorjs/pure-fx";
+ * import { toLambdaHandler } from "@igorjs/pure-fx/runtime/adapter/lambda";
  *
  * const app = Server("api")
  *   .get("/health", () => json({ ok: true }));
@@ -186,8 +186,8 @@ export const toLambdaHandler = (
  *
  * @example
  * ```ts
- * import { Server, json } from "@igorjs/pure-ts";
- * import { toLambdaStreamHandler } from "@igorjs/pure-ts/runtime/adapter/lambda";
+ * import { Server, json } from "@igorjs/pure-fx";
+ * import { toLambdaStreamHandler } from "@igorjs/pure-fx/runtime/adapter/lambda";
  *
  * const app = Server("api")
  *   .get("/stream", () => new Response("streamed"));

@@ -7,7 +7,7 @@
  * Consumers' bundlers (esbuild, Rollup, Vite) would strip them again anyway.
  *
  * How: Regex-based removal of block comments and single-line comments,
- * preserving sourceMappingURL directives. Safe because pure-ts source
+ * preserving sourceMappingURL directives. Safe because pure-fx source
  * contains no string literals with comment-like sequences.
  *
  * Run by: `pnpm run build` (chained after `tsgo`)
@@ -25,7 +25,7 @@ for (const name of await readdir(dist)) {
   let code = await readFile(path, "utf8");
 
   // Strip block comments and their leading indentation. Safe here because
-  // pure-ts source has no string literals containing "/*".
+  // pure-fx source has no string literals containing "/*".
   code = code.replace(/[ \t]*\/\*[\s\S]*?\*\/\n?/g, "");
 
   // Strip single-line decoration comments and their leading indentation,

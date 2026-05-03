@@ -7,7 +7,7 @@ Lazy async computation, sequences, resilience, and concurrency control.
 Lazy async computation that returns `Result<T, E>`. Nothing runs until `.run()`.
 
 ```ts
-import { Task, Ok, Err } from '@igorjs/pure-ts'
+import { Task, Ok, Err } from '@igorjs/pure-fx'
 
 // Create
 const task = Task.of(42);
@@ -42,7 +42,7 @@ const cached = task.memoize(); // subsequent .run() returns cached result
 Lazy pull-based async sequences. Backpressure-free.
 
 ```ts
-import { Stream } from '@igorjs/pure-ts'
+import { Stream } from '@igorjs/pure-fx'
 
 // Create
 const s = Stream.of(1, 2, 3, 4, 5);
@@ -80,7 +80,7 @@ await s.reduce((sum, n) => sum + n, 0).run(); // Ok(15)
 Builder pattern for retry policies.
 
 ```ts
-import { Retry, Task } from '@igorjs/pure-ts'
+import { Retry, Task } from '@igorjs/pure-fx'
 
 const policy = Retry.exponential({ base: 100, factor: 2, maxDelay: 5000 })
   .maxAttempts(5)
@@ -97,7 +97,7 @@ const result = await policy.execute(
 Prevent cascading failures with open/half-open/closed states.
 
 ```ts
-import { CircuitBreaker } from '@igorjs/pure-ts'
+import { CircuitBreaker } from '@igorjs/pure-fx'
 
 const breaker = CircuitBreaker.create({
   failureThreshold: 5,
@@ -114,7 +114,7 @@ const result = await breaker.execute(
 ## Concurrency
 
 ```ts
-import { Semaphore, Mutex, RateLimiter, Cache, Channel } from '@igorjs/pure-ts'
+import { Semaphore, Mutex, RateLimiter, Cache, Channel } from '@igorjs/pure-fx'
 
 // Semaphore: limit concurrent access
 const sem = Semaphore.create(3);
@@ -141,7 +141,7 @@ await cache.getOrSet('user:1', () => fetchUser('1'));
 Deferred computation that evaluates at most once and caches the result. Implements `Disposable` for scoped cleanup.
 
 ```ts
-import { Lazy } from '@igorjs/pure-ts'
+import { Lazy } from '@igorjs/pure-fx'
 
 const config = Lazy(() => loadExpensiveConfig());
 
@@ -170,7 +170,7 @@ config.toResult(e => String(e)); // Ok(value) or Err(message)
 Reader-style dependency injection for async pipelines. Compose first, provide dependencies at the edge.
 
 ```ts
-import { Env } from '@igorjs/pure-ts'
+import { Env } from '@igorjs/pure-fx'
 
 type Deps = { db: Database; logger: Logger };
 
@@ -199,7 +199,7 @@ const narrowed = getUser('u_1').provide((small: { db: Database }) =>
 Async producer/consumer communication with backpressure. Bounded channels block sends when the buffer is full.
 
 ```ts
-import { Channel, Stream } from '@igorjs/pure-ts'
+import { Channel, Stream } from '@igorjs/pure-fx'
 
 // Bounded channel (backpressure when buffer fills)
 const ch = Channel.bounded<number>(10);
@@ -233,7 +233,7 @@ See [state-machine.md](state-machine.md) for the full guide.
 Type-safe event emitter with per-event typed handlers.
 
 ```ts
-import { EventEmitter } from '@igorjs/pure-ts'
+import { EventEmitter } from '@igorjs/pure-fx'
 
 type Events = {
   userCreated: { id: string; name: string };
@@ -257,7 +257,7 @@ emitter.removeAll('userCreated');
 Generic resource pool for connections, handles, or any reusable resource.
 
 ```ts
-import { Pool } from '@igorjs/pure-ts'
+import { Pool } from '@igorjs/pure-fx'
 
 const pool = Pool.create({
   create: () => connectToDb(),
@@ -283,7 +283,7 @@ await pool.drain(); // destroy all
 Async job queue with concurrency control and priorities.
 
 ```ts
-import { Queue } from '@igorjs/pure-ts'
+import { Queue } from '@igorjs/pure-fx'
 
 const queue = Queue.create({
   concurrency: 3,
@@ -310,7 +310,7 @@ queue.resume();
 Execute async tasks on cron schedules.
 
 ```ts
-import { CronRunner } from '@igorjs/pure-ts'
+import { CronRunner } from '@igorjs/pure-fx'
 
 const runner = CronRunner.create({
   schedule: '*/5 * * * *', // every 5 minutes
@@ -332,7 +332,7 @@ runner.stop();
 Type-safe time-based operations using web standard APIs. Wraps `setTimeout` and `performance.now()` in Task/Stream for lazy, composable timing.
 
 ```ts
-import { Timer, Duration } from '@igorjs/pure-ts'
+import { Timer, Duration } from '@igorjs/pure-fx'
 
 // Sleep for 1 second
 await Timer.sleep(Duration.seconds(1)).run();

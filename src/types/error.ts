@@ -30,9 +30,9 @@ import { deepFreezeRaw } from "../data/internals.js";
  *
  * Uses `Symbol.for` so the brand is shared across realms (e.g. when the
  * library is duplicated in node_modules). This makes `.is()` guards reliable
- * even when multiple copies of pure-ts are loaded.
+ * even when multiple copies of pure-fx are loaded.
  */
-const ERR_TYPE_BRAND = Symbol.for("pure-ts/ErrType");
+const ERR_TYPE_BRAND = Symbol.for("pure-fx/ErrType");
 
 /** Capture a stack trace, stripping library frames where V8 is available. */
 const captureStack = (): string | undefined => {

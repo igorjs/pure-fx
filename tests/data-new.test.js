@@ -1100,7 +1100,7 @@ describe("File", () => {
 
   // Create temp directory before tests, clean up after
   it("setup: create temp directory", async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), "pure-ts-test-"));
+    tmpDir = await mkdtemp(join(tmpdir(), "pure-fx-test-"));
   });
 
   it("write then read: roundtrip", async () => {

@@ -1,10 +1,10 @@
-# Pure TS
+# Pure FX
 
-[![CI](https://github.com/igorjs/pure-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/igorjs/pure-ts/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@igorjs/pure-ts?color=blue)](https://www.npmjs.com/package/@igorjs/pure-ts)
-[![npm downloads](https://img.shields.io/npm/dm/@igorjs/pure-ts)](https://www.npmjs.com/package/@igorjs/pure-ts)
-[![JSR](https://jsr.io/badges/@igorjs/pure-ts)](https://jsr.io/@igorjs/pure-ts)
-[![License](https://img.shields.io/npm/l/@igorjs/pure-ts)](https://github.com/igorjs/pure-ts/blob/main/LICENSE)
+[![CI](https://github.com/igorjs/pure-fx/actions/workflows/ci.yml/badge.svg)](https://github.com/igorjs/pure-fx/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@igorjs/pure-fx?color=blue)](https://www.npmjs.com/package/@igorjs/pure-fx)
+[![npm downloads](https://img.shields.io/npm/dm/@igorjs/pure-fx)](https://www.npmjs.com/package/@igorjs/pure-fx)
+[![JSR](https://jsr.io/badges/@igorjs/pure-fx)](https://jsr.io/@igorjs/pure-fx)
+[![License](https://img.shields.io/npm/l/@igorjs/pure-fx)](https://github.com/igorjs/pure-fx/blob/main/LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)]()
 
 Functional application framework for TypeScript. Zero dependencies.
@@ -18,19 +18,19 @@ Runs on Node.js 22+, Deno 2+, Bun, Cloudflare Workers, and Chromium.
 ## Install
 
 ```bash
-npm install @igorjs/pure-ts
+npm install @igorjs/pure-fx
 ```
 
-Also available on [JSR](https://jsr.io/@igorjs/pure-ts):
+Also available on [JSR](https://jsr.io/@igorjs/pure-fx):
 
 ```bash
-npx jsr add @igorjs/pure-ts
+npx jsr add @igorjs/pure-fx
 ```
 
 ## Quick Example
 
 ```ts
-import { Ok, Err, pipe, Task, Schema, File, Valid, Invalid } from '@igorjs/pure-ts'
+import { Ok, Err, pipe, Task, Schema, File, Valid, Invalid } from '@igorjs/pure-fx'
 
 // Errors as values, not exceptions
 const parse = (s: string) => {
@@ -91,7 +91,7 @@ Most modules are pure TypeScript and work everywhere. Runtime-dependent modules 
 
 ### Compression hangs on older Deno versions
 
-Pure TS uses `Blob.stream().pipeThrough()` for compression, which requires Deno 1.38+. If compression operations hang, update Deno.
+Pure FX uses `Blob.stream().pipeThrough()` for compression, which requires Deno 1.38+. If compression operations hang, update Deno.
 
 ### FFI not available
 
@@ -121,7 +121,7 @@ if (result.isErr) {
 
 ### Deno requires version 2.0+
 
-Pure TS uses Deno 2.0+ APIs. Deno 1.x is not supported. Compression requires Deno 1.38+ for `CompressionStream`, but all other modules require Deno 2.0+.
+Pure FX uses Deno 2.0+ APIs. Deno 1.x is not supported. Compression requires Deno 1.38+ for `CompressionStream`, but all other modules require Deno 2.0+.
 
 ### Modules return Err in Workers/Browser
 
@@ -131,13 +131,13 @@ Runtime-dependent modules (`File`, `Command`, `Process`, etc.) gracefully return
 
 ```ts
 // Import everything
-import { Ok, Task, Schema } from '@igorjs/pure-ts'
+import { Ok, Task, Schema } from '@igorjs/pure-fx'
 
 // Or import specific modules for smaller bundles
-import { Ok, Err, pipe } from '@igorjs/pure-ts/core'
-import { Schema, HashMap } from '@igorjs/pure-ts/data'
-import { Task, Stream } from '@igorjs/pure-ts/async'
-import { File, Command, FFI } from '@igorjs/pure-ts/io'
+import { Ok, Err, pipe } from '@igorjs/pure-fx/core'
+import { Schema, HashMap } from '@igorjs/pure-fx/data'
+import { Task, Stream } from '@igorjs/pure-fx/async'
+import { File, Command, FFI } from '@igorjs/pure-fx/io'
 ```
 
 ## Disclaimer

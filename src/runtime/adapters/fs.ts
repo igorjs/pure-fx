@@ -137,7 +137,7 @@ const createNodeFs = async (): Promise<Fs | null> => {
     readDir: path => nfs.readdir(path),
     copyFile: (src, dest) => nfs.copyFile(src, dest),
     rename: (oldPath, newPath) => nfs.rename(oldPath, newPath),
-    makeTempDir: prefix => nfs.mkdtemp(prefix ?? "pure-ts-"),
+    makeTempDir: prefix => nfs.mkdtemp(prefix ?? "pure-fx-"),
     readBytes: path => nfs.readFile(path) as Promise<Uint8Array>,
     writeBytes: (path, data) => nfs.writeFile(path, data),
     symlink: (target, path) => nfs.symlink(target, path),

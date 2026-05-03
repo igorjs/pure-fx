@@ -7,7 +7,7 @@ Type-safe wrappers for file system, subprocess, encoding, and network operations
 Multi-runtime file system operations (Node, Deno, Bun).
 
 ```ts
-import { File } from '@igorjs/pure-ts'
+import { File } from '@igorjs/pure-fx'
 
 // Read/write
 const content = await File.read('./config.json').run();     // Result<string, FileError>
@@ -67,7 +67,7 @@ const abs = await File.realPath('./relative').run(); // resolve to absolute
 Cross-runtime subprocess execution.
 
 ```ts
-import { Command } from '@igorjs/pure-ts'
+import { Command } from '@igorjs/pure-fx'
 
 const result = await Command.exec('echo', ['hello']).run();
 // Result<CommandResult, CommandError>
@@ -107,7 +107,7 @@ if (child.isOk) {
 Safe JSON parse/stringify returning Result.
 
 ```ts
-import { Json } from '@igorjs/pure-ts'
+import { Json } from '@igorjs/pure-fx'
 
 Json.parse('{"a":1}');    // Ok({ a: 1 })
 Json.parse('{bad}');      // Err(JsonError(...))
@@ -119,7 +119,7 @@ Json.stringify({ b: 2 }); // Ok('{"b":2}')
 Base64, hex, and UTF-8 encoding/decoding.
 
 ```ts
-import { Encoding } from '@igorjs/pure-ts'
+import { Encoding } from '@igorjs/pure-fx'
 
 const bytes = Encoding.utf8.encode('hello');
 Encoding.base64.encode(bytes);   // 'aGVsbG8='
@@ -135,7 +135,7 @@ Encoding.utf8.decode(bytes);        // Ok('hello')
 Gzip and deflate compression via web standard `CompressionStream`. Uses `Blob.stream().pipeThrough()` for correct backpressure handling across all runtimes.
 
 ```ts
-import { Compression } from '@igorjs/pure-ts'
+import { Compression } from '@igorjs/pure-fx'
 
 const data = new TextEncoder().encode('hello world');
 const compressed = await Compression.gzip(data).run();
@@ -153,7 +153,7 @@ const inflated = await Compression.inflate(deflated.unwrap()).run();
 URL parsing and manipulation returning Result.
 
 ```ts
-import { Url } from '@igorjs/pure-ts'
+import { Url } from '@igorjs/pure-fx'
 
 Url.parse('https://example.com/path?q=1');
 // Ok({ hostname: 'example.com', pathname: '/path', ... })
@@ -166,7 +166,7 @@ Url.parse('not a url'); // Err(UrlError(...))
 Type-safe deep cloning via the web standard `structuredClone` API. Returns `Result` instead of throwing on non-cloneable types.
 
 ```ts
-import { Clone } from '@igorjs/pure-ts'
+import { Clone } from '@igorjs/pure-fx'
 
 const original = { nested: { value: 42 } };
 const cloned = Clone.deep(original);
@@ -181,7 +181,7 @@ Clone.deep({ fn: () => {} });
 Cross-runtime DNS resolution with IPv4/IPv6 support.
 
 ```ts
-import { Dns } from '@igorjs/pure-ts'
+import { Dns } from '@igorjs/pure-fx'
 
 // Resolve A/AAAA records
 const records = await Dns.resolve('example.com', 'A').run();
@@ -198,7 +198,7 @@ const addr = await Dns.lookup('example.com').run();
 Cross-runtime TCP client.
 
 ```ts
-import { Net } from '@igorjs/pure-ts'
+import { Net } from '@igorjs/pure-fx'
 
 const conn = await Net.connect({ host: 'localhost', port: 8080 }).run();
 if (conn.isOk) {
@@ -213,7 +213,7 @@ if (conn.isOk) {
 Cross-runtime terminal interaction for stdin reading, prompting, and password input. Handles TTY detection, piped input, timeouts, and EOF across Node, Deno, and Bun.
 
 ```ts
-import { Terminal } from '@igorjs/pure-ts'
+import { Terminal } from '@igorjs/pure-fx'
 
 // Check if running interactively
 Terminal.isInteractive(); // true if TTY, false if piped/CI
@@ -256,7 +256,7 @@ Terminal.writeLine('done');
 Type-safe WebSocket routing with event handlers. Defines routes and handlers; actual upgrade is handled by the runtime adapter (Bun, Deno, or Node).
 
 ```ts
-import { WebSocket } from '@igorjs/pure-ts'
+import { WebSocket } from '@igorjs/pure-fx'
 
 const ws = WebSocket.router()
   .route('/chat', {
@@ -281,7 +281,7 @@ Cross-runtime Foreign Function Interface for loading and calling native shared l
 ### Basic usage
 
 ```ts
-import { FFI } from '@igorjs/pure-ts'
+import { FFI } from '@igorjs/pure-fx'
 
 // Always check availability first
 if (!FFI.isAvailable()) {
@@ -416,7 +416,7 @@ double circle_area(double radius) { return M_PI * radius * radius; }
 
 ```ts
 // calc.ts
-import { FFI } from '@igorjs/pure-ts'
+import { FFI } from '@igorjs/pure-fx'
 
 const lib = FFI.open(`./libcalc.${FFI.suffix}`, {
   add:         { parameters: ['i32', 'i32'], result: 'i32' },
@@ -442,7 +442,7 @@ pub extern "C" fn fibonacci(n: u32) -> u32 {
 ```
 
 ```ts
-import { FFI } from '@igorjs/pure-ts'
+import { FFI } from '@igorjs/pure-fx'
 
 const lib = FFI.open(`./target/release/libfib.${FFI.suffix}`, {
   fibonacci: { parameters: ['u32'], result: 'u32' },
@@ -459,7 +459,7 @@ if (lib.isOk) {
 Full Web Crypto API coverage. All operations return `Result` or `Task`.
 
 ```ts
-import { Crypto } from '@igorjs/pure-ts'
+import { Crypto } from '@igorjs/pure-fx'
 
 // Random
 Crypto.uuid();                          // 'f47ac10b-...'

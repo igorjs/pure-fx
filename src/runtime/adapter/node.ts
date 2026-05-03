@@ -143,8 +143,8 @@ const writeResponse = async (response: Response, nodeRes: NodeResponse): Promise
  *
  * @example
  * ```ts
- * import { Server, json } from "@igorjs/pure-ts";
- * import { nodeAdapter } from "@igorjs/pure-ts/runtime/adapter/node";
+ * import { Server, json } from "@igorjs/pure-fx";
+ * import { nodeAdapter } from "@igorjs/pure-fx/runtime/adapter/node";
  *
  * const app = Server("api")
  *   .get("/health", () => json({ ok: true }))

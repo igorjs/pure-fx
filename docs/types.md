@@ -7,7 +7,7 @@ Structured errors, nominal types, and time primitives.
 Structured, immutable error constructors with discriminant tags.
 
 ```ts
-import { ErrType } from '@igorjs/pure-ts'
+import { ErrType } from '@igorjs/pure-fx'
 
 // Define error kinds
 const NotFound = ErrType('NotFound');           // code: 'NOT_FOUND' (auto-derived)
@@ -46,7 +46,7 @@ err.toJSON();       // { tag, code, message, metadata, timestamp, cause }
 Branded types that prevent mixing structurally identical values.
 
 ```ts
-import type { Type } from '@igorjs/pure-ts'
+import type { Type } from '@igorjs/pure-fx'
 
 type UserId = Type<'UserId', string>;
 type OrderId = Type<'OrderId', string>;
@@ -65,7 +65,7 @@ getUser(orderId);  // TYPE ERROR
 Typed time values in milliseconds with conversions.
 
 ```ts
-import { Duration } from '@igorjs/pure-ts'
+import { Duration } from '@igorjs/pure-fx'
 
 const d = Duration.seconds(90);    // 90000 (milliseconds)
 Duration.toSeconds(d);              // 90
@@ -112,7 +112,7 @@ Retry.exponential({ base: Duration.milliseconds(100) });
 Cron expression parser with field validation.
 
 ```ts
-import { Cron } from '@igorjs/pure-ts'
+import { Cron } from '@igorjs/pure-fx'
 
 const expr = Cron.parse('*/5 * * * *');
 // Result<CronExpression, SchemaError>

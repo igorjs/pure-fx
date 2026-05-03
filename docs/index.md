@@ -1,4 +1,4 @@
-# Pure TS Documentation
+# Pure FX Documentation
 
 Functional application framework for TypeScript. Zero dependencies. Errors as values. Immutability at runtime.
 
@@ -16,17 +16,17 @@ Functional application framework for TypeScript. Zero dependencies. Errors as va
 ## Quick Start
 
 ```bash
-npm install @igorjs/pure-ts
+npm install @igorjs/pure-fx
 ```
 
 ```ts
-import { Ok, Err, pipe, Task, Schema, File } from '@igorjs/pure-ts'
+import { Ok, Err, pipe, Task, Schema, File } from '@igorjs/pure-fx'
 
 // Or import specific modules for smaller bundles:
-import { Ok, Err, pipe } from '@igorjs/pure-ts/core'
-import { Schema, HashMap } from '@igorjs/pure-ts/data'
-import { Task } from '@igorjs/pure-ts/async'
-import { File, FFI } from '@igorjs/pure-ts/io'
+import { Ok, Err, pipe } from '@igorjs/pure-fx/core'
+import { Schema, HashMap } from '@igorjs/pure-fx/data'
+import { Task } from '@igorjs/pure-fx/async'
+import { File, FFI } from '@igorjs/pure-fx/io'
 ```
 
 ## Principles

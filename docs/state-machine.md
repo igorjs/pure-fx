@@ -5,7 +5,7 @@ Type-safe finite state machine with compile-time transition validation, runtime 
 ## Basic Usage
 
 ```ts
-import { StateMachine } from '@igorjs/pure-ts'
+import { StateMachine } from '@igorjs/pure-fx'
 
 const machine = StateMachine({
   initial: 'idle',

@@ -7,8 +7,8 @@ HTTP server, program lifecycle, logging, configuration, and cross-runtime utilit
 Production-grade HTTP server with typed routing, middleware, and runtime adapters.
 
 ```ts
-import { Server, json, text, html } from '@igorjs/pure-ts'
-import { nodeAdapter } from '@igorjs/pure-ts/runtime/adapter/node'
+import { Server, json, text, html } from '@igorjs/pure-fx'
+import { nodeAdapter } from '@igorjs/pure-fx/runtime/adapter/node'
 
 const app = Server.create()
   .get('/health', () => json({ status: 'ok' }))
@@ -32,7 +32,7 @@ Adapters: `nodeAdapter`, `denoAdapter`, `bunAdapter`, `lambdaAdapter`
 Process lifecycle wrapper for Task-based CLI programs with signal handling and graceful shutdown.
 
 ```ts
-import { Program, Task } from '@igorjs/pure-ts'
+import { Program, Task } from '@igorjs/pure-fx'
 
 // Create from a Task or effect function receiving AbortSignal
 const main = Program('my-service', (signal) =>
@@ -59,7 +59,7 @@ await simple.run();
 Structured logging with levels and JSON output.
 
 ```ts
-import { Logger } from '@igorjs/pure-ts'
+import { Logger } from '@igorjs/pure-fx'
 
 const log = Logger.create({ level: 'info', json: true });
 log.info('server started', { port: 3000 });
@@ -71,7 +71,7 @@ log.error('request failed', { path: '/api', status: 500 });
 Environment variable validation via Schema.
 
 ```ts
-import { Config, Schema } from '@igorjs/pure-ts'
+import { Config, Schema } from '@igorjs/pure-fx'
 
 const AppConfig = Config.from({
   PORT: Schema.string.transform(Number),
@@ -95,7 +95,7 @@ const testConfig = AppConfig.loadFrom({
 Runtime platform detection and OS-aware constants. Works everywhere (Node, Deno, Bun, browsers, edge runtimes) without importing `node:os` or `node:path`.
 
 ```ts
-import { Platform } from '@igorjs/pure-ts'
+import { Platform } from '@igorjs/pure-fx'
 
 Platform.isWindows; // true on Windows, false elsewhere
 Platform.isPosix;   // true on macOS/Linux/Deno/browsers
@@ -106,7 +106,7 @@ Platform.isPosix;   // true on macOS/Linux/Deno/browsers
 Cross-runtime OS info, process control, and path utilities.
 
 ```ts
-import { Os, Process, Path, Eol } from '@igorjs/pure-ts'
+import { Os, Process, Path, Eol } from '@igorjs/pure-fx'
 
 Os.hostname();    // Option<string>
 Os.platform();    // 'darwin' | 'linux' | 'win32' | ...

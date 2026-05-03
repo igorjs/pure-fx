@@ -58,8 +58,8 @@ type DenoServeFn = (
  *
  * @example
  * ```ts
- * import { Server, json } from "@igorjs/pure-ts";
- * import { denoAdapter } from "@igorjs/pure-ts/runtime/adapter/deno";
+ * import { Server, json } from "@igorjs/pure-fx";
+ * import { denoAdapter } from "@igorjs/pure-fx/runtime/adapter/deno";
  *
  * const app = Server("api")
  *   .get("/health", () => json({ ok: true }))

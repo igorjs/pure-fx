@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * import { Config, Logger, Process } from '@igorjs/pure-ts/runtime'
+ * import { Config, Logger, Process } from '@igorjs/pure-fx/runtime'
  *
  * const log = Logger.create({ level: 'info' });
  * const cwd = Process.cwd();

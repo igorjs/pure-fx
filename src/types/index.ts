@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * import { ErrType, Duration } from '@igorjs/pure-ts/types'
+ * import { ErrType, Duration } from '@igorjs/pure-fx/types'
  *
  * const NotFound = ErrType('NotFound');
  * const timeout = Duration.seconds(30);

@@ -1,4 +1,4 @@
-# Contributing to Pure TS
+# Contributing to Pure FX
 
 Thank you for your interest in contributing. This document explains the process and requirements.
 
@@ -47,8 +47,8 @@ The CLA bot will record your signature automatically. You only need to do this o
 ### Setup
 
 ```bash
-git clone https://github.com/igorjs/pure-ts.git
-cd pure-ts
+git clone https://github.com/igorjs/pure-fx.git
+cd pure-fx
 pnpm install
 ```
 

@@ -7,7 +7,7 @@ Foundational types and composition utilities.
 A value that is either `Ok(value)` or `Err(error)`. Replaces try/catch.
 
 ```ts
-import { Ok, Err, Result } from '@igorjs/pure-ts'
+import { Ok, Err, Result } from '@igorjs/pure-fx'
 
 const parse = (input: string): Result<number, string> => {
   const n = Number(input);
@@ -47,7 +47,7 @@ Result.partition([Ok(1), Err('a'), Ok(2)]); // { ok: [1, 2], err: ['a'] }
 A value that is either `Some(value)` or `None`. Replaces null checks.
 
 ```ts
-import { Some, None, Option } from '@igorjs/pure-ts'
+import { Some, None, Option } from '@igorjs/pure-fx'
 
 const find = (id: string): Option<User> =>
   users.has(id) ? Some(users.get(id)) : None;
@@ -78,7 +78,7 @@ Some('ok').toResult('missing');      // Ok('ok')
 ## pipe / flow
 
 ```ts
-import { pipe, flow } from '@igorjs/pure-ts'
+import { pipe, flow } from '@igorjs/pure-fx'
 
 // pipe: apply value through functions left-to-right
 const result = pipe(5, n => n * 2, n => n + 1); // 11
@@ -93,7 +93,7 @@ transform(5); // 11
 Exhaustive pattern matching on tagged unions.
 
 ```ts
-import { Match, Ok, Err } from '@igorjs/pure-ts'
+import { Match, Ok, Err } from '@igorjs/pure-fx'
 
 const result = Ok(42);
 
@@ -114,7 +114,7 @@ Match(value)
 Typeclass instances for equality and ordering.
 
 ```ts
-import { Eq, Ord } from '@igorjs/pure-ts'
+import { Eq, Ord } from '@igorjs/pure-fx'
 
 const byAge = Ord.fromCompare<User>((a, b) => a.age - b.age);
 const sorted = [...users].sort(byAge.compare);
@@ -128,7 +128,7 @@ byName.equals(user1, user2);
 State monad for threading state through pure computations.
 
 ```ts
-import { State } from '@igorjs/pure-ts'
+import { State } from '@igorjs/pure-fx'
 
 const counter = State.get<number>()
   .flatMap(n => State.set(n + 1).map(() => n));
@@ -142,7 +142,7 @@ counter.run(5);  // [5, 6]
 Composable optics for immutable data access and updates.
 
 ```ts
-import { Lens, LensOptional, Iso } from '@igorjs/pure-ts'
+import { Lens, LensOptional, Iso } from '@igorjs/pure-fx'
 
 // Property lens
 const name = Lens.prop<User>()('name');
@@ -172,7 +172,7 @@ celsius.reverse().get(212); // 100
 Like `Result` but accumulates **all** errors instead of short-circuiting on the first. Use for form validation, config parsing, or any scenario where you want every error at once.
 
 ```ts
-import { Valid, Invalid, Validation } from '@igorjs/pure-ts'
+import { Valid, Invalid, Validation } from '@igorjs/pure-fx'
 
 const validateName = (s: string) =>
   s.trim().length > 0 ? Valid(s.trim()) : Invalid('name required');
@@ -201,7 +201,7 @@ Invalid(['e']).toResult();         // Err(['e'])
 Optic for focusing on a variant of a sum type. Like Lens but the target may not exist.
 
 ```ts
-import { Prism, Some, None } from '@igorjs/pure-ts'
+import { Prism, Some, None } from '@igorjs/pure-fx'
 
 const numPrism = Prism.from(
   (v: unknown) => typeof v === 'number' ? Some(v) : None,
@@ -218,7 +218,7 @@ numPrism.reverseGet(42);    // 42
 Optic focusing on multiple targets within a data structure.
 
 ```ts
-import { Traversal } from '@igorjs/pure-ts'
+import { Traversal } from '@igorjs/pure-fx'
 
 const items = Traversal.fromArray<number>();
 items.getAll([1, 2, 3]);               // [1, 2, 3]
@@ -230,7 +230,7 @@ items.modify(x => x * 10)([1, 2, 3]); // [10, 20, 30]
 Optic for values that may not exist in the source (nullable properties, array indices).
 
 ```ts
-import { LensOptional } from '@igorjs/pure-ts'
+import { LensOptional } from '@igorjs/pure-fx'
 
 const second = LensOptional.index<number>(1);
 second.getOption([10, 20, 30]); // Some(20)
@@ -246,7 +246,7 @@ nullable.getOption({});              // None
 Lossless bidirectional transformation between two types.
 
 ```ts
-import { Iso } from '@igorjs/pure-ts'
+import { Iso } from '@igorjs/pure-fx'
 
 const celsius = Iso.from(
   (c: number) => c * 9/5 + 32,

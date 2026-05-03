@@ -8,7 +8,7 @@
  * **Why Timer instead of raw setTimeout?**
  * `setTimeout` is fire-and-forget with no composability. Timer wraps
  * time-based operations in Task and Stream, making them lazy, typed,
- * and composable with the rest of pure-ts. Duration branding prevents
+ * and composable with the rest of pure-fx. Duration branding prevents
  * unit-mismatch bugs. `performance.now()` provides high-resolution
  * timing without importing node:perf_hooks.
  */

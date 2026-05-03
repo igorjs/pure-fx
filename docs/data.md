@@ -7,7 +7,7 @@ Immutable data structures, validation, and algebraic data types.
 Deeply frozen immutable objects with typed updates.
 
 ```ts
-import { Record } from '@igorjs/pure-ts'
+import { Record } from '@igorjs/pure-fx'
 
 const user = Record({ name: 'Alice', age: 30, tags: ['admin'] });
 
@@ -28,7 +28,7 @@ user.name = 'Bob'; // TypeError: Cannot assign to read only property
 Immutable array with functional methods.
 
 ```ts
-import { List } from '@igorjs/pure-ts'
+import { List } from '@igorjs/pure-fx'
 
 const nums = List([3, 1, 4, 1, 5]);
 
@@ -47,7 +47,7 @@ nums.groupBy(n => n > 3 ? 'big' : 'small');
 List guaranteed to have at least one element. Enables `reduce1` without initial value.
 
 ```ts
-import { NonEmptyList } from '@igorjs/pure-ts'
+import { NonEmptyList } from '@igorjs/pure-fx'
 
 const nel = NonEmptyList.of(1, 2, 3);
 nel.head;              // 1
@@ -60,7 +60,7 @@ nel.reduce1((a, b) => a + b); // 6 (no init needed)
 Composable runtime validators that parse unknown input into typed values.
 
 ```ts
-import { Schema } from '@igorjs/pure-ts'
+import { Schema } from '@igorjs/pure-fx'
 
 // Primitives
 Schema.string.parse('hello');      // Ok('hello')
@@ -111,7 +111,7 @@ Schema.intersection(a, b) / .record(valueSchema) / .lazy(factory)
 Bidirectional encode/decode paired with Schema validation.
 
 ```ts
-import { Codec, Schema } from '@igorjs/pure-ts'
+import { Codec, Schema } from '@igorjs/pure-fx'
 
 const DateCodec = Codec.from(
   Schema.string.refine(s => !isNaN(Date.parse(s)), 'date string'),
@@ -128,7 +128,7 @@ DateCodec.encode(new Date());              // '2024-...'
 Generic algebraic data type (discriminated union) factory.
 
 ```ts
-import { ADT, Match } from '@igorjs/pure-ts'
+import { ADT, Match } from '@igorjs/pure-fx'
 
 // Define variants
 const Color = ADT({
@@ -169,7 +169,7 @@ const Shape = ADT({
 Dense, index-stable collection with O(1) insert, remove, and access. Elements are referenced by handles that survive mutations to other elements.
 
 ```ts
-import { StableVec } from '@igorjs/pure-ts'
+import { StableVec } from '@igorjs/pure-fx'
 
 const vec = StableVec.create<{ x: number; y: number }>();
 const h1 = vec.insert({ x: 1, y: 2 });
@@ -206,7 +206,7 @@ vec.clear();     // remove all elements
 Persistent immutable hash map backed by a Hash Array Mapped Trie (HAMT). O(log32 N) get/set/delete with structural sharing.
 
 ```ts
-import { HashMap } from '@igorjs/pure-ts'
+import { HashMap } from '@igorjs/pure-fx'
 
 const m = HashMap.of([['name', 'Alice'], ['city', 'Sydney']]);
 m.get('name');          // Some('Alice')

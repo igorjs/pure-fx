@@ -9,7 +9,7 @@
  *
  * @example
  * ```ts
- * import { Ok, Err, pipe, Match } from '@igorjs/pure-ts/core'
+ * import { Ok, Err, pipe, Match } from '@igorjs/pure-fx/core'
  *
  * const result = pipe(Ok(42), r => r.map(n => n * 2));
  * ```

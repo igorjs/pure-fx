@@ -10,7 +10,7 @@
  *
  * @example
  * ```ts
- * import { Task, Stream, Retry } from '@igorjs/pure-ts/async'
+ * import { Task, Stream, Retry } from '@igorjs/pure-fx/async'
  *
  * const result = await Task.of(42).map(n => n * 2).run();
  * ```
