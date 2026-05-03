@@ -10,8 +10,6 @@ updates:
     commit-message:
       prefix: "chore(deps):"
     open-pull-requests-limit: 5
-    reviewers:
-      - "igorjs"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -23,5 +21,3 @@ updates:
     commit-message:
       prefix: "ci(deps):"
     open-pull-requests-limit: 5
-    reviewers:
-      - "igorjs"

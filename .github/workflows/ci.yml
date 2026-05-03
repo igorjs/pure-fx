@@ -61,7 +61,7 @@ jobs:
       - name: Unit tests
         run: pnpm test
       - name: Runtime integration test
-        run: node ${{ matrix.node-version == '25' && '--allow-ffi' || '' }} tests/integration-runtime.mjs
+        run: node tests/integration-runtime.mjs
       - name: Web integration test
         run: node tests/integration-web.mjs
 
