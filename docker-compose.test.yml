@@ -1,33 +1,49 @@
 services:
-  # ── Node (official images) ──────────────────────────────────────────────
-  node-22:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "22" } }
-  node-24:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24" } }
-  node-25:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25" } }
-  node-alpine:
+  # ── Node (official: node:VERSION-VARIANT) ───────────────────────────────
+  node-22-bookworm-slim:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "22", VARIANT: bookworm-slim } }
+  node-22-alpine:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "22", VARIANT: alpine } }
+  node-24-bookworm-slim:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: bookworm-slim } }
+  node-24-bullseye-slim:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: bullseye-slim } }
+  node-24-alpine:
     build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: alpine } }
+  node-25-bookworm-slim:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25", VARIANT: bookworm-slim } }
+  node-25-alpine:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25", VARIANT: alpine } }
 
-  # ── Deno (official images) ───────────────────────────────────────────────
+  # ── Deno (official: denoland/deno:VARIANT) ──────────────────────────────
   deno-debian:
     build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: debian } }
     entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
   deno-alpine:
     build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: alpine } }
     entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
+  deno-ubuntu:
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: ubuntu } }
+    entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
+  deno-distroless:
+    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: distroless } }
+    entrypoint: ["deno", "run", "--allow-all", "tests/smoke-all.mjs"]
 
-  # ── Bun (official images) ───────────────────────────────────────────────
+  # ── Bun (official: oven/bun:VARIANT) ────────────────────────────────────
   bun-debian:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: debian } }
+  bun-slim:
+    build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: slim } }
   bun-alpine:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: alpine } }
+  bun-distroless:
+    build: { context: ., dockerfile: docker/bun-distroless.Dockerfile }
 
-  # ── Distroless (production runtime) ──────────────────────────────────────
-  distroless:
+  # ── Distroless Node (production runtime) ────────────────────────────────
+  distroless-node:
     build: { context: ., dockerfile: docker/distroless.Dockerfile }
 
-  # ── Browser + Workers (Debian only) ─────────────────────────────────────
+  # ── Browser + Workers ───────────────────────────────────────────────────
   browser:
     build: { context: ., dockerfile: docker/browser.Dockerfile }
   workers:
