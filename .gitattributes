@@ -1,0 +1,15 @@
+# Normalise line endings
+* text=auto eol=lf
+
+# Explicitly declare text files
+*.ts text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Mark generated files for linguist
+dist/** linguist-generated
+pnpm-lock.yaml linguist-generated

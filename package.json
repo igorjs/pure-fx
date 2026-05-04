@@ -116,6 +116,10 @@
     "url": "https://github.com/igorjs/pure-fx/issues"
   },
   "homepage": "https://github.com/igorjs/pure-fx#readme",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/igorjs"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.4.14",
     "@typescript/native-preview": "latest",
