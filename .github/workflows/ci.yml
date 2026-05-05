@@ -41,6 +41,13 @@ jobs:
       - name: Type tests
         run: pnpm run test:types
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
   integration-node:
     needs: lint-and-test
     runs-on: ubuntu-latest
@@ -57,7 +64,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Unit tests
         run: pnpm test
       - name: Runtime integration test
@@ -78,7 +88,10 @@ jobs:
           cache: pnpm
       - uses: denoland/setup-deno@v2
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Runtime integration test
         run: deno run --allow-all tests/smoke-platform.mjs
       - name: Web integration test
@@ -97,7 +110,10 @@ jobs:
           cache: pnpm
       - uses: oven-sh/setup-bun@v2
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Runtime integration test
         run: bun tests/smoke-platform.mjs
       - name: Web integration test
@@ -115,7 +131,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - run: pnpm add -D miniflare
       - name: Workers integration test (miniflare)
         run: node tests/workers/run.mjs
@@ -132,8 +151,22 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - run: pnpm add -D playwright
-      - run: npx playwright install chromium --with-deps
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('node_modules/.pnpm/playwright@*/node_modules/playwright/package.json') }}
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+      - name: Install Playwright deps only
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - name: Browser integration test (Chromium via Playwright)
         run: node tests/browser/run.mjs
