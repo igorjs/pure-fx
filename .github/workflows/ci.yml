@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["22", "24", "25"]
+        node-version: ["22", "23", "24", "25"]
     name: integration / node-${{ matrix.node-version }}
     steps:
       - uses: actions/checkout@v6
@@ -70,15 +70,19 @@ jobs:
           path: dist/
       - name: Unit tests
         run: pnpm test
-      - name: Runtime integration test
+      - name: Runtime smoke test
         run: node tests/smoke-platform.mjs
-      - name: Web integration test
+      - name: Core smoke test
         run: node tests/smoke-core.mjs
 
   integration-deno:
     needs: lint-and-test
     runs-on: ubuntu-latest
-    name: integration / deno
+    strategy:
+      fail-fast: false
+      matrix:
+        deno-version: ["2.x", "canary"]
+    name: integration / deno-${{ matrix.deno-version }}
     steps:
       - uses: actions/checkout@v6
       - run: corepack enable
@@ -87,20 +91,26 @@ jobs:
           node-version: 24
           cache: pnpm
       - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ matrix.deno-version }}
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - name: Runtime integration test
+      - name: Runtime smoke test
         run: deno run --allow-all tests/smoke-platform.mjs
-      - name: Web integration test
+      - name: Core smoke test
         run: deno run --allow-all tests/smoke-core.mjs
 
   integration-bun:
     needs: lint-and-test
     runs-on: ubuntu-latest
-    name: integration / bun
+    strategy:
+      fail-fast: false
+      matrix:
+        bun-version: ["latest", "canary"]
+    name: integration / bun-${{ matrix.bun-version }}
     steps:
       - uses: actions/checkout@v6
       - run: corepack enable
@@ -109,14 +119,16 @@ jobs:
           node-version: 24
           cache: pnpm
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun-version }}
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
-      - name: Runtime integration test
+      - name: Runtime smoke test
         run: bun tests/smoke-platform.mjs
-      - name: Web integration test
+      - name: Core smoke test
         run: bun tests/smoke-core.mjs
 
   integration-workers:
@@ -136,7 +148,7 @@ jobs:
           name: dist
           path: dist/
       - run: pnpm add -D miniflare
-      - name: Workers integration test (miniflare)
+      - name: Workers smoke test (miniflare)
         run: node tests/workers/run.mjs
 
   integration-browser:
@@ -168,5 +180,5 @@ jobs:
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - name: Browser integration test (Chromium via Playwright)
+      - name: Browser smoke test (Chromium)
         run: node tests/browser/run.mjs
