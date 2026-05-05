@@ -39,8 +39,11 @@ const adapter = resolveProcessInfo();
 
 /** Heap and RSS memory usage. */
 export interface MemoryUsage {
+  /** Bytes of V8 heap currently in use. */
   readonly heapUsed: number;
+  /** Total V8 heap size in bytes. */
   readonly heapTotal: number;
+  /** Resident set size in bytes. */
   readonly rss: number;
 }
 

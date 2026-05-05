@@ -167,7 +167,9 @@ export const setByPath = <T>(obj: T, path: readonly string[], value: unknown, de
 
 /** A single mutation captured during a `produce()` draft session. */
 export interface Mutation {
+  /** Property path from root to the mutated field. */
   readonly path: readonly string[];
+  /** The new value assigned at this path. */
   readonly value: unknown;
 }
 

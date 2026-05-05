@@ -31,8 +31,11 @@ export const CommandError: ErrTypeConstructor<"CommandError", string> = ErrType(
 
 /** Output of a subprocess execution. */
 export interface CommandResult {
+  /** Process exit code (0 typically means success). */
   readonly exitCode: number;
+  /** Captured standard output text. */
   readonly stdout: string;
+  /** Captured standard error text. */
   readonly stderr: string;
 }
 
@@ -40,15 +43,21 @@ export interface CommandResult {
 
 /** Options for subprocess execution. */
 export interface CommandOptions {
+  /** Working directory for the subprocess. */
   readonly cwd?: string | undefined;
+  /** Environment variables to set. */
   readonly env?: Record<string, string> | undefined;
+  /** Timeout in milliseconds. */
   readonly timeout?: number | undefined;
+  /** String piped to subprocess stdin. */
   readonly stdin?: string | undefined;
 }
 
 /** Options for spawning a background process. */
 export interface SpawnOptions {
+  /** Working directory for the subprocess. */
   readonly cwd?: string | undefined;
+  /** Environment variables to set. */
   readonly env?: Record<string, string> | undefined;
   /** Pipe and collect stdout/stderr (default: inherit parent streams). */
   readonly capture?: boolean | undefined;

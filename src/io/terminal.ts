@@ -37,12 +37,15 @@ export const TerminalError: ErrTypeConstructor<"TerminalError", string> = ErrTyp
 
 /** Options for terminal read operations. */
 export interface TerminalReadOptions {
+  /** Maximum wait time in milliseconds. */
   readonly timeout?: number | undefined;
 }
 
 /** Terminal dimensions in character cells. */
 export interface TerminalSize {
+  /** Number of character columns. */
   readonly columns: number;
+  /** Number of character rows. */
   readonly rows: number;
 }
 

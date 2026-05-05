@@ -26,8 +26,11 @@ export const NetError: ErrTypeConstructor<"NetError", string> = ErrType("NetErro
 
 /** A connected TCP socket with send, receive, and close operations. */
 export interface TcpConnection {
+  /** Send data over the connection. */
   readonly send: (data: string | Uint8Array) => TaskLike<void, ErrType<"NetError">>;
+  /** Receive the next chunk of data. */
   readonly receive: () => TaskLike<Uint8Array, ErrType<"NetError">>;
+  /** Close the connection. */
   readonly close: () => void;
 }
 

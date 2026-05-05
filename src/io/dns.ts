@@ -26,7 +26,9 @@ export const DnsError: ErrTypeConstructor<"DnsError", string> = ErrType("DnsErro
 
 /** A resolved DNS address with IP family. */
 export interface DnsRecord {
+  /** The resolved IP address string. */
   readonly address: string;
+  /** IP version: 4 for IPv4, 6 for IPv6. */
   readonly family: 4 | 6;
 }
 

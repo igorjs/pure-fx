@@ -30,9 +30,13 @@ export const FileError: ErrTypeConstructor<"FileError", string> = ErrType("FileE
 
 /** Metadata returned by File.stat. */
 export interface FileStat {
+  /** True if the path is a regular file. */
   readonly isFile: boolean;
+  /** True if the path is a directory. */
   readonly isDirectory: boolean;
+  /** File size in bytes. */
   readonly size: number;
+  /** Last modification time, if available. */
   readonly mtime: Date | undefined;
 }
 

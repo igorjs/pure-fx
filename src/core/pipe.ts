@@ -91,6 +91,7 @@ export function pipe<A, B, C, D, E, F, G, H, I>(
   gh: (g: G) => H,
   hi: (h: H) => I,
 ): I;
+/** Runtime implementation for all pipe overloads. */
 export function pipe(initial: unknown, ...fns: ((arg: unknown) => unknown)[]): unknown {
   let result = initial;
   // biome-ignore lint/style/useForOf: hot-path, indexed loop avoids iterator allocation
@@ -140,6 +141,7 @@ export function flow<A, B, C, D, E, F, G>(
   ef: (e: E) => F,
   fg: (f: F) => G,
 ): (a: A) => G;
+/** Runtime implementation for all flow overloads. */
 export function flow(...fns: ((arg: unknown) => unknown)[]): (a: unknown) => unknown {
   return initial => {
     let result = initial;

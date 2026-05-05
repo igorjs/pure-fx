@@ -21,21 +21,35 @@ import type { ServerBuilder } from "../../server.js";
 
 /** API Gateway HTTP API v2 / Lambda Function URL event shape. */
 export interface LambdaEvent {
+  /** The URL path without query string. */
   readonly rawPath: string;
+  /** The raw query string (without leading ?). */
   readonly rawQueryString: string;
+  /** HTTP headers as key-value pairs. */
   readonly headers: Readonly<Record<string, string | undefined>>;
+  /** API Gateway request context metadata. */
   readonly requestContext: {
-    readonly http: { readonly method: string };
+    /** HTTP-specific request metadata. */
+    readonly http: {
+      /** HTTP request method. */
+      readonly method: string;
+    };
   };
+  /** Request body, possibly base64-encoded. */
   readonly body?: string | undefined;
+  /** Whether the body is base64-encoded. */
   readonly isBase64Encoded?: boolean | undefined;
 }
 
 /** Buffered Lambda response shape. */
 export interface LambdaResult {
+  /** HTTP status code. */
   readonly statusCode: number;
+  /** Response headers as key-value pairs. */
   readonly headers: Readonly<Record<string, string>>;
+  /** Response body string (plain or base64). */
   readonly body: string;
+  /** Whether the body is base64-encoded. */
   readonly isBase64Encoded: boolean;
 }
 

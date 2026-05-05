@@ -42,15 +42,23 @@ type KeyUsage =
   | "wrapKey"
   | "unwrapKey";
 
+/** Structural descriptor for a Web Crypto key. */
 export interface CryptoKeyDescriptor {
+  /** Key type (e.g. "public", "private", "secret"). */
   readonly type: string;
+  /** Whether the key material can be exported. */
   readonly extractable: boolean;
+  /** Algorithm parameters associated with the key. */
   readonly algorithm: Record<string, unknown>;
+  /** Permitted operations for this key. */
   readonly usages: readonly string[];
 }
 
+/** Structural descriptor for an asymmetric key pair. */
 export interface CryptoKeyPairDescriptor {
+  /** The public key of the pair. */
   readonly publicKey: CryptoKeyDescriptor;
+  /** The private key of the pair. */
   readonly privateKey: CryptoKeyDescriptor;
 }
 
