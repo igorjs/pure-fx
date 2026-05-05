@@ -140,6 +140,25 @@ import { Task, Stream } from '@igorjs/pure-fx/async'
 import { File, Command, FFI } from '@igorjs/pure-fx/io'
 ```
 
+## How It Compares
+
+| | Pure FX | Effect | fp-ts / Effect-ts |
+|---|---------|--------|-------------------|
+| **Philosophy** | Thin, opt-in primitives | Comprehensive runtime with fibers, layers, services | Category-theory encodings (HKT, typeclasses) |
+| **Dependencies** | Zero | ~10 internal packages | Several (`fp-ts` ecosystem) |
+| **Learning curve** | Familiar JS idioms (`Result`, `Option`, `pipe`) | Steep: generators, layers, services, scopes | Steep: HKT, Kind, typeclass instances |
+| **Bundle size** | Small, tree-shakeable subpaths | Large (full runtime) | Medium |
+| **Error handling** | `Result<T, E>` and `Task<T, E>` | Typed errors via `Effect<A, E, R>` | `Either<E, A>`, `TaskEither` |
+| **Async** | `Task` (lazy Promise wrapper) | Fiber-based with structured concurrency | `TaskEither`, `ReaderTaskEither` |
+| **Runtime support** | Node, Deno, Bun, Workers, Browser | Node (primary), limited Deno/Bun | Node (primary) |
+| **IO** | Built-in File, Command, Server, Crypto, FFI | Via services and layers | BYO (no IO primitives) |
+
+**Choose Pure FX when** you want typed errors and immutable data without adopting a framework. It adds `Result`, `Task`, `Schema`, and IO adapters on top of plain TypeScript: no generators, no layers, no HKT. If your code already uses `pipe` and explicit error returns, Pure FX fits in without reshaping your architecture.
+
+**Choose Effect when** you need structured concurrency, dependency injection via layers, or a full application runtime with fibers, scopes, and managed services.
+
+**Choose fp-ts when** you want strict category-theory abstractions and are comfortable with HKT-based typeclass hierarchies.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and how to submit changes.

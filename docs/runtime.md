@@ -10,19 +10,19 @@ Production-grade HTTP server with typed routing, middleware, and runtime adapter
 import { Server, json, text, html } from '@igorjs/pure-fx'
 import { nodeAdapter } from '@igorjs/pure-fx/runtime/adapter/node'
 
-const app = Server.create()
+const app = Server('api')
   .get('/health', () => json({ status: 'ok' }))
   .get('/users/:id', ctx => {
     const { id } = ctx.params; // typed from route pattern
     return json({ id });
   })
   .post('/users', async ctx => {
-    const body = await ctx.body.json();
+    const body = await ctx.req.json();
     return json(body, { status: 201 });
   });
 
 // Start with runtime adapter
-await app.listen(nodeAdapter, { port: 3000 });
+await app.listen({ port: 3000 }, nodeAdapter);
 ```
 
 Adapters: `nodeAdapter`, `denoAdapter`, `bunAdapter`, `lambdaAdapter`
