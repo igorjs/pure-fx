@@ -2,12 +2,11 @@
  * async-new.test.js - Tests for new async modules: Stream, Retry, CircuitBreaker,
  * Semaphore, Mutex, RateLimiter, Cache, Channel, Env, EventEmitter.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output, not the source.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
   Stream,
@@ -52,42 +51,42 @@ describe("Stream", () => {
   describe("Stream.of", () => {
     it("creates a stream from values and collect returns Ok array", async () => {
       const result = await Stream.of(1, 2, 3).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3]);
     });
 
     it("handles a single value", async () => {
       const result = await Stream.of(42).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [42]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([42]);
     });
 
     it("handles no values (empty variadic)", async () => {
       const result = await Stream.of().collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
   describe("Stream.fromArray", () => {
     it("creates a stream from an array", async () => {
       const result = await Stream.fromArray([10, 20, 30]).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [10, 20, 30]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([10, 20, 30]);
     });
 
     it("handles empty array", async () => {
       const result = await Stream.fromArray([]).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
   describe("Stream.empty", () => {
     it("collect returns Ok([])", async () => {
       const result = await Stream.empty().collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
@@ -96,16 +95,16 @@ describe("Stream", () => {
       const result = await Stream.unfold(0, n => (n < 5 ? Some([n, n + 1]) : None))
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [0, 1, 2, 3, 4]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([0, 1, 2, 3, 4]);
     });
 
     it("produces empty stream when seed immediately returns None", async () => {
       const result = await Stream.unfold(0, () => None)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
@@ -115,8 +114,8 @@ describe("Stream", () => {
         .map(n => n * 10)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [10, 20, 30]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([10, 20, 30]);
     });
   });
 
@@ -126,8 +125,8 @@ describe("Stream", () => {
         .filter(n => n % 2 === 0)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [2, 4]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([2, 4]);
     });
 
     it("returns empty when nothing matches", async () => {
@@ -135,48 +134,48 @@ describe("Stream", () => {
         .filter(n => n % 2 === 0)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
   describe(".take", () => {
     it("limits count to n values", async () => {
       const result = await Stream.of(1, 2, 3, 4, 5).take(3).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3]);
     });
 
     it("returns all values when n exceeds stream length", async () => {
       const result = await Stream.of(1, 2).take(10).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2]);
     });
 
     it("returns empty when taking 0", async () => {
       const result = await Stream.of(1, 2, 3).take(0).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
   describe(".drop", () => {
     it("skips first n values", async () => {
       const result = await Stream.of(1, 2, 3, 4, 5).drop(2).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [3, 4, 5]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([3, 4, 5]);
     });
 
     it("returns empty when dropping more than available", async () => {
       const result = await Stream.of(1, 2).drop(10).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
 
     it("returns all when dropping 0", async () => {
       const result = await Stream.of(1, 2, 3).drop(0).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3]);
     });
   });
 
@@ -186,8 +185,8 @@ describe("Stream", () => {
         .takeWhile(n => n < 4)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3]);
     });
 
     it("returns all when predicate never fails", async () => {
@@ -195,8 +194,8 @@ describe("Stream", () => {
         .takeWhile(() => true)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3]);
     });
 
     it("returns empty when predicate fails immediately", async () => {
@@ -204,16 +203,16 @@ describe("Stream", () => {
         .takeWhile(() => false)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
   describe(".chunk", () => {
     it("groups into fixed-size chunks", async () => {
       const result = await Stream.of(1, 2, 3, 4, 5, 6).chunk(2).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([
         [1, 2],
         [3, 4],
         [5, 6],
@@ -222,8 +221,8 @@ describe("Stream", () => {
 
     it("handles remainder when stream length is not divisible by chunk size", async () => {
       const result = await Stream.of(1, 2, 3, 4, 5).chunk(3).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([
         [1, 2, 3],
         [4, 5],
       ]);
@@ -231,8 +230,8 @@ describe("Stream", () => {
 
     it("handles chunk size larger than stream", async () => {
       const result = await Stream.of(1, 2).chunk(10).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [[1, 2]]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([[1, 2]]);
     });
   });
 
@@ -243,9 +242,9 @@ describe("Stream", () => {
         .tap(v => tapped.push(v))
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3]);
-      assert.deepEqual(tapped, [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3]);
+      expect(tapped).toEqual([1, 2, 3]);
     });
   });
 
@@ -259,8 +258,8 @@ describe("Stream", () => {
         .mapErr(e => `wrapped: ${e}`)
         .collect()
         .run();
-      assert.equal(result.isErr, true);
-      assert.equal(result.unwrapErr(), "wrapped: oops");
+      expect(result.isErr).toBe(true);
+      expect(result.unwrapErr()).toBe("wrapped: oops");
     });
   });
 
@@ -270,8 +269,8 @@ describe("Stream", () => {
         .flatMap(n => Stream.of(n, n * 10))
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 10, 2, 20, 3, 30]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 10, 2, 20, 3, 30]);
     });
 
     it("handles empty inner streams", async () => {
@@ -279,8 +278,8 @@ describe("Stream", () => {
         .flatMap(() => Stream.empty())
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
   });
 
@@ -289,14 +288,14 @@ describe("Stream", () => {
       const a = Stream.of(1, 2);
       const b = Stream.of(3, 4);
       const result = await a.concat(b).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2, 3, 4]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2, 3, 4]);
     });
 
     it("concatenates with empty stream", async () => {
       const result = await Stream.of(1, 2).concat(Stream.empty()).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 2]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 2]);
     });
   });
 
@@ -306,8 +305,8 @@ describe("Stream", () => {
         .zip(Stream.of("a", "b", "c"))
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([
         [1, "a"],
         [2, "b"],
         [3, "c"],
@@ -319,8 +318,8 @@ describe("Stream", () => {
         .zip(Stream.of("a", "b", "c"))
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([
         [1, "a"],
         [2, "b"],
       ]);
@@ -328,16 +327,16 @@ describe("Stream", () => {
 
     it("stops at shorter stream (right shorter)", async () => {
       const result = await Stream.of(1, 2, 3).zip(Stream.of("a")).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [[1, "a"]]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([[1, "a"]]);
     });
   });
 
   describe(".window", () => {
     it("produces sliding windows with correct overlap", async () => {
       const result = await Stream.of(1, 2, 3, 4, 5).window(3).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([
         [1, 2, 3],
         [2, 3, 4],
         [3, 4, 5],
@@ -346,14 +345,14 @@ describe("Stream", () => {
 
     it("returns empty when stream is shorter than window size", async () => {
       const result = await Stream.of(1, 2).window(5).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), []);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([]);
     });
 
     it("window of 1 returns each element individually", async () => {
       const result = await Stream.of(1, 2, 3).window(1).collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [[1], [2], [3]]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([[1], [2], [3]]);
     });
   });
 
@@ -363,8 +362,8 @@ describe("Stream", () => {
         .scan((acc, v) => acc + v, 0)
         .collect()
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), [1, 3, 6, 10]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual([1, 3, 6, 10]);
     });
   });
 
@@ -378,13 +377,13 @@ describe("Stream", () => {
       )
         .groupBy(item => item.type)
         .run();
-      assert.equal(result.isOk, true);
+      expect(result.isOk).toBe(true);
       const groups = result.unwrap();
-      assert.deepEqual(groups.fruit, [
+      expect(groups.fruit).toEqual([
         { type: "fruit", name: "apple" },
         { type: "fruit", name: "banana" },
       ]);
-      assert.deepEqual(groups.veggie, [
+      expect(groups.veggie).toEqual([
         { type: "veggie", name: "carrot" },
         { type: "veggie", name: "pea" },
       ]);
@@ -394,8 +393,8 @@ describe("Stream", () => {
   describe(".collect", () => {
     it("gathers all values into array", async () => {
       const result = await Stream.of("a", "b", "c").collect().run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), ["a", "b", "c"]);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual(["a", "b", "c"]);
     });
 
     it("short-circuits on error", async () => {
@@ -405,8 +404,8 @@ describe("Stream", () => {
         yield Ok(3);
       });
       const result = await s.collect().run();
-      assert.equal(result.isErr, true);
-      assert.equal(result.unwrapErr(), "fail");
+      expect(result.isErr).toBe(true);
+      expect(result.unwrapErr()).toBe("fail");
     });
   });
 
@@ -418,8 +417,8 @@ describe("Stream", () => {
           values.push(v);
         })
         .run();
-      assert.equal(result.isOk, true);
-      assert.deepEqual(values, [1, 2, 3]);
+      expect(result.isOk).toBe(true);
+      expect(values).toEqual([1, 2, 3]);
     });
 
     it("short-circuits on error", async () => {
@@ -434,8 +433,8 @@ describe("Stream", () => {
           values.push(v);
         })
         .run();
-      assert.equal(result.isErr, true);
-      assert.deepEqual(values, [1]);
+      expect(result.isErr).toBe(true);
+      expect(values).toEqual([1]);
     });
   });
 
@@ -444,33 +443,33 @@ describe("Stream", () => {
       const result = await Stream.of(1, 2, 3, 4)
         .reduce((acc, v) => acc + v, 0)
         .run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), 10);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe(10);
     });
 
     it("returns init for empty stream", async () => {
       const result = await Stream.empty()
         .reduce((acc, v) => acc + v, 42)
         .run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), 42);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe(42);
     });
   });
 
   describe(".first", () => {
     it("returns Some(first element) for non-empty stream", async () => {
       const result = await Stream.of(10, 20, 30).first().run();
-      assert.equal(result.isOk, true);
+      expect(result.isOk).toBe(true);
       const opt = result.unwrap();
-      assert.equal(opt.isSome, true);
-      assert.equal(opt.unwrap(), 10);
+      expect(opt.isSome).toBe(true);
+      expect(opt.unwrap()).toBe(10);
     });
 
     it("returns None for empty stream", async () => {
       const result = await Stream.empty().first().run();
-      assert.equal(result.isOk, true);
+      expect(result.isOk).toBe(true);
       const opt = result.unwrap();
-      assert.equal(opt.isNone, true);
+      expect(opt.isNone).toBe(true);
     });
   });
 });
@@ -488,33 +487,33 @@ describe("Retry", () => {
         .jitter()
         .build();
 
-      assert.equal(policy.maxAttempts, 5);
-      assert.equal(policy.backoff, "exponential");
-      assert.equal(policy.jitter, true);
+      expect(policy.maxAttempts).toBe(5);
+      expect(policy.backoff).toBe("exponential");
+      expect(policy.jitter).toBe(true);
     });
 
     it("defaults to 3 maxAttempts, fixed backoff, no jitter", () => {
       const policy = Retry.policy().build();
-      assert.equal(policy.maxAttempts, 3);
-      assert.equal(policy.backoff, "fixed");
-      assert.equal(policy.jitter, false);
+      expect(policy.maxAttempts).toBe(3);
+      expect(policy.backoff).toBe("fixed");
+      expect(policy.jitter).toBe(false);
     });
   });
 
   describe("Retry.fixed", () => {
     it("creates a fixed policy with specified attempts and delay", () => {
       const policy = Retry.fixed(4, Duration.milliseconds(50));
-      assert.equal(policy.maxAttempts, 4);
-      assert.equal(policy.backoff, "fixed");
-      assert.equal(policy.jitter, false);
+      expect(policy.maxAttempts).toBe(4);
+      expect(policy.backoff).toBe("fixed");
+      expect(policy.jitter).toBe(false);
     });
   });
 
   describe("Retry.exponential", () => {
     it("creates an exponential policy", () => {
       const policy = Retry.exponential(3, Duration.milliseconds(10));
-      assert.equal(policy.maxAttempts, 3);
-      assert.equal(policy.backoff, "exponential");
+      expect(policy.maxAttempts).toBe(3);
+      expect(policy.backoff).toBe("exponential");
     });
   });
 
@@ -529,9 +528,9 @@ describe("Retry", () => {
 
       const policy = Retry.fixed(5, Duration.milliseconds(1));
       const result = await Retry.apply(policy, flaky).run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "done");
-      assert.equal(attempts, 3);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("done");
+      expect(attempts).toBe(3);
     });
 
     it("stops after maxAttempts and returns last error", async () => {
@@ -543,9 +542,9 @@ describe("Retry", () => {
 
       const policy = Retry.fixed(3, Duration.milliseconds(1));
       const result = await Retry.apply(policy, failing).run();
-      assert.equal(result.isErr, true);
-      assert.equal(result.unwrapErr(), "fail-3");
-      assert.equal(attempts, 3);
+      expect(result.isErr).toBe(true);
+      expect(result.unwrapErr()).toBe("fail-3");
+      expect(attempts).toBe(3);
     });
 
     it("does not retry when first attempt succeeds", async () => {
@@ -557,8 +556,8 @@ describe("Retry", () => {
 
       const policy = Retry.fixed(5, Duration.milliseconds(1));
       const result = await Retry.apply(policy, ok).run();
-      assert.equal(result.isOk, true);
-      assert.equal(attempts, 1);
+      expect(result.isOk).toBe(true);
+      expect(attempts).toBe(1);
     });
   });
 
@@ -574,9 +573,9 @@ describe("Retry", () => {
       const policy = Retry.fixed(3, Duration.milliseconds(1));
       const withRetry = Retry.withPolicy(policy);
       const result = await withRetry(flaky).run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "ok");
-      assert.equal(attempts, 2);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("ok");
+      expect(attempts).toBe(2);
     });
   });
 });
@@ -592,7 +591,7 @@ describe("CircuitBreaker", () => {
       successThreshold: 1,
       timeout: Duration.milliseconds(50),
     });
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
   });
 
   it("transitions to open after failureThreshold failures", async () => {
@@ -605,10 +604,10 @@ describe("CircuitBreaker", () => {
     const failing = mkTask(async () => Err("fail"));
 
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
 
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
   });
 
   it("rejects requests when open with CircuitOpen error", async () => {
@@ -620,13 +619,13 @@ describe("CircuitBreaker", () => {
 
     const failing = mkTask(async () => Err("fail"));
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
 
     const succeeding = mkTask(async () => Ok("should not run"));
     const result = await cb.protect(succeeding).run();
-    assert.equal(result.isErr, true);
-    assert.equal(CircuitOpen.is(result.unwrapErr()), true);
-    assert.equal(result.unwrapErr().tag, "CircuitOpen");
+    expect(result.isErr).toBe(true);
+    expect(CircuitOpen.is(result.unwrapErr())).toBe(true);
+    expect(result.unwrapErr().tag).toBe("CircuitOpen");
   });
 
   it("transitions to half-open after timeout", async () => {
@@ -638,10 +637,10 @@ describe("CircuitBreaker", () => {
 
     const failing = mkTask(async () => Err("fail"));
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
 
     await sleep(50);
-    assert.equal(cb.state(), "half-open");
+    expect(cb.state()).toBe("half-open");
   });
 
   it("closes after successThreshold successes in half-open", async () => {
@@ -653,7 +652,7 @@ describe("CircuitBreaker", () => {
 
     const failing = mkTask(async () => Err("fail"));
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
 
     await sleep(50);
     // Now half-open: two successes needed
@@ -662,7 +661,7 @@ describe("CircuitBreaker", () => {
     // After one success, still half-open (need 2)
     // state() itself also checks for transition, but internal state tracks successCount
     await cb.protect(succeeding).run();
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
   });
 
   it("reopens on failure in half-open", async () => {
@@ -674,14 +673,14 @@ describe("CircuitBreaker", () => {
 
     const failing = mkTask(async () => Err("fail"));
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
 
     await sleep(50);
-    assert.equal(cb.state(), "half-open");
+    expect(cb.state()).toBe("half-open");
 
     // Fail in half-open -> reopens
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
   });
 
   it(".reset() returns to closed", async () => {
@@ -693,16 +692,16 @@ describe("CircuitBreaker", () => {
 
     const failing = mkTask(async () => Err("fail"));
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
 
     cb.reset();
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
 
     // After reset, requests pass through again
     const succeeding = mkTask(async () => Ok("ok"));
     const result = await cb.protect(succeeding).run();
-    assert.equal(result.isOk, true);
-    assert.equal(result.unwrap(), "ok");
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toBe("ok");
   });
 
   it(".state() reflects current state accurately", async () => {
@@ -712,21 +711,21 @@ describe("CircuitBreaker", () => {
       timeout: Duration.milliseconds(30),
     });
 
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
 
     const failing = mkTask(async () => Err("fail"));
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
 
     await cb.protect(failing).run();
-    assert.equal(cb.state(), "open");
+    expect(cb.state()).toBe("open");
 
     await sleep(50);
-    assert.equal(cb.state(), "half-open");
+    expect(cb.state()).toBe("half-open");
 
     const succeeding = mkTask(async () => Ok("ok"));
     await cb.protect(succeeding).run();
-    assert.equal(cb.state(), "closed");
+    expect(cb.state()).toBe("closed");
   });
 });
 
@@ -737,18 +736,18 @@ describe("CircuitBreaker", () => {
 describe("Semaphore", () => {
   it("allows n concurrent tasks", async () => {
     const sem = Semaphore.create(2);
-    assert.equal(sem.available(), 2);
-    assert.equal(sem.pending(), 0);
+    expect(sem.available()).toBe(2);
+    expect(sem.pending()).toBe(0);
 
     const r1 = await sem.acquire();
-    assert.equal(sem.available(), 1);
+    expect(sem.available()).toBe(1);
     const r2 = await sem.acquire();
-    assert.equal(sem.available(), 0);
+    expect(sem.available()).toBe(0);
 
     r1();
-    assert.equal(sem.available(), 1);
+    expect(sem.available()).toBe(1);
     r2();
-    assert.equal(sem.available(), 2);
+    expect(sem.available()).toBe(2);
   });
 
   it("blocks the n+1th acquire until a permit is released", async () => {
@@ -766,14 +765,14 @@ describe("Semaphore", () => {
 
     // Let microtasks settle
     await sleep(5);
-    assert.equal(order.length, 1);
-    assert.equal(sem.pending(), 1);
+    expect(order.length).toBe(1);
+    expect(sem.pending()).toBe(1);
 
     // Release first permit
     r1();
     const r2 = await p2;
-    assert.equal(order.length, 2);
-    assert.deepEqual(order, ["acquired-1", "acquired-2"]);
+    expect(order.length).toBe(2);
+    expect(order).toEqual(["acquired-1", "acquired-2"]);
     r2();
   });
 
@@ -796,41 +795,41 @@ describe("Semaphore", () => {
       );
 
       await Promise.all(tasks.map(t => t.run()));
-      assert.equal(maxRunning, 1);
-      assert.equal(sem.available(), 1);
+      expect(maxRunning).toBe(1);
+      expect(sem.available()).toBe(1);
     });
 
     it("releases permit even when task returns Err", async () => {
       const sem = Semaphore.create(1);
       const failing = sem.wrap(mkTask(async () => Err("boom")));
       const result = await failing.run();
-      assert.equal(result.isErr, true);
-      assert.equal(sem.available(), 1);
+      expect(result.isErr).toBe(true);
+      expect(sem.available()).toBe(1);
     });
   });
 
   it(".available() and .pending() reflect state", async () => {
     const sem = Semaphore.create(2);
-    assert.equal(sem.available(), 2);
-    assert.equal(sem.pending(), 0);
+    expect(sem.available()).toBe(2);
+    expect(sem.pending()).toBe(0);
 
     const r1 = await sem.acquire();
-    assert.equal(sem.available(), 1);
-    assert.equal(sem.pending(), 0);
+    expect(sem.available()).toBe(1);
+    expect(sem.pending()).toBe(0);
 
     const r2 = await sem.acquire();
-    assert.equal(sem.available(), 0);
-    assert.equal(sem.pending(), 0);
+    expect(sem.available()).toBe(0);
+    expect(sem.pending()).toBe(0);
 
     // Third acquire will pend
     const p3 = sem.acquire();
     // Let event loop tick
     await sleep(1);
-    assert.equal(sem.pending(), 1);
+    expect(sem.pending()).toBe(1);
 
     r1();
     await p3;
-    assert.equal(sem.pending(), 0);
+    expect(sem.pending()).toBe(0);
     r2();
   });
 });
@@ -838,24 +837,24 @@ describe("Semaphore", () => {
 describe("Mutex", () => {
   it("only allows 1 concurrent task", async () => {
     const mutex = Mutex.create();
-    assert.equal(mutex.isLocked(), false);
+    expect(mutex.isLocked()).toBe(false);
 
     const r1 = await mutex.acquire();
-    assert.equal(mutex.isLocked(), true);
+    expect(mutex.isLocked()).toBe(true);
 
     r1();
-    assert.equal(mutex.isLocked(), false);
+    expect(mutex.isLocked()).toBe(false);
   });
 
   it(".isLocked() reflects state correctly", async () => {
     const mutex = Mutex.create();
-    assert.equal(mutex.isLocked(), false);
+    expect(mutex.isLocked()).toBe(false);
 
     const release = await mutex.acquire();
-    assert.equal(mutex.isLocked(), true);
+    expect(mutex.isLocked()).toBe(true);
 
     release();
-    assert.equal(mutex.isLocked(), false);
+    expect(mutex.isLocked()).toBe(false);
   });
 
   it(".wrap ensures mutual exclusion", async () => {
@@ -876,8 +875,8 @@ describe("Mutex", () => {
     );
 
     await Promise.all(tasks.map(t => t.run()));
-    assert.equal(maxRunning, 1);
-    assert.equal(mutex.isLocked(), false);
+    expect(maxRunning).toBe(1);
+    expect(mutex.isLocked()).toBe(false);
   });
 });
 
@@ -894,9 +893,9 @@ describe("RateLimiter", () => {
         refillInterval: Duration.seconds(10),
       });
 
-      assert.equal(limiter.tryAcquire(), true);
-      assert.equal(limiter.tryAcquire(), true);
-      assert.equal(limiter.tryAcquire(), true);
+      expect(limiter.tryAcquire()).toBe(true);
+      expect(limiter.tryAcquire()).toBe(true);
+      expect(limiter.tryAcquire()).toBe(true);
     });
 
     it("fails when tokens are exhausted", () => {
@@ -908,7 +907,7 @@ describe("RateLimiter", () => {
 
       limiter.tryAcquire();
       limiter.tryAcquire();
-      assert.equal(limiter.tryAcquire(), false);
+      expect(limiter.tryAcquire()).toBe(false);
     });
   });
 
@@ -922,11 +921,11 @@ describe("RateLimiter", () => {
     // Exhaust tokens
     limiter.tryAcquire();
     limiter.tryAcquire();
-    assert.equal(limiter.tryAcquire(), false);
+    expect(limiter.tryAcquire()).toBe(false);
 
     // Wait for refill
     await sleep(50);
-    assert.equal(limiter.tryAcquire(), true);
+    expect(limiter.tryAcquire()).toBe(true);
   });
 
   describe(".wrap", () => {
@@ -939,8 +938,8 @@ describe("RateLimiter", () => {
 
       const task = mkTask(async () => Ok("ok"));
       const result = await limiter.wrap(task).run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "ok");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("ok");
     });
 
     it("returns RateLimited error when tokens exhausted", async () => {
@@ -956,9 +955,9 @@ describe("RateLimiter", () => {
 
       // Second call should be rate limited
       const result = await limiter.wrap(task).run();
-      assert.equal(result.isErr, true);
-      assert.equal(RateLimited.is(result.unwrapErr()), true);
-      assert.equal(result.unwrapErr().tag, "RateLimited");
+      expect(result.isErr).toBe(true);
+      expect(RateLimited.is(result.unwrapErr())).toBe(true);
+      expect(result.unwrapErr().tag).toBe("RateLimited");
     });
   });
 
@@ -972,10 +971,10 @@ describe("RateLimiter", () => {
     limiter.tryAcquire();
     limiter.tryAcquire();
     limiter.tryAcquire();
-    assert.equal(limiter.tokens(), 0);
+    expect(limiter.tokens()).toBe(0);
 
     limiter.reset();
-    assert.equal(limiter.tokens(), 3);
+    expect(limiter.tokens()).toBe(3);
   });
 });
 
@@ -989,14 +988,14 @@ describe("Cache", () => {
       const cache = Cache.create({ ttl: Duration.seconds(10) });
       cache.set("key", "value");
       const result = cache.get("key");
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), "value");
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe("value");
     });
 
     it("returns None for missing keys", () => {
       const cache = Cache.create({ ttl: Duration.seconds(10) });
       const result = cache.get("missing");
-      assert.equal(result.isNone, true);
+      expect(result.isNone).toBe(true);
     });
   });
 
@@ -1005,10 +1004,10 @@ describe("Cache", () => {
       const cache = Cache.create({ ttl: Duration.milliseconds(30) });
       cache.set("key", "value");
 
-      assert.equal(cache.get("key").isSome, true);
+      expect(cache.get("key").isSome).toBe(true);
 
       await sleep(50);
-      assert.equal(cache.get("key").isNone, true);
+      expect(cache.get("key").isNone).toBe(true);
     });
   });
 
@@ -1023,9 +1022,9 @@ describe("Cache", () => {
       cache.set("b", 2);
       cache.set("c", 3); // This should evict "a"
 
-      assert.equal(cache.get("a").isNone, true);
-      assert.equal(cache.get("b").isSome, true);
-      assert.equal(cache.get("c").isSome, true);
+      expect(cache.get("a").isNone).toBe(true);
+      expect(cache.get("b").isSome).toBe(true);
+      expect(cache.get("c").isSome).toBe(true);
     });
 
     it("accessing a key moves it to most-recent (avoids eviction)", () => {
@@ -1043,9 +1042,9 @@ describe("Cache", () => {
       // Insert "c": should evict "b" (least recently used), not "a"
       cache.set("c", 3);
 
-      assert.equal(cache.get("a").isSome, true);
-      assert.equal(cache.get("b").isNone, true);
-      assert.equal(cache.get("c").isSome, true);
+      expect(cache.get("a").isSome).toBe(true);
+      expect(cache.get("b").isNone).toBe(true);
+      expect(cache.get("c").isSome).toBe(true);
     });
   });
 
@@ -1053,19 +1052,19 @@ describe("Cache", () => {
     it("returns true for present keys", () => {
       const cache = Cache.create({ ttl: Duration.seconds(10) });
       cache.set("key", "value");
-      assert.equal(cache.has("key"), true);
+      expect(cache.has("key")).toBe(true);
     });
 
     it("returns false for missing keys", () => {
       const cache = Cache.create({ ttl: Duration.seconds(10) });
-      assert.equal(cache.has("missing"), false);
+      expect(cache.has("missing")).toBe(false);
     });
 
     it("returns false for expired keys", async () => {
       const cache = Cache.create({ ttl: Duration.milliseconds(30) });
       cache.set("key", "value");
       await sleep(50);
-      assert.equal(cache.has("key"), false);
+      expect(cache.has("key")).toBe(false);
     });
   });
 
@@ -1073,13 +1072,13 @@ describe("Cache", () => {
     it("removes an entry", () => {
       const cache = Cache.create({ ttl: Duration.seconds(10) });
       cache.set("key", "value");
-      assert.equal(cache.delete("key"), true);
-      assert.equal(cache.get("key").isNone, true);
+      expect(cache.delete("key")).toBe(true);
+      expect(cache.get("key").isNone).toBe(true);
     });
 
     it("returns false when deleting non-existent key", () => {
       const cache = Cache.create({ ttl: Duration.seconds(10) });
-      assert.equal(cache.delete("missing"), false);
+      expect(cache.delete("missing")).toBe(false);
     });
   });
 
@@ -1089,8 +1088,8 @@ describe("Cache", () => {
       cache.set("a", 1);
       cache.set("b", 2);
       cache.clear();
-      assert.equal(cache.size(), 0);
-      assert.equal(cache.get("a").isNone, true);
+      expect(cache.size()).toBe(0);
+      expect(cache.get("a").isNone).toBe(true);
     });
   });
 
@@ -1099,10 +1098,10 @@ describe("Cache", () => {
       const cache = Cache.create({ ttl: Duration.milliseconds(30) });
       cache.set("a", 1);
       cache.set("b", 2);
-      assert.equal(cache.size(), 2);
+      expect(cache.size()).toBe(2);
 
       await sleep(50);
-      assert.equal(cache.size(), 0);
+      expect(cache.size()).toBe(0);
     });
   });
 
@@ -1118,9 +1117,9 @@ describe("Cache", () => {
       });
 
       const result = await cache.getOrElse("key", task).run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "cached");
-      assert.equal(taskRan, false);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("cached");
+      expect(taskRan).toBe(false);
     });
 
     it("runs task on miss and caches the result", async () => {
@@ -1128,11 +1127,11 @@ describe("Cache", () => {
 
       const task = mkTask(async () => Ok("computed"));
       const result = await cache.getOrElse("key", task).run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "computed");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("computed");
 
       // Value should now be cached
-      assert.equal(cache.get("key").unwrap(), "computed");
+      expect(cache.get("key").unwrap()).toBe("computed");
     });
 
     it("does not cache on task error", async () => {
@@ -1140,8 +1139,8 @@ describe("Cache", () => {
 
       const task = mkTask(async () => Err("fail"));
       const result = await cache.getOrElse("key", task).run();
-      assert.equal(result.isErr, true);
-      assert.equal(cache.has("key"), false);
+      expect(result.isErr).toBe(true);
+      expect(cache.has("key")).toBe(false);
     });
   });
 
@@ -1151,10 +1150,10 @@ describe("Cache", () => {
 
       // Set with a short custom TTL
       cache.setWithTTL("short", "value", Duration.milliseconds(30));
-      assert.equal(cache.get("short").isSome, true);
+      expect(cache.get("short").isSome).toBe(true);
 
       await sleep(50);
-      assert.equal(cache.get("short").isNone, true);
+      expect(cache.get("short").isNone).toBe(true);
     });
   });
 });
@@ -1176,7 +1175,7 @@ describe("Channel", () => {
       for await (const v of ch.receive()) {
         received.push(v);
       }
-      assert.deepEqual(received, [1, 2, 3]);
+      expect(received).toEqual([1, 2, 3]);
     });
 
     it("send blocks when buffer is full", async () => {
@@ -1186,7 +1185,7 @@ describe("Channel", () => {
       // First send buffers immediately
       await ch.send(1);
       order.push("sent-1");
-      assert.equal(ch.size(), 1);
+      expect(ch.size()).toBe(1);
 
       // Second send should block until receiver drains
       const sendPromise = ch.send(2).then(ok => {
@@ -1196,15 +1195,15 @@ describe("Channel", () => {
 
       // Let microtasks run, send-2 should still be blocked
       await sleep(5);
-      assert.equal(order.length, 1);
+      expect(order.length).toBe(1);
 
       // Now consume one value to unblock
       const iter = ch.receive()[Symbol.asyncIterator]();
       const first = await iter.next();
-      assert.equal(first.value, 1);
+      expect(first.value).toBe(1);
 
       await sendPromise;
-      assert.equal(order.length, 2);
+      expect(order.length).toBe(2);
 
       // Clean up
       ch.close();
@@ -1216,7 +1215,7 @@ describe("Channel", () => {
       const ch = Channel.bounded(10);
       ch.close();
       const result = await ch.send(42);
-      assert.equal(result, false);
+      expect(result).toBe(false);
     });
 
     it("receivers get done", async () => {
@@ -1228,7 +1227,7 @@ describe("Channel", () => {
       for await (const v of ch.receive()) {
         received.push(v);
       }
-      assert.deepEqual(received, [1]);
+      expect(received).toEqual([1]);
     });
 
     it("waiting receivers resolve done on close", async () => {
@@ -1242,7 +1241,7 @@ describe("Channel", () => {
       ch.close();
 
       const result = await nextPromise;
-      assert.equal(result.done, true);
+      expect(result.done).toBe(true);
     });
   });
 
@@ -1253,7 +1252,7 @@ describe("Channel", () => {
       // Send many values rapidly without blocking
       for (let i = 0; i < 100; i++) {
         const ok = await ch.send(i);
-        assert.equal(ok, true);
+        expect(ok).toBe(true);
       }
 
       ch.close();
@@ -1262,27 +1261,27 @@ describe("Channel", () => {
       for await (const v of ch.receive()) {
         received.push(v);
       }
-      assert.equal(received.length, 100);
-      assert.equal(received[0], 0);
-      assert.equal(received[99], 99);
+      expect(received.length).toBe(100);
+      expect(received[0]).toBe(0);
+      expect(received[99]).toBe(99);
     });
   });
 
   describe(".isClosed / .size", () => {
     it(".isClosed reflects state", () => {
       const ch = Channel.bounded(10);
-      assert.equal(ch.isClosed(), false);
+      expect(ch.isClosed()).toBe(false);
       ch.close();
-      assert.equal(ch.isClosed(), true);
+      expect(ch.isClosed()).toBe(true);
     });
 
     it(".size reflects buffered count", async () => {
       const ch = Channel.bounded(10);
-      assert.equal(ch.size(), 0);
+      expect(ch.size()).toBe(0);
       await ch.send(1);
-      assert.equal(ch.size(), 1);
+      expect(ch.size()).toBe(1);
       await ch.send(2);
-      assert.equal(ch.size(), 2);
+      expect(ch.size()).toBe(2);
     });
   });
 });
@@ -1296,15 +1295,15 @@ describe("Env", () => {
     it("wraps a value and ignores the environment", async () => {
       const env = Env.of(42);
       const result = await env.run({ anything: true });
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), 42);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe(42);
     });
 
     it("works with any environment type", async () => {
       const env = Env.of("hello");
       const result = await env.run(null);
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "hello");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("hello");
     });
   });
 
@@ -1312,8 +1311,8 @@ describe("Env", () => {
     it("returns the environment as the produced value", async () => {
       const env = Env.access();
       const result = await env.run({ db: "postgres", port: 5432 });
-      assert.equal(result.isOk, true);
-      assert.deepEqual(result.unwrap(), { db: "postgres", port: 5432 });
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toEqual({ db: "postgres", port: 5432 });
     });
   });
 
@@ -1321,15 +1320,15 @@ describe("Env", () => {
     it("transforms the produced value", async () => {
       const env = Env.of(10).map(n => n * 3);
       const result = await env.run({});
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), 30);
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe(30);
     });
 
     it("does not transform errors", async () => {
       const env = Env.from(async () => Err("fail")).map(() => "should not run");
       const result = await env.run({});
-      assert.equal(result.isErr, true);
-      assert.equal(result.unwrapErr(), "fail");
+      expect(result.isErr).toBe(true);
+      expect(result.unwrapErr()).toBe("fail");
     });
   });
 
@@ -1341,8 +1340,8 @@ describe("Env", () => {
       const combined = getPort.flatMap(port => getHost.map(host => `${host}:${port}`));
 
       const result = await combined.run({ host: "localhost", port: 8080 });
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "localhost:8080");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("localhost:8080");
     });
 
     it("short-circuits on error", async () => {
@@ -1354,8 +1353,8 @@ describe("Env", () => {
       });
 
       const result = await chained.run({});
-      assert.equal(result.isErr, true);
-      assert.equal(secondRan, false);
+      expect(result.isErr).toBe(true);
+      expect(secondRan).toBe(false);
     });
   });
 
@@ -1368,8 +1367,8 @@ describe("Env", () => {
       const outer = inner.provide(env => ({ db: env.config.database }));
 
       const result = await outer.run({ config: { database: "mydb" } });
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "mydb");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("mydb");
     });
   });
 
@@ -1380,8 +1379,8 @@ describe("Env", () => {
 
       // taskLike has .run() that takes no arguments
       const result = await taskLike.run();
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "Alice");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("Alice");
     });
   });
 
@@ -1393,9 +1392,9 @@ describe("Env", () => {
       });
 
       const result = await env.run({});
-      assert.equal(result.isOk, true);
-      assert.equal(result.unwrap(), "value");
-      assert.equal(sideEffect, "value");
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe("value");
+      expect(sideEffect).toBe("value");
     });
 
     it("does not run side effect on error", async () => {
@@ -1405,8 +1404,8 @@ describe("Env", () => {
       });
 
       const result = await env.run({});
-      assert.equal(result.isErr, true);
-      assert.equal(sideEffect, null);
+      expect(result.isErr).toBe(true);
+      expect(sideEffect).toBe(null);
     });
   });
 });
@@ -1460,8 +1459,8 @@ describe("Stream.debounce", () => {
     }).debounce(50);
 
     const result = await s.collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [3]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([3]);
   });
 
   it("emits multiple values when there are pauses between bursts", async () => {
@@ -1478,37 +1477,37 @@ describe("Stream.debounce", () => {
     }).debounce(30);
 
     const result = await s.collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [2, 4]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([2, 4]);
   });
 
   it("handles empty stream", async () => {
     const result = await Stream.empty().debounce(50).collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("handles single value", async () => {
     const result = await Stream.of(42).debounce(30).collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [42]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([42]);
   });
 });
 
 describe("Stream.throttle", () => {
   it("lets the first value through immediately", async () => {
     const result = await Stream.of(1, 2, 3).throttle(1000).collect().run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     // Only the first value passes because the others arrive within the same ms window
-    assert.ok(result.unwrap().length > 0);
-    assert.equal(result.unwrap()[0], 1);
+    expect(result.unwrap().length > 0).toBe(true);
+    expect(result.unwrap()[0]).toBe(1);
   });
 
   it("drops values within the throttle window", async () => {
     // All values are emitted synchronously, so only the first passes a 100ms throttle
     const result = await Stream.of(1, 2, 3, 4, 5).throttle(100).collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [1]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([1]);
   });
 
   it("emits values that arrive after the window expires", async () => {
@@ -1539,15 +1538,15 @@ describe("Stream.throttle", () => {
     }).throttle(50);
 
     const result = await s.collect().run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     // First value passes, second arrives after 60ms (> 50ms window), third arrives after another 60ms
-    assert.deepEqual(result.unwrap(), [1, 2, 3]);
+    expect(result.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("handles empty stream", async () => {
     const result = await Stream.empty().throttle(100).collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("passes errors through without throttling", async () => {
@@ -1570,33 +1569,33 @@ describe("Stream.throttle", () => {
 
     const result = await s.collect().run();
     // collect() short-circuits on first Err
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 });
 
 describe("Stream.distinctUntilChanged", () => {
   it("removes consecutive duplicates with default equality", async () => {
     const result = await Stream.of(1, 1, 2, 2, 3, 3, 1).distinctUntilChanged().collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [1, 2, 3, 1]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([1, 2, 3, 1]);
   });
 
   it("passes all values when no consecutive duplicates exist", async () => {
     const result = await Stream.of(1, 2, 3, 4).distinctUntilChanged().collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [1, 2, 3, 4]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([1, 2, 3, 4]);
   });
 
   it("handles single-element stream", async () => {
     const result = await Stream.of(42).distinctUntilChanged().collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [42]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([42]);
   });
 
   it("handles empty stream", async () => {
     const result = await Stream.empty().distinctUntilChanged().collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("uses custom equality function", async () => {
@@ -1612,18 +1611,18 @@ describe("Stream.distinctUntilChanged", () => {
       .distinctUntilChanged((a, b) => a.id === b.id)
       .collect()
       .run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     const values = result.unwrap();
-    assert.equal(values.length, 3);
-    assert.equal(values[0].name, "a");
-    assert.equal(values[1].name, "c");
-    assert.equal(values[2].name, "e");
+    expect(values.length).toBe(3);
+    expect(values[0].name).toBe("a");
+    expect(values[1].name).toBe("c");
+    expect(values[2].name).toBe("e");
   });
 
   it("handles all identical values", async () => {
     const result = await Stream.of(5, 5, 5, 5).distinctUntilChanged().collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [5]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([5]);
   });
 });
 
@@ -1632,41 +1631,41 @@ describe("Stream.merge", () => {
     const a = Stream.of(1, 2, 3);
     const b = Stream.of(4, 5, 6);
     const result = await Stream.merge(a, b).collect().run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     const values = result.unwrap();
     // All values should be present (order may vary due to concurrency)
-    assert.equal(values.length, 6);
-    assert.equal(values.includes(1), true);
-    assert.equal(values.includes(2), true);
-    assert.equal(values.includes(3), true);
-    assert.equal(values.includes(4), true);
-    assert.equal(values.includes(5), true);
-    assert.equal(values.includes(6), true);
+    expect(values.length).toBe(6);
+    expect(values.includes(1)).toBe(true);
+    expect(values.includes(2)).toBe(true);
+    expect(values.includes(3)).toBe(true);
+    expect(values.includes(4)).toBe(true);
+    expect(values.includes(5)).toBe(true);
+    expect(values.includes(6)).toBe(true);
   });
 
   it("handles single stream", async () => {
     const result = await Stream.merge(Stream.of(1, 2, 3))
       .collect()
       .run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [1, 2, 3]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("handles empty streams", async () => {
     const result = await Stream.merge(Stream.empty(), Stream.empty()).collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("handles mix of empty and non-empty streams", async () => {
     const result = await Stream.merge(Stream.empty(), Stream.of(1, 2), Stream.empty())
       .collect()
       .run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     const values = result.unwrap();
-    assert.equal(values.length, 2);
-    assert.equal(values.includes(1), true);
-    assert.equal(values.includes(2), true);
+    expect(values.length).toBe(2);
+    expect(values.includes(1)).toBe(true);
+    expect(values.includes(2)).toBe(true);
   });
 
   it("interleaves streams with different speeds", async () => {
@@ -1691,19 +1690,19 @@ describe("Stream.merge", () => {
     });
 
     const result = await Stream.merge(a, b).collect().run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     const values = result.unwrap();
-    assert.equal(values.length, 4);
-    assert.equal(values.includes(1), true);
-    assert.equal(values.includes(2), true);
-    assert.equal(values.includes(10), true);
-    assert.equal(values.includes(20), true);
+    expect(values.length).toBe(4);
+    expect(values.includes(1)).toBe(true);
+    expect(values.includes(2)).toBe(true);
+    expect(values.includes(10)).toBe(true);
+    expect(values.includes(20)).toBe(true);
   });
 
   it("handles zero streams (no arguments)", async () => {
     const result = await Stream.merge().collect().run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 });
 
@@ -1724,66 +1723,66 @@ describe("StateMachine", () => {
   });
 
   it("initial: returns the initial state", () => {
-    assert.equal(machine.initial, "idle");
+    expect(machine.initial).toBe("idle");
   });
 
   it("states: returns frozen array of state names", () => {
-    assert.deepEqual(machine.states, ["idle", "loading", "success", "error"]);
-    assert.throws(() => {
+    expect(machine.states).toEqual(["idle", "loading", "success", "error"]);
+    expect(() => {
       machine.states[0] = "x";
-    }, TypeError);
+    }).toThrow();
   });
 
   it("events: returns valid events for a state", () => {
-    assert.deepEqual(machine.events("idle"), ["FETCH"]);
-    assert.deepEqual(machine.events("loading"), ["RESOLVE", "REJECT"]);
+    expect(machine.events("idle")).toEqual(["FETCH"]);
+    expect(machine.events("loading")).toEqual(["RESOLVE", "REJECT"]);
   });
 
   it("events: returns empty for state with no transitions", () => {
-    assert.deepEqual(machine.events("nonexistent"), []);
+    expect(machine.events("nonexistent")).toEqual([]);
   });
 
   it("transition: valid transition returns [nextState, ctx]", () => {
     const [next, ctx] = machine.transition("idle", undefined, "FETCH");
-    assert.equal(next, "loading");
-    assert.equal(ctx, undefined);
+    expect(next).toBe("loading");
+    expect(ctx).toBe(undefined);
   });
 
   it("transition: chained transitions", () => {
     const [s1] = machine.transition("idle", undefined, "FETCH");
     const [s2] = machine.transition(s1, undefined, "RESOLVE");
-    assert.equal(s2, "success");
+    expect(s2).toBe("success");
   });
 
   it("send: valid transition returns Ok", () => {
     const result = machine.send("idle", undefined, "FETCH");
-    assert.equal(result.isOk, true);
-    assert.equal(result.value[0], "loading");
+    expect(result.isOk).toBe(true);
+    expect(result.value[0]).toBe("loading");
   });
 
   it("send: invalid event returns Err(InvalidTransition)", () => {
     const result = machine.send("idle", undefined, "RESOLVE");
-    assert.equal(result.isErr, true);
-    assert.equal(result.error.tag, "InvalidTransition");
+    expect(result.isErr).toBe(true);
+    expect(result.error.tag).toBe("InvalidTransition");
   });
 
   it("send: invalid state returns Err", () => {
     const result = machine.send("nonexistent", undefined, "FETCH");
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 
   it("canTransition: returns true for valid", () => {
-    assert.equal(machine.canTransition("idle", "FETCH"), true);
+    expect(machine.canTransition("idle", "FETCH")).toBe(true);
   });
 
   it("canTransition: returns false for invalid", () => {
-    assert.equal(machine.canTransition("idle", "RESOLVE"), false);
+    expect(machine.canTransition("idle", "RESOLVE")).toBe(false);
   });
 
   it("machine object is frozen", () => {
-    assert.throws(() => {
+    expect(() => {
       machine.initial = "x";
-    }, TypeError);
+    }).toThrow();
   });
 });
 
@@ -1798,12 +1797,12 @@ describe("StateMachine with guards and actions", () => {
       },
     });
     const blocked = m.send("locked", { hasKey: false }, "UNLOCK");
-    assert.equal(blocked.isErr, true);
-    assert.ok(blocked.error.message.includes("Guard"));
+    expect(blocked.isErr).toBe(true);
+    expect(blocked.error.message.includes("Guard")).toBe(true);
 
     const allowed = m.send("locked", { hasKey: true }, "UNLOCK");
-    assert.equal(allowed.isOk, true);
-    assert.equal(allowed.value[0], "unlocked");
+    expect(allowed.isOk).toBe(true);
+    expect(allowed.value[0]).toBe("unlocked");
   });
 
   it("action transforms context", () => {
@@ -1816,8 +1815,8 @@ describe("StateMachine with guards and actions", () => {
       },
     });
     const result = m.send("idle", { count: 0 }, "START");
-    assert.equal(result.isOk, true);
-    assert.equal(result.value[1].count, 1);
+    expect(result.isOk).toBe(true);
+    expect(result.value[1].count).toBe(1);
   });
 
   it("entry/exit hooks fire in correct order", () => {
@@ -1852,7 +1851,7 @@ describe("StateMachine with guards and actions", () => {
       },
     });
     m.send("a", undefined, "GO");
-    assert.deepEqual(log, ["exit-a", "action", "enter-b"]);
+    expect(log).toEqual(["exit-a", "action", "enter-b"]);
   });
 });
 
@@ -1868,7 +1867,7 @@ describe("EventEmitter", () => {
       received.push(payload);
     });
     emitter.emit("data", { id: "u1", name: "Alice" });
-    assert.deepEqual(received, [{ id: "u1", name: "Alice" }]);
+    expect(received).toEqual([{ id: "u1", name: "Alice" }]);
   });
 
   it("multiple handlers on same event", () => {
@@ -1881,7 +1880,7 @@ describe("EventEmitter", () => {
       log.push("b");
     });
     emitter.emit("ping", undefined);
-    assert.deepEqual(log, ["a", "b"]);
+    expect(log).toEqual(["a", "b"]);
   });
 
   it("off removes specific handler", () => {
@@ -1897,7 +1896,7 @@ describe("EventEmitter", () => {
     emitter.on("evt", handlerB);
     emitter.off("evt", handlerA);
     emitter.emit("evt", undefined);
-    assert.deepEqual(log, ["b"]);
+    expect(log).toEqual(["b"]);
   });
 
   it("once fires handler only once", () => {
@@ -1909,14 +1908,14 @@ describe("EventEmitter", () => {
     emitter.emit("tick", undefined);
     emitter.emit("tick", undefined);
     emitter.emit("tick", undefined);
-    assert.equal(count, 1);
+    expect(count).toBe(1);
   });
 
   it("emit with no handlers does not throw", () => {
     const emitter = EventEmitter.create();
-    assert.doesNotThrow(() => {
+    expect(() => {
       emitter.emit("nope", undefined);
-    });
+    }).not.toThrow();
   });
 
   it("removeAll clears all handlers for event", () => {
@@ -1930,13 +1929,13 @@ describe("EventEmitter", () => {
     });
     emitter.removeAll("x");
     emitter.emit("x", undefined);
-    assert.equal(count, 0);
-    assert.equal(emitter.listenerCount("x"), 0);
+    expect(count).toBe(0);
+    expect(emitter.listenerCount("x")).toBe(0);
   });
 
   it("listenerCount returns correct count", () => {
     const emitter = EventEmitter.create();
-    assert.equal(emitter.listenerCount("e"), 0);
+    expect(emitter.listenerCount("e")).toBe(0);
     const h1 = () => {
       /* noop listener */
     };
@@ -1944,11 +1943,11 @@ describe("EventEmitter", () => {
       /* noop listener */
     };
     emitter.on("e", h1);
-    assert.equal(emitter.listenerCount("e"), 1);
+    expect(emitter.listenerCount("e")).toBe(1);
     emitter.on("e", h2);
-    assert.equal(emitter.listenerCount("e"), 2);
+    expect(emitter.listenerCount("e")).toBe(2);
     emitter.off("e", h1);
-    assert.equal(emitter.listenerCount("e"), 1);
+    expect(emitter.listenerCount("e")).toBe(1);
   });
 
   it("different events are independent", () => {
@@ -1964,13 +1963,13 @@ describe("EventEmitter", () => {
     emitter.emit("a", 1);
     emitter.emit("b", 2);
     emitter.emit("a", 3);
-    assert.deepEqual(aLog, [1, 3]);
-    assert.deepEqual(bLog, [2]);
+    expect(aLog).toEqual([1, 3]);
+    expect(bLog).toEqual([2]);
   });
 
   it("returned instance is frozen", () => {
     const emitter = EventEmitter.create();
-    assert.equal(Object.isFrozen(emitter), true);
+    expect(Object.isFrozen(emitter)).toBe(true);
   });
 });
 
@@ -1985,8 +1984,8 @@ describe("Pool", () => {
       maxSize: 2,
     });
     const result = await pool.acquire().run();
-    assert.equal(result.isOk, true);
-    assert.ok(result.value);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBeTruthy();
     result.value.release();
     await pool.drain();
   });
@@ -2001,12 +2000,12 @@ describe("Pool", () => {
       maxSize: 2,
     });
     const r1 = await pool.acquire().run();
-    assert.equal(r1.isOk, true);
+    expect(r1.isOk).toBe(true);
     r1.value.release();
     // Acquiring again should reuse the released resource, not create a new one
     const r2 = await pool.acquire().run();
-    assert.equal(r2.isOk, true);
-    assert.equal(created, 1);
+    expect(r2.isOk).toBe(true);
+    expect(created).toBe(1);
     r2.value.release();
     await pool.drain();
   });
@@ -2018,8 +2017,8 @@ describe("Pool", () => {
       maxSize: 1,
     });
     const result = await pool.acquire().run();
-    assert.equal(result.isOk, true);
-    assert.equal(result.value.value, obj);
+    expect(result.isOk).toBe(true);
+    expect(result.value.value).toBe(obj);
     result.value.release();
     await pool.drain();
   });
@@ -2038,11 +2037,11 @@ describe("Pool", () => {
         return resource.id;
       })
       .run();
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, 1);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(1);
     // Pool should have 1 idle resource after use()
-    assert.equal(pool.idle(), 1);
-    assert.equal(pool.active(), 0);
+    expect(pool.idle()).toBe(1);
+    expect(pool.active()).toBe(0);
     await pool.drain();
   });
 
@@ -2056,12 +2055,12 @@ describe("Pool", () => {
         throw new Error("boom");
       })
       .run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.error.tag, "PoolError");
-    assert.ok(result.error.message.includes("boom"));
+    expect(result.isErr).toBe(true);
+    expect(result.error.tag).toBe("PoolError");
+    expect(result.error.message.includes("boom")).toBe(true);
     // Resource should be back in the pool
-    assert.equal(pool.idle(), 1);
-    assert.equal(pool.active(), 0);
+    expect(pool.idle()).toBe(1);
+    expect(pool.active()).toBe(0);
     await pool.drain();
   });
 
@@ -2076,10 +2075,10 @@ describe("Pool", () => {
     });
     const r1 = await pool.acquire().run();
     const r2 = await pool.acquire().run();
-    assert.equal(r1.isOk, true);
-    assert.equal(r2.isOk, true);
-    assert.equal(created, 2);
-    assert.equal(pool.active(), 2);
+    expect(r1.isOk).toBe(true);
+    expect(r2.isOk).toBe(true);
+    expect(created).toBe(2);
+    expect(pool.active()).toBe(2);
 
     // Third acquire should block until one is released
     let r3resolved = false;
@@ -2093,16 +2092,16 @@ describe("Pool", () => {
 
     // Give the microtask queue a tick
     await new Promise(resolve => setTimeout(resolve, 10));
-    assert.equal(r3resolved, false);
+    expect(r3resolved).toBe(false);
 
     // Release one resource to unblock
     r1.value.release();
     const r3 = await r3promise;
-    assert.equal(r3resolved, true);
-    assert.equal(r3.isOk, true);
+    expect(r3resolved).toBe(true);
+    expect(r3.isOk).toBe(true);
 
     // Should have reused, not created a third
-    assert.equal(created, 2);
+    expect(created).toBe(2);
     r2.value.release();
     r3.value.release();
     await pool.drain();
@@ -2113,29 +2112,29 @@ describe("Pool", () => {
       create: async () => ({ id: 1 }),
       maxSize: 5,
     });
-    assert.equal(pool.size(), 0);
-    assert.equal(pool.idle(), 0);
-    assert.equal(pool.active(), 0);
+    expect(pool.size()).toBe(0);
+    expect(pool.idle()).toBe(0);
+    expect(pool.active()).toBe(0);
 
     const r1 = await pool.acquire().run();
-    assert.equal(pool.size(), 1);
-    assert.equal(pool.idle(), 0);
-    assert.equal(pool.active(), 1);
+    expect(pool.size()).toBe(1);
+    expect(pool.idle()).toBe(0);
+    expect(pool.active()).toBe(1);
 
     const r2 = await pool.acquire().run();
-    assert.equal(pool.size(), 2);
-    assert.equal(pool.idle(), 0);
-    assert.equal(pool.active(), 2);
+    expect(pool.size()).toBe(2);
+    expect(pool.idle()).toBe(0);
+    expect(pool.active()).toBe(2);
 
     r1.value.release();
-    assert.equal(pool.size(), 2);
-    assert.equal(pool.idle(), 1);
-    assert.equal(pool.active(), 1);
+    expect(pool.size()).toBe(2);
+    expect(pool.idle()).toBe(1);
+    expect(pool.active()).toBe(1);
 
     r2.value.release();
-    assert.equal(pool.size(), 2);
-    assert.equal(pool.idle(), 2);
-    assert.equal(pool.active(), 0);
+    expect(pool.size()).toBe(2);
+    expect(pool.idle()).toBe(2);
+    expect(pool.active()).toBe(0);
 
     await pool.drain();
   });
@@ -2153,16 +2152,16 @@ describe("Pool", () => {
     const r2 = await pool.acquire().run();
     r1.value.release();
     // r1 is idle, r2 is active
-    assert.equal(pool.idle(), 1);
-    assert.equal(pool.active(), 1);
+    expect(pool.idle()).toBe(1);
+    expect(pool.active()).toBe(1);
 
     const drainPromise = pool.drain();
     // The idle resource should be destroyed immediately
     // Release active resource so drain can finish
     r2.value.release();
     await drainPromise;
-    assert.equal(destroyed.length, 2);
-    assert.equal(pool.size(), 0);
+    expect(destroyed.length).toBe(2);
+    expect(pool.size()).toBe(0);
   });
 
   it("validate rejects unhealthy resources and creates new one", async () => {
@@ -2177,24 +2176,24 @@ describe("Pool", () => {
     });
     // First acquire creates resource with id 1
     const r1 = await pool.acquire().run();
-    assert.equal(r1.isOk, true);
-    assert.equal(r1.value.value.id, 1);
+    expect(r1.isOk).toBe(true);
+    expect(r1.value.value.id).toBe(1);
     r1.value.release();
 
     // Second acquire finds id=1 idle, validates it (fails), creates new
     const r2 = await pool.acquire().run();
-    assert.equal(r2.isOk, true);
-    assert.equal(r2.value.value.id, 2);
-    assert.equal(created, 2);
+    expect(r2.isOk).toBe(true);
+    expect(r2.value.value.id).toBe(2);
+    expect(created).toBe(2);
     r2.value.release();
     await pool.drain();
   });
 
   it("PoolError has correct tag", () => {
     const err = PoolError("test message");
-    assert.equal(err.tag, "PoolError");
-    assert.equal(err.code, "POOL_ERROR");
-    assert.equal(err.message, "test message");
+    expect(err.tag).toBe("PoolError");
+    expect(err.code).toBe("POOL_ERROR");
+    expect(err.message).toBe("test message");
   });
 
   it("returned instance is frozen", () => {
@@ -2202,7 +2201,7 @@ describe("Pool", () => {
       create: async () => ({}),
       maxSize: 1,
     });
-    assert.equal(Object.isFrozen(pool), true);
+    expect(Object.isFrozen(pool)).toBe(true);
   });
 
   it("acquire after drain returns error", async () => {
@@ -2212,9 +2211,9 @@ describe("Pool", () => {
     });
     await pool.drain();
     const result = await pool.acquire().run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.error.tag, "PoolError");
-    assert.ok(result.error.message.includes("draining"));
+    expect(result.isErr).toBe(true);
+    expect(result.error.tag).toBe("PoolError");
+    expect(result.error.message.includes("draining")).toBe(true);
   });
 
   it("double release is safe (no-op)", async () => {
@@ -2223,10 +2222,10 @@ describe("Pool", () => {
       maxSize: 2,
     });
     const result = await pool.acquire().run();
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     result.value.release();
     result.value.release(); // should not throw or double-return
-    assert.equal(pool.idle(), 1);
+    expect(pool.idle()).toBe(1);
     await pool.drain();
   });
 });
@@ -2247,8 +2246,8 @@ describe("Queue", () => {
     queue.push("hello");
     await queue.drain();
 
-    assert.deepEqual(processed, ["hello"]);
-    assert.equal(queue.processed(), 1);
+    expect(processed).toEqual(["hello"]);
+    expect(queue.processed()).toBe(1);
   });
 
   it("concurrency limits parallel execution", async () => {
@@ -2274,8 +2273,8 @@ describe("Queue", () => {
 
     await queue.drain();
 
-    assert.equal(maxConcurrent, 2);
-    assert.equal(queue.processed(), 4);
+    expect(maxConcurrent).toBe(2);
+    expect(queue.processed()).toBe(4);
   });
 
   it("priority ordering (lower priority number runs first)", async () => {
@@ -2311,7 +2310,7 @@ describe("Queue", () => {
     await queue.drain();
 
     // After blocker, jobs should process in priority order: high(0), medium(5), low(10)
-    assert.deepEqual(order, ["blocker", "high", "medium", "low"]);
+    expect(order).toEqual(["blocker", "high", "medium", "low"]);
   });
 
   it("drain waits for all jobs", async () => {
@@ -2330,14 +2329,14 @@ describe("Queue", () => {
     queue.push(3);
 
     // Before drain, not all jobs are done
-    assert.ok(results.length < 3);
+    expect(results.length < 3).toBe(true);
 
     await queue.drain();
 
     // After drain, all jobs are done
-    assert.equal(results.length, 3);
-    assert.equal(queue.size(), 0);
-    assert.equal(queue.active(), 0);
+    expect(results.length).toBe(3);
+    expect(queue.size()).toBe(0);
+    expect(queue.active()).toBe(0);
   });
 
   it("drain resolves immediately when queue is empty", async () => {
@@ -2349,7 +2348,7 @@ describe("Queue", () => {
 
     // Should resolve immediately with no jobs
     await queue.drain();
-    assert.equal(queue.size(), 0);
+    expect(queue.size()).toBe(0);
   });
 
   it("pause/resume lifecycle", async () => {
@@ -2366,16 +2365,16 @@ describe("Queue", () => {
     queue.push("b");
 
     // Jobs are pending but not processing
-    assert.equal(queue.size(), 2);
-    assert.equal(queue.active(), 0);
+    expect(queue.size()).toBe(2);
+    expect(queue.active()).toBe(0);
     await sleep(20);
-    assert.deepEqual(processed, []);
+    expect(processed).toEqual([]);
 
     // Resume starts processing
     queue.resume();
     await queue.drain();
 
-    assert.deepEqual(processed, ["a", "b"]);
+    expect(processed).toEqual(["a", "b"]);
   });
 
   it("onError callback fires on handler failure", async () => {
@@ -2393,11 +2392,11 @@ describe("Queue", () => {
     queue.push("x");
     await queue.drain();
 
-    assert.equal(errors.length, 1);
-    assert.equal(errors[0].msg, "fail-x");
-    assert.equal(errors[0].data, "x");
+    expect(errors.length).toBe(1);
+    expect(errors[0].msg).toBe("fail-x");
+    expect(errors[0].data).toBe("x");
     // Failed jobs still count as processed
-    assert.equal(queue.processed(), 1);
+    expect(queue.processed()).toBe(1);
   });
 
   it("size/active/processed counts", async () => {
@@ -2415,31 +2414,31 @@ describe("Queue", () => {
       },
     });
 
-    assert.equal(queue.size(), 0);
-    assert.equal(queue.active(), 0);
-    assert.equal(queue.processed(), 0);
+    expect(queue.size()).toBe(0);
+    expect(queue.active()).toBe(0);
+    expect(queue.processed()).toBe(0);
 
     queue.push("first");
     await sleep(5);
 
     // First job is active, none pending
-    assert.equal(queue.active(), 1);
-    assert.equal(queue.size(), 0);
-    assert.equal(queue.processed(), 0);
+    expect(queue.active()).toBe(1);
+    expect(queue.size()).toBe(0);
+    expect(queue.processed()).toBe(0);
 
     queue.push("second");
     queue.push("third");
 
     // Two pending, one active
-    assert.equal(queue.size(), 2);
-    assert.equal(queue.active(), 1);
+    expect(queue.size()).toBe(2);
+    expect(queue.active()).toBe(1);
 
     resolveFirst();
     await queue.drain();
 
-    assert.equal(queue.size(), 0);
-    assert.equal(queue.active(), 0);
-    assert.equal(queue.processed(), 3);
+    expect(queue.size()).toBe(0);
+    expect(queue.active()).toBe(0);
+    expect(queue.processed()).toBe(3);
   });
 
   it("returned instance is frozen", () => {
@@ -2449,7 +2448,7 @@ describe("Queue", () => {
       },
     });
 
-    assert.ok(Object.isFrozen(queue));
+    expect(Object.isFrozen(queue)).toBe(true);
   });
 
   it("jobs have unique ids", async () => {
@@ -2466,8 +2465,8 @@ describe("Queue", () => {
     queue.push("c");
     await queue.drain();
 
-    assert.equal(ids.length, 3);
-    assert.equal(new Set(ids).size, 3);
+    expect(ids.length).toBe(3);
+    expect(new Set(ids).size).toBe(3);
   });
 });
 
@@ -2484,24 +2483,22 @@ describe("CronRunner", () => {
       },
     });
 
-    assert.ok(runner);
-    assert.equal(typeof runner.start, "function");
-    assert.equal(typeof runner.stop, "function");
-    assert.equal(typeof runner.isRunning, "function");
-    assert.equal(typeof runner.nextRun, "function");
+    expect(runner).toBeTruthy();
+    expect(typeof runner.start).toBe("function");
+    expect(typeof runner.stop).toBe("function");
+    expect(typeof runner.isRunning).toBe("function");
+    expect(typeof runner.nextRun).toBe("function");
   });
 
   it("throws on invalid cron expression", () => {
-    assert.throws(
-      () =>
-        CronRunner.create({
-          schedule: "not a cron",
-          handler: async () => {
-            /* noop */
-          },
-        }),
-      /Invalid cron expression/,
-    );
+    expect(() =>
+      CronRunner.create({
+        schedule: "not a cron",
+        handler: async () => {
+          /* noop */
+        },
+      }),
+    ).toThrow();
   });
 
   it("start/stop lifecycle", () => {
@@ -2512,11 +2509,11 @@ describe("CronRunner", () => {
       },
     });
 
-    assert.equal(runner.isRunning(), false);
+    expect(runner.isRunning()).toBe(false);
     runner.start();
-    assert.equal(runner.isRunning(), true);
+    expect(runner.isRunning()).toBe(true);
     runner.stop();
-    assert.equal(runner.isRunning(), false);
+    expect(runner.isRunning()).toBe(false);
   });
 
   it("isRunning returns correct state", () => {
@@ -2527,15 +2524,15 @@ describe("CronRunner", () => {
       },
     });
 
-    assert.equal(runner.isRunning(), false);
+    expect(runner.isRunning()).toBe(false);
     runner.start();
-    assert.equal(runner.isRunning(), true);
+    expect(runner.isRunning()).toBe(true);
     runner.start(); // double start is a no-op
-    assert.equal(runner.isRunning(), true);
+    expect(runner.isRunning()).toBe(true);
     runner.stop();
-    assert.equal(runner.isRunning(), false);
+    expect(runner.isRunning()).toBe(false);
     runner.stop(); // double stop is a no-op
-    assert.equal(runner.isRunning(), false);
+    expect(runner.isRunning()).toBe(false);
   });
 
   it("runImmediately executes handler on start", async () => {
@@ -2554,7 +2551,7 @@ describe("CronRunner", () => {
     await sleep(10);
     runner.stop();
 
-    assert.equal(called, true);
+    expect(called).toBe(true);
   });
 
   it("stop prevents further executions", () => {
@@ -2568,9 +2565,9 @@ describe("CronRunner", () => {
     runner.start();
     runner.stop();
 
-    assert.equal(runner.isRunning(), false);
+    expect(runner.isRunning()).toBe(false);
     // nextRun returns undefined when stopped
-    assert.equal(runner.nextRun(), undefined);
+    expect(runner.nextRun()).toBe(undefined);
   });
 
   it("nextRun returns a Date when running", () => {
@@ -2582,12 +2579,12 @@ describe("CronRunner", () => {
     });
 
     // Not running: nextRun is undefined
-    assert.equal(runner.nextRun(), undefined);
+    expect(runner.nextRun()).toBe(undefined);
 
     runner.start();
     const next = runner.nextRun();
-    assert.ok(next instanceof Date);
-    assert.ok(next.getTime() > Date.now());
+    expect(next instanceof Date).toBe(true);
+    expect(next.getTime() > Date.now()).toBe(true);
     runner.stop();
   });
 
@@ -2609,8 +2606,8 @@ describe("CronRunner", () => {
     await sleep(10);
     runner.stop();
 
-    assert.ok(capturedError);
-    assert.equal(capturedError.message, "cron-fail");
+    expect(capturedError).toBeTruthy();
+    expect(capturedError.message).toBe("cron-fail");
   });
 
   it("returned instance is frozen", () => {
@@ -2621,6 +2618,6 @@ describe("CronRunner", () => {
       },
     });
 
-    assert.ok(Object.isFrozen(runner));
+    expect(Object.isFrozen(runner)).toBe(true);
   });
 });

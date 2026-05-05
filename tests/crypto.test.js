@@ -1,14 +1,13 @@
 /**
  * crypto.test.js - Tests for expanded Crypto module (full Web Crypto API).
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Run: node --test tests/crypto.test.js
  *
  * Tests the compiled dist/ output, not the source.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const { Crypto } = await import("../dist/index.js");
 
@@ -19,9 +18,9 @@ const { Crypto } = await import("../dist/index.js");
 describe("Crypto.randomInt", () => {
   it("returns Ok with value in [min, max)", () => {
     const r = Crypto.randomInt(0, 10);
-    assert.equal(r.isOk, true);
+    expect(r.isOk).toBe(true);
     const v = r.unwrap();
-    assert.ok(v >= 0 && v < 10);
+    expect(v >= 0 && v < 10).toBe(true);
   });
 
   it("returns different values across calls (statistical)", () => {
@@ -29,17 +28,17 @@ describe("Crypto.randomInt", () => {
     for (let i = 0; i < 50; i++) {
       values.add(Crypto.randomInt(0, 1000).unwrap());
     }
-    assert.ok(values.size > 1);
+    expect(values.size > 1).toBe(true);
   });
 
   it("returns Err when min >= max", () => {
-    assert.equal(Crypto.randomInt(10, 10).isErr, true);
-    assert.equal(Crypto.randomInt(10, 5).isErr, true);
+    expect(Crypto.randomInt(10, 10).isErr).toBe(true);
+    expect(Crypto.randomInt(10, 5).isErr).toBe(true);
   });
 
   it("works with range of 1", () => {
     const r = Crypto.randomInt(5, 6);
-    assert.equal(r.unwrap(), 5);
+    expect(r.unwrap()).toBe(5);
   });
 });
 
@@ -50,22 +49,22 @@ describe("Crypto.randomInt", () => {
 describe("Crypto.hashHex", () => {
   it("returns hex string for SHA-256", async () => {
     const r = await Crypto.hashHex("SHA-256", "hello").run();
-    assert.equal(r.isOk, true);
+    expect(r.isOk).toBe(true);
     const hex = r.unwrap();
-    assert.equal(typeof hex, "string");
-    assert.equal(hex.length, 64);
-    assert.match(hex, /^[0-9a-f]+$/);
+    expect(typeof hex).toBe("string");
+    expect(hex.length).toBe(64);
+    expect(hex).toMatch(/^[0-9a-f]+$/);
   });
 
   it("produces consistent output", async () => {
     const a = await Crypto.hashHex("SHA-256", "test").run();
     const b = await Crypto.hashHex("SHA-256", "test").run();
-    assert.equal(a.unwrap(), b.unwrap());
+    expect(a.unwrap()).toBe(b.unwrap());
   });
 
   it("SHA-512 produces 128 hex chars", async () => {
     const r = await Crypto.hashHex("SHA-512", "hello").run();
-    assert.equal(r.unwrap().length, 128);
+    expect(r.unwrap().length).toBe(128);
   });
 });
 
@@ -77,18 +76,18 @@ describe("Crypto.hmac", () => {
   it("sign and verify round-trip", async () => {
     const key = (await Crypto.generateKey.hmac("SHA-256").run()).unwrap();
     const sig = (await Crypto.hmac.sign(key, "hello world").run()).unwrap();
-    assert.ok(sig instanceof Uint8Array);
-    assert.ok(sig.length > 0);
+    expect(sig instanceof Uint8Array).toBe(true);
+    expect(sig.length > 0).toBe(true);
 
     const valid = (await Crypto.hmac.verify(key, sig, "hello world").run()).unwrap();
-    assert.equal(valid, true);
+    expect(valid).toBe(true);
   });
 
   it("verify fails with wrong data", async () => {
     const key = (await Crypto.generateKey.hmac("SHA-256").run()).unwrap();
     const sig = (await Crypto.hmac.sign(key, "hello").run()).unwrap();
     const valid = (await Crypto.hmac.verify(key, sig, "wrong").run()).unwrap();
-    assert.equal(valid, false);
+    expect(valid).toBe(false);
   });
 
   it("verify fails with wrong key", async () => {
@@ -96,7 +95,7 @@ describe("Crypto.hmac", () => {
     const key2 = (await Crypto.generateKey.hmac("SHA-256").run()).unwrap();
     const sig = (await Crypto.hmac.sign(key1, "hello").run()).unwrap();
     const valid = (await Crypto.hmac.verify(key2, sig, "hello").run()).unwrap();
-    assert.equal(valid, false);
+    expect(valid).toBe(false);
   });
 });
 
@@ -108,14 +107,14 @@ describe("Crypto.aesGcm", () => {
   it("encrypt and decrypt round-trip", async () => {
     const key = (await Crypto.generateKey.aesGcm(256).run()).unwrap();
     const encrypted = (await Crypto.aesGcm.encrypt(key, "secret message").run()).unwrap();
-    assert.ok(encrypted.iv instanceof Uint8Array);
-    assert.equal(encrypted.iv.length, 12);
-    assert.ok(encrypted.data instanceof Uint8Array);
+    expect(encrypted.iv instanceof Uint8Array).toBe(true);
+    expect(encrypted.iv.length).toBe(12);
+    expect(encrypted.data instanceof Uint8Array).toBe(true);
 
     const decrypted = (
       await Crypto.aesGcm.decrypt(key, encrypted.iv, encrypted.data).run()
     ).unwrap();
-    assert.equal(new TextDecoder().decode(decrypted), "secret message");
+    expect(new TextDecoder().decode(decrypted)).toBe("secret message");
   });
 
   it("decrypt fails with wrong key", async () => {
@@ -123,7 +122,7 @@ describe("Crypto.aesGcm", () => {
     const key2 = (await Crypto.generateKey.aesGcm(256).run()).unwrap();
     const encrypted = (await Crypto.aesGcm.encrypt(key1, "secret").run()).unwrap();
     const result = await Crypto.aesGcm.decrypt(key2, encrypted.iv, encrypted.data).run();
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 
   it("supports additional data", async () => {
@@ -133,7 +132,7 @@ describe("Crypto.aesGcm", () => {
     const decrypted = (
       await Crypto.aesGcm.decrypt(key, encrypted.iv, encrypted.data, aad).run()
     ).unwrap();
-    assert.equal(new TextDecoder().decode(decrypted), "payload");
+    expect(new TextDecoder().decode(decrypted)).toBe("payload");
   });
 
   it("decrypt fails with wrong additional data", async () => {
@@ -142,7 +141,7 @@ describe("Crypto.aesGcm", () => {
     const encrypted = (await Crypto.aesGcm.encrypt(key, "payload", aad).run()).unwrap();
     const wrongAad = new TextEncoder().encode("wrong");
     const result = await Crypto.aesGcm.decrypt(key, encrypted.iv, encrypted.data, wrongAad).run();
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 });
 
@@ -154,12 +153,12 @@ describe("Crypto.aesCbc", () => {
   it("encrypt and decrypt round-trip", async () => {
     const key = (await Crypto.generateKey.aesCbc(256).run()).unwrap();
     const encrypted = (await Crypto.aesCbc.encrypt(key, "cbc secret").run()).unwrap();
-    assert.equal(encrypted.iv.length, 16);
+    expect(encrypted.iv.length).toBe(16);
 
     const decrypted = (
       await Crypto.aesCbc.decrypt(key, encrypted.iv, encrypted.data).run()
     ).unwrap();
-    assert.equal(new TextDecoder().decode(decrypted), "cbc secret");
+    expect(new TextDecoder().decode(decrypted)).toBe("cbc secret");
   });
 });
 
@@ -171,17 +170,17 @@ describe("Crypto.ecdsa", () => {
   it("sign and verify round-trip", async () => {
     const pair = (await Crypto.generateKey.ecdsa("P-256").run()).unwrap();
     const sig = (await Crypto.ecdsa.sign(pair.privateKey, "data to sign").run()).unwrap();
-    assert.ok(sig instanceof Uint8Array);
+    expect(sig instanceof Uint8Array).toBe(true);
 
     const valid = (await Crypto.ecdsa.verify(pair.publicKey, sig, "data to sign").run()).unwrap();
-    assert.equal(valid, true);
+    expect(valid).toBe(true);
   });
 
   it("verify fails with tampered data", async () => {
     const pair = (await Crypto.generateKey.ecdsa("P-256").run()).unwrap();
     const sig = (await Crypto.ecdsa.sign(pair.privateKey, "original").run()).unwrap();
     const valid = (await Crypto.ecdsa.verify(pair.publicKey, sig, "tampered").run()).unwrap();
-    assert.equal(valid, false);
+    expect(valid).toBe(false);
   });
 
   it("supports P-384 curve", async () => {
@@ -190,7 +189,7 @@ describe("Crypto.ecdsa", () => {
     const valid = (
       await Crypto.ecdsa.verify(pair.publicKey, sig, "hello", "SHA-384").run()
     ).unwrap();
-    assert.equal(valid, true);
+    expect(valid).toBe(true);
   });
 });
 
@@ -202,17 +201,17 @@ describe("Crypto.rsaPss", () => {
   it("sign and verify round-trip", async () => {
     const pair = (await Crypto.generateKey.rsaPss(2048, "SHA-256").run()).unwrap();
     const sig = (await Crypto.rsaPss.sign(pair.privateKey, "rsa data").run()).unwrap();
-    assert.ok(sig instanceof Uint8Array);
+    expect(sig instanceof Uint8Array).toBe(true);
 
     const valid = (await Crypto.rsaPss.verify(pair.publicKey, sig, "rsa data").run()).unwrap();
-    assert.equal(valid, true);
+    expect(valid).toBe(true);
   });
 
   it("verify fails with wrong data", async () => {
     const pair = (await Crypto.generateKey.rsaPss(2048, "SHA-256").run()).unwrap();
     const sig = (await Crypto.rsaPss.sign(pair.privateKey, "correct").run()).unwrap();
     const valid = (await Crypto.rsaPss.verify(pair.publicKey, sig, "wrong").run()).unwrap();
-    assert.equal(valid, false);
+    expect(valid).toBe(false);
   });
 });
 
@@ -224,10 +223,10 @@ describe("Crypto.rsaOaep", () => {
   it("encrypt and decrypt round-trip", async () => {
     const pair = (await Crypto.generateKey.rsaOaep(2048, "SHA-256").run()).unwrap();
     const encrypted = (await Crypto.rsaOaep.encrypt(pair.publicKey, "rsa secret").run()).unwrap();
-    assert.ok(encrypted instanceof Uint8Array);
+    expect(encrypted instanceof Uint8Array).toBe(true);
 
     const decrypted = (await Crypto.rsaOaep.decrypt(pair.privateKey, encrypted).run()).unwrap();
-    assert.equal(new TextDecoder().decode(decrypted), "rsa secret");
+    expect(new TextDecoder().decode(decrypted)).toBe("rsa secret");
   });
 });
 
@@ -244,15 +243,15 @@ describe("Crypto.pbkdf2", () => {
     const b = (
       await Crypto.pbkdf2.deriveBits("password123", salt, 100000, "SHA-256", 256).run()
     ).unwrap();
-    assert.equal(a.length, 32);
-    assert.deepEqual(a, b);
+    expect(a.length).toBe(32);
+    expect(a).toEqual(b);
   });
 
   it("different passwords produce different keys", async () => {
     const salt = new Uint8Array(16);
     const a = (await Crypto.pbkdf2.deriveBits("pass1", salt, 1000, "SHA-256", 256).run()).unwrap();
     const b = (await Crypto.pbkdf2.deriveBits("pass2", salt, 1000, "SHA-256", 256).run()).unwrap();
-    assert.notDeepEqual(a, b);
+    expect(a).not.toEqual(b);
   });
 });
 
@@ -266,7 +265,7 @@ describe("Crypto.hkdf", () => {
     const salt = new Uint8Array(16);
     const info = new TextEncoder().encode("context");
     const result = (await Crypto.hkdf.deriveBits(ikm, salt, info, "SHA-256", 256).run()).unwrap();
-    assert.equal(result.length, 32);
+    expect(result.length).toBe(32);
   });
 });
 
@@ -286,8 +285,8 @@ describe("Crypto.ecdh", () => {
       await Crypto.ecdh.deriveBits(bob.privateKey, alice.publicKey, 256).run()
     ).unwrap();
 
-    assert.equal(sharedA.length, 32);
-    assert.deepEqual(sharedA, sharedB);
+    expect(sharedA.length).toBe(32);
+    expect(sharedA).toEqual(sharedB);
   });
 });
 
@@ -299,27 +298,27 @@ describe("Crypto.exportKey / importKey", () => {
   it("export and re-import AES key as raw", async () => {
     const key = (await Crypto.generateKey.aesGcm(256).run()).unwrap();
     const exported = (await Crypto.exportKey("raw", key).run()).unwrap();
-    assert.ok(exported instanceof Uint8Array);
-    assert.equal(exported.length, 32);
+    expect(exported instanceof Uint8Array).toBe(true);
+    expect(exported.length).toBe(32);
 
     const imported = (
       await Crypto.importKey.raw(exported, { name: "AES-GCM" }, ["encrypt", "decrypt"]).run()
     ).unwrap();
-    assert.ok(imported);
+    expect(imported).toBe(imported);
 
     // Verify the imported key works
     const encrypted = (await Crypto.aesGcm.encrypt(imported, "test").run()).unwrap();
     const decrypted = (
       await Crypto.aesGcm.decrypt(imported, encrypted.iv, encrypted.data).run()
     ).unwrap();
-    assert.equal(new TextDecoder().decode(decrypted), "test");
+    expect(new TextDecoder().decode(decrypted)).toBe("test");
   });
 
   it("export and re-import as JWK", async () => {
     const key = (await Crypto.generateKey.hmac("SHA-256").run()).unwrap();
     const jwk = (await Crypto.exportKey("jwk", key).run()).unwrap();
-    assert.equal(typeof jwk, "object");
-    assert.ok("kty" in jwk);
+    expect(typeof jwk).toBe("object");
+    expect("kty" in jwk).toBe(true);
 
     const imported = (
       await Crypto.importKey.jwk(jwk, { name: "HMAC", hash: "SHA-256" }, ["sign", "verify"]).run()
@@ -327,7 +326,7 @@ describe("Crypto.exportKey / importKey", () => {
 
     const sig = (await Crypto.hmac.sign(imported, "data").run()).unwrap();
     const valid = (await Crypto.hmac.verify(imported, sig, "data").run()).unwrap();
-    assert.equal(valid, true);
+    expect(valid).toBe(true);
   });
 });
 
@@ -348,7 +347,7 @@ describe("Crypto.wrapKey / unwrapKey", () => {
     const wrapped = (
       await Crypto.wrapKey("raw", dataKey, wrapKey, { name: "AES-GCM", iv }).run()
     ).unwrap();
-    assert.ok(wrapped instanceof Uint8Array);
+    expect(wrapped instanceof Uint8Array).toBe(true);
 
     const unwrapped = (
       await Crypto.unwrapKey(
@@ -361,13 +360,13 @@ describe("Crypto.wrapKey / unwrapKey", () => {
         ["encrypt", "decrypt"],
       ).run()
     ).unwrap();
-    assert.ok(unwrapped);
+    expect(unwrapped).toBe(unwrapped);
 
     // Verify the unwrapped key works
     const encrypted = (await Crypto.aesGcm.encrypt(unwrapped, "wrapped test").run()).unwrap();
     const decrypted = (
       await Crypto.aesGcm.decrypt(unwrapped, encrypted.iv, encrypted.data).run()
     ).unwrap();
-    assert.equal(new TextDecoder().decode(decrypted), "wrapped test");
+    expect(new TextDecoder().decode(decrypted)).toBe("wrapped test");
   });
 });

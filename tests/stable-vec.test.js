@@ -1,14 +1,11 @@
 /**
  * stable-vec.test.js - Tests for StableVec data structure.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
- * Run: node --test tests/stable-vec.test.js
- *
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output, not the source.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const { StableVec } = await import("../dist/index.js");
 
@@ -16,25 +13,25 @@ describe("StableVec", () => {
   it("insert and get", () => {
     const v = StableVec.create();
     const h = v.insert("hello");
-    assert.ok(v.get(h).isSome);
-    assert.equal(v.get(h).unwrap(), "hello");
-    assert.equal(v.length, 1);
+    expect(v.get(h).isSome).toBe(true);
+    expect(v.get(h).unwrap()).toBe("hello");
+    expect(v.length).toBe(1);
   });
 
   it("remove invalidates handle", () => {
     const v = StableVec.create();
     const h = v.insert(42);
-    assert.equal(v.remove(h), true);
-    assert.ok(v.get(h).isNone);
-    assert.equal(v.isValid(h), false);
-    assert.equal(v.length, 0);
+    expect(v.remove(h)).toBe(true);
+    expect(v.get(h).isNone).toBe(true);
+    expect(v.isValid(h)).toBe(false);
+    expect(v.length).toBe(0);
   });
 
   it("remove returns false for stale handle", () => {
     const v = StableVec.create();
     const h = v.insert(1);
     v.remove(h);
-    assert.equal(v.remove(h), false);
+    expect(v.remove(h)).toBe(false);
   });
 
   it("slot reuse bumps generation", () => {
@@ -42,10 +39,10 @@ describe("StableVec", () => {
     const h1 = v.insert("first");
     v.remove(h1);
     const h2 = v.insert("second");
-    assert.equal(h2.index, h1.index);
-    assert.equal(h2.generation, h1.generation + 1);
-    assert.ok(v.get(h1).isNone);
-    assert.equal(v.get(h2).unwrap(), "second");
+    expect(h2.index).toBe(h1.index);
+    expect(h2.generation).toBe(h1.generation + 1);
+    expect(v.get(h1).isNone).toBe(true);
+    expect(v.get(h2).unwrap()).toBe("second");
   });
 
   it("remove keeps data dense via swap", () => {
@@ -54,10 +51,10 @@ describe("StableVec", () => {
     const h2 = v.insert("b");
     const h3 = v.insert("c");
     v.remove(h2);
-    assert.equal(v.length, 2);
-    assert.equal(v.get(h1).unwrap(), "a");
-    assert.equal(v.get(h3).unwrap(), "c");
-    assert.ok(v.get(h2).isNone);
+    expect(v.length).toBe(2);
+    expect(v.get(h1).unwrap()).toBe("a");
+    expect(v.get(h3).unwrap()).toBe("c");
+    expect(v.get(h2).isNone).toBe(true);
   });
 
   it("iterates over dense data", () => {
@@ -66,10 +63,10 @@ describe("StableVec", () => {
     v.insert(20);
     v.insert(30);
     const items = [...v];
-    assert.equal(items.length, 3);
-    assert.ok(items.includes(10));
-    assert.ok(items.includes(20));
-    assert.ok(items.includes(30));
+    expect(items.length).toBe(3);
+    expect(items).toContain(10);
+    expect(items).toContain(20);
+    expect(items).toContain(30);
   });
 
   it("iterate after removals has no gaps", () => {
@@ -80,8 +77,8 @@ describe("StableVec", () => {
     v.insert(4);
     v.remove(h2);
     const items = [...v];
-    assert.equal(items.length, 3);
-    assert.ok(items.every(n => typeof n === "number"));
+    expect(items.length).toBe(3);
+    expect(items.every(n => typeof n === "number")).toBe(true);
   });
 
   it("entries yields handle-value pairs", () => {
@@ -89,9 +86,9 @@ describe("StableVec", () => {
     v.insert("x");
     v.insert("y");
     const entries = [...v.entries()];
-    assert.equal(entries.length, 2);
-    assert.ok(entries.some(([h, val]) => val === "x" && v.isValid(h)));
-    assert.ok(entries.some(([h, val]) => val === "y" && v.isValid(h)));
+    expect(entries.length).toBe(2);
+    expect(entries.some(([h, val]) => val === "x" && v.isValid(h))).toBe(true);
+    expect(entries.some(([h, val]) => val === "y" && v.isValid(h))).toBe(true);
   });
 
   it("forEach visits all live elements", () => {
@@ -103,7 +100,7 @@ describe("StableVec", () => {
     v.forEach(val => {
       sum += val;
     });
-    assert.equal(sum, 6);
+    expect(sum).toBe(6);
   });
 
   it("toArray returns snapshot", () => {
@@ -111,9 +108,9 @@ describe("StableVec", () => {
     v.insert(10);
     v.insert(20);
     const arr = v.toArray();
-    assert.equal(arr.length, 2);
+    expect(arr.length).toBe(2);
     arr.push(30);
-    assert.equal(v.length, 2);
+    expect(v.length).toBe(2);
   });
 
   it("clear removes all and frees slots", () => {
@@ -121,22 +118,22 @@ describe("StableVec", () => {
     const h1 = v.insert(1);
     const h2 = v.insert(2);
     v.clear();
-    assert.equal(v.length, 0);
-    assert.equal(v.isValid(h1), false);
-    assert.equal(v.isValid(h2), false);
+    expect(v.length).toBe(0);
+    expect(v.isValid(h1)).toBe(false);
+    expect(v.isValid(h2)).toBe(false);
     const h3 = v.insert(3);
-    assert.equal(v.get(h3).unwrap(), 3);
+    expect(v.get(h3).unwrap()).toBe(3);
   });
 
   it("capacity tracks total slots including free", () => {
     const v = StableVec.create();
-    assert.equal(v.capacity, 0);
+    expect(v.capacity).toBe(0);
     const h1 = v.insert(1);
     v.insert(2);
-    assert.equal(v.capacity, 2);
+    expect(v.capacity).toBe(2);
     v.remove(h1);
-    assert.equal(v.capacity, 2);
-    assert.equal(v.length, 1);
+    expect(v.capacity).toBe(2);
+    expect(v.length).toBe(1);
   });
 
   it("many insert-remove cycles reuse slots", () => {
@@ -144,10 +141,10 @@ describe("StableVec", () => {
     const handles = [];
     for (let i = 0; i < 100; i++) handles.push(v.insert(i));
     for (const h of handles) v.remove(h);
-    assert.equal(v.length, 0);
-    assert.equal(v.capacity, 100);
+    expect(v.length).toBe(0);
+    expect(v.capacity).toBe(100);
     for (let i = 0; i < 100; i++) v.insert(i + 1000);
-    assert.equal(v.length, 100);
-    assert.equal(v.capacity, 100);
+    expect(v.length).toBe(100);
+    expect(v.capacity).toBe(100);
   });
 });

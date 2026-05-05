@@ -3,12 +3,11 @@
  * Result/Option traverse/sequence, Task traverse/sequence/ap,
  * and List sortByOrd/uniqBy/groupBy.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output, not the source.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
   Eq,
@@ -39,54 +38,54 @@ const {
 describe("Eq", () => {
   describe("Eq.string", () => {
     it("returns true for equal strings", () => {
-      assert.equal(Eq.string.equals("hello", "hello"), true);
+      expect(Eq.string.equals("hello", "hello")).toBe(true);
     });
 
     it("returns false for different strings", () => {
-      assert.equal(Eq.string.equals("hello", "world"), false);
+      expect(Eq.string.equals("hello", "world")).toBe(false);
     });
 
     it("returns true for empty strings", () => {
-      assert.equal(Eq.string.equals("", ""), true);
+      expect(Eq.string.equals("", "")).toBe(true);
     });
 
     it("is case-sensitive", () => {
-      assert.equal(Eq.string.equals("Hello", "hello"), false);
+      expect(Eq.string.equals("Hello", "hello")).toBe(false);
     });
   });
 
   describe("Eq.number", () => {
     it("returns true for equal numbers", () => {
-      assert.equal(Eq.number.equals(42, 42), true);
+      expect(Eq.number.equals(42, 42)).toBe(true);
     });
 
     it("returns false for different numbers", () => {
-      assert.equal(Eq.number.equals(1, 2), false);
+      expect(Eq.number.equals(1, 2)).toBe(false);
     });
 
     it("handles zero", () => {
-      assert.equal(Eq.number.equals(0, 0), true);
+      expect(Eq.number.equals(0, 0)).toBe(true);
     });
 
     it("handles negative numbers", () => {
-      assert.equal(Eq.number.equals(-5, -5), true);
-      assert.equal(Eq.number.equals(-5, 5), false);
+      expect(Eq.number.equals(-5, -5)).toBe(true);
+      expect(Eq.number.equals(-5, 5)).toBe(false);
     });
 
     it("handles floating point", () => {
-      assert.equal(Eq.number.equals(0.1 + 0.2, 0.3), false); // IEEE 754
+      expect(Eq.number.equals(0.1 + 0.2, 0.3)).toBe(false);
     });
   });
 
   describe("Eq.boolean", () => {
     it("returns true for equal booleans", () => {
-      assert.equal(Eq.boolean.equals(true, true), true);
-      assert.equal(Eq.boolean.equals(false, false), true);
+      expect(Eq.boolean.equals(true, true)).toBe(true);
+      expect(Eq.boolean.equals(false, false)).toBe(true);
     });
 
     it("returns false for different booleans", () => {
-      assert.equal(Eq.boolean.equals(true, false), false);
-      assert.equal(Eq.boolean.equals(false, true), false);
+      expect(Eq.boolean.equals(true, false)).toBe(false);
+      expect(Eq.boolean.equals(false, true)).toBe(false);
     });
   });
 
@@ -94,29 +93,29 @@ describe("Eq", () => {
     it("returns true for dates with the same timestamp", () => {
       const d1 = new Date("2024-01-01");
       const d2 = new Date("2024-01-01");
-      assert.equal(Eq.date.equals(d1, d2), true);
+      expect(Eq.date.equals(d1, d2)).toBe(true);
     });
 
     it("returns false for different dates", () => {
       const d1 = new Date("2024-01-01");
       const d2 = new Date("2024-06-15");
-      assert.equal(Eq.date.equals(d1, d2), false);
+      expect(Eq.date.equals(d1, d2)).toBe(false);
     });
 
     it("compares by time value, not reference", () => {
       const d1 = new Date(1000);
       const d2 = new Date(1000);
-      assert.notEqual(d1, d2); // different references
-      assert.equal(Eq.date.equals(d1, d2), true);
+      expect(d1).not.toBe(d2);
+      expect(Eq.date.equals(d1, d2)).toBe(true);
     });
   });
 
   describe("Eq.struct", () => {
     it("compares flat structs field-by-field", () => {
       const eqUser = Eq.struct({ id: Eq.number, name: Eq.string });
-      assert.equal(eqUser.equals({ id: 1, name: "Alice" }, { id: 1, name: "Alice" }), true);
-      assert.equal(eqUser.equals({ id: 1, name: "Alice" }, { id: 2, name: "Alice" }), false);
-      assert.equal(eqUser.equals({ id: 1, name: "Alice" }, { id: 1, name: "Bob" }), false);
+      expect(eqUser.equals({ id: 1, name: "Alice" }, { id: 1, name: "Alice" })).toBe(true);
+      expect(eqUser.equals({ id: 1, name: "Alice" }, { id: 2, name: "Alice" })).toBe(false);
+      expect(eqUser.equals({ id: 1, name: "Alice" }, { id: 1, name: "Bob" })).toBe(false);
     });
 
     it("supports nested structs", () => {
@@ -127,59 +126,59 @@ describe("Eq", () => {
       const u2 = { name: "Alice", address: { city: "Melbourne", zip: "3000" } };
       const u3 = { name: "Alice", address: { city: "Sydney", zip: "2000" } };
 
-      assert.equal(eqUser.equals(u1, u2), true);
-      assert.equal(eqUser.equals(u1, u3), false);
+      expect(eqUser.equals(u1, u2)).toBe(true);
+      expect(eqUser.equals(u1, u3)).toBe(false);
     });
 
     it("returns true for empty struct", () => {
       const eqEmpty = Eq.struct({});
-      assert.equal(eqEmpty.equals({}, {}), true);
+      expect(eqEmpty.equals({}, {})).toBe(true);
     });
   });
 
   describe("Eq.contramap", () => {
     it("derives equality through a projection function", () => {
       const eqByLength = Eq.contramap(Eq.number, s => s.length);
-      assert.equal(eqByLength.equals("abc", "def"), true);
-      assert.equal(eqByLength.equals("abc", "ab"), false);
+      expect(eqByLength.equals("abc", "def")).toBe(true);
+      expect(eqByLength.equals("abc", "ab")).toBe(false);
     });
 
     it("derives Eq for objects by projecting a field", () => {
       const eqById = Eq.contramap(Eq.number, u => u.id);
-      assert.equal(eqById.equals({ id: 1, name: "Alice" }, { id: 1, name: "Bob" }), true);
-      assert.equal(eqById.equals({ id: 1 }, { id: 2 }), false);
+      expect(eqById.equals({ id: 1, name: "Alice" }, { id: 1, name: "Bob" })).toBe(true);
+      expect(eqById.equals({ id: 1 }, { id: 2 })).toBe(false);
     });
   });
 
   describe("Eq (callable factory)", () => {
     it("creates a custom Eq from a function", () => {
       const eqModulo = Eq((a, b) => a % 3 === b % 3);
-      assert.equal(eqModulo.equals(4, 7), true); // both mod 3 === 1
-      assert.equal(eqModulo.equals(4, 5), false);
+      expect(eqModulo.equals(4, 7)).toBe(true);
+      expect(eqModulo.equals(4, 5)).toBe(false);
     });
   });
 
   describe("frozen instances", () => {
     it("built-in Eq instances are frozen", () => {
-      assert.equal(Object.isFrozen(Eq.string), true);
-      assert.equal(Object.isFrozen(Eq.number), true);
-      assert.equal(Object.isFrozen(Eq.boolean), true);
-      assert.equal(Object.isFrozen(Eq.date), true);
+      expect(Object.isFrozen(Eq.string)).toBe(true);
+      expect(Object.isFrozen(Eq.number)).toBe(true);
+      expect(Object.isFrozen(Eq.boolean)).toBe(true);
+      expect(Object.isFrozen(Eq.date)).toBe(true);
     });
 
     it("Eq.struct returns a frozen instance", () => {
       const eq = Eq.struct({ x: Eq.number });
-      assert.equal(Object.isFrozen(eq), true);
+      expect(Object.isFrozen(eq)).toBe(true);
     });
 
     it("Eq.contramap returns a frozen instance", () => {
       const eq = Eq.contramap(Eq.number, s => s.length);
-      assert.equal(Object.isFrozen(eq), true);
+      expect(Object.isFrozen(eq)).toBe(true);
     });
 
     it("Eq factory returns a frozen instance", () => {
       const eq = Eq((a, b) => a === b);
-      assert.equal(Object.isFrozen(eq), true);
+      expect(Object.isFrozen(eq)).toBe(true);
     });
   });
 });
@@ -191,39 +190,39 @@ describe("Eq", () => {
 describe("Ord", () => {
   describe("Ord.number", () => {
     it("returns -1 when a < b", () => {
-      assert.equal(Ord.number.compare(1, 2), -1);
+      expect(Ord.number.compare(1, 2)).toBe(-1);
     });
 
     it("returns 0 when a === b", () => {
-      assert.equal(Ord.number.compare(5, 5), 0);
+      expect(Ord.number.compare(5, 5)).toBe(0);
     });
 
     it("returns 1 when a > b", () => {
-      assert.equal(Ord.number.compare(10, 3), 1);
+      expect(Ord.number.compare(10, 3)).toBe(1);
     });
 
     it("handles negative numbers", () => {
-      assert.equal(Ord.number.compare(-5, -3), -1);
-      assert.equal(Ord.number.compare(-3, -5), 1);
+      expect(Ord.number.compare(-5, -3)).toBe(-1);
+      expect(Ord.number.compare(-3, -5)).toBe(1);
     });
 
     it("derives equals from compare", () => {
-      assert.equal(Ord.number.equals(5, 5), true);
-      assert.equal(Ord.number.equals(5, 6), false);
+      expect(Ord.number.equals(5, 5)).toBe(true);
+      expect(Ord.number.equals(5, 6)).toBe(false);
     });
   });
 
   describe("Ord.string", () => {
     it("compares strings lexicographically", () => {
-      assert.equal(Ord.string.compare("apple", "banana"), -1);
-      assert.equal(Ord.string.compare("banana", "apple"), 1);
-      assert.equal(Ord.string.compare("same", "same"), 0);
+      expect(Ord.string.compare("apple", "banana")).toBe(-1);
+      expect(Ord.string.compare("banana", "apple")).toBe(1);
+      expect(Ord.string.compare("same", "same")).toBe(0);
     });
 
     it("handles empty strings", () => {
-      assert.equal(Ord.string.compare("", "a"), -1);
-      assert.equal(Ord.string.compare("a", ""), 1);
-      assert.equal(Ord.string.compare("", ""), 0);
+      expect(Ord.string.compare("", "a")).toBe(-1);
+      expect(Ord.string.compare("a", "")).toBe(1);
+      expect(Ord.string.compare("", "")).toBe(0);
     });
   });
 
@@ -231,153 +230,153 @@ describe("Ord", () => {
     it("compares dates by time value", () => {
       const earlier = new Date("2024-01-01");
       const later = new Date("2024-12-31");
-      assert.equal(Ord.date.compare(earlier, later), -1);
-      assert.equal(Ord.date.compare(later, earlier), 1);
-      assert.equal(Ord.date.compare(earlier, new Date("2024-01-01")), 0);
+      expect(Ord.date.compare(earlier, later)).toBe(-1);
+      expect(Ord.date.compare(later, earlier)).toBe(1);
+      expect(Ord.date.compare(earlier, new Date("2024-01-01"))).toBe(0);
     });
   });
 
   describe("Ord.reverse", () => {
     it("reverses the ordering", () => {
       const reversed = Ord.reverse(Ord.number);
-      assert.equal(reversed.compare(1, 2), 1);
-      assert.equal(reversed.compare(2, 1), -1);
-      assert.equal(reversed.compare(5, 5), 0);
+      expect(reversed.compare(1, 2)).toBe(1);
+      expect(reversed.compare(2, 1)).toBe(-1);
+      expect(reversed.compare(5, 5)).toBe(0);
     });
 
     it("double reverse restores original ordering", () => {
       const doubleReversed = Ord.reverse(Ord.reverse(Ord.number));
-      assert.equal(doubleReversed.compare(1, 2), -1);
-      assert.equal(doubleReversed.compare(2, 1), 1);
+      expect(doubleReversed.compare(1, 2)).toBe(-1);
+      expect(doubleReversed.compare(2, 1)).toBe(1);
     });
   });
 
   describe("Ord.contramap", () => {
     it("derives ordering through a projection function", () => {
       const byAge = Ord.contramap(Ord.number, u => u.age);
-      assert.equal(byAge.compare({ age: 20 }, { age: 30 }), -1);
-      assert.equal(byAge.compare({ age: 30 }, { age: 20 }), 1);
-      assert.equal(byAge.compare({ age: 25 }, { age: 25 }), 0);
+      expect(byAge.compare({ age: 20 }, { age: 30 })).toBe(-1);
+      expect(byAge.compare({ age: 30 }, { age: 20 })).toBe(1);
+      expect(byAge.compare({ age: 25 }, { age: 25 })).toBe(0);
     });
 
     it("derives ordering by string length", () => {
       const byLength = Ord.contramap(Ord.number, s => s.length);
-      assert.equal(byLength.compare("ab", "abc"), -1);
-      assert.equal(byLength.compare("abc", "ab"), 1);
-      assert.equal(byLength.compare("ab", "cd"), 0);
+      expect(byLength.compare("ab", "abc")).toBe(-1);
+      expect(byLength.compare("abc", "ab")).toBe(1);
+      expect(byLength.compare("ab", "cd")).toBe(0);
     });
   });
 
   describe("Ord.min", () => {
     it("returns the smaller of two values", () => {
       const min = Ord.min(Ord.number);
-      assert.equal(min(3, 7), 3);
-      assert.equal(min(7, 3), 3);
+      expect(min(3, 7)).toBe(3);
+      expect(min(7, 3)).toBe(3);
     });
 
     it("returns the first value when equal", () => {
       const min = Ord.min(Ord.number);
-      assert.equal(min(5, 5), 5);
+      expect(min(5, 5)).toBe(5);
     });
 
     it("works with strings", () => {
       const min = Ord.min(Ord.string);
-      assert.equal(min("banana", "apple"), "apple");
+      expect(min("banana", "apple")).toBe("apple");
     });
   });
 
   describe("Ord.max", () => {
     it("returns the larger of two values", () => {
       const max = Ord.max(Ord.number);
-      assert.equal(max(3, 7), 7);
-      assert.equal(max(7, 3), 7);
+      expect(max(3, 7)).toBe(7);
+      expect(max(7, 3)).toBe(7);
     });
 
     it("returns the first value when equal", () => {
       const max = Ord.max(Ord.number);
-      assert.equal(max(5, 5), 5);
+      expect(max(5, 5)).toBe(5);
     });
 
     it("works with strings", () => {
       const max = Ord.max(Ord.string);
-      assert.equal(max("apple", "banana"), "banana");
+      expect(max("apple", "banana")).toBe("banana");
     });
   });
 
   describe("Ord.clamp", () => {
     it("returns value when within bounds", () => {
       const clamp = Ord.clamp(Ord.number, 0, 100);
-      assert.equal(clamp(50), 50);
+      expect(clamp(50)).toBe(50);
     });
 
     it("clamps to low when below", () => {
       const clamp = Ord.clamp(Ord.number, 0, 100);
-      assert.equal(clamp(-10), 0);
+      expect(clamp(-10)).toBe(0);
     });
 
     it("clamps to high when above", () => {
       const clamp = Ord.clamp(Ord.number, 0, 100);
-      assert.equal(clamp(150), 100);
+      expect(clamp(150)).toBe(100);
     });
 
     it("returns boundary values when at boundary", () => {
       const clamp = Ord.clamp(Ord.number, 0, 100);
-      assert.equal(clamp(0), 0);
-      assert.equal(clamp(100), 100);
+      expect(clamp(0)).toBe(0);
+      expect(clamp(100)).toBe(100);
     });
 
     it("works with strings", () => {
       const clamp = Ord.clamp(Ord.string, "b", "d");
-      assert.equal(clamp("a"), "b");
-      assert.equal(clamp("c"), "c");
-      assert.equal(clamp("e"), "d");
+      expect(clamp("a")).toBe("b");
+      expect(clamp("c")).toBe("c");
+      expect(clamp("e")).toBe("d");
     });
   });
 
   describe("Ord.between", () => {
     it("returns true when value is within bounds", () => {
       const between = Ord.between(Ord.number, 0, 100);
-      assert.equal(between(50), true);
+      expect(between(50)).toBe(true);
     });
 
     it("returns true at exact boundaries", () => {
       const between = Ord.between(Ord.number, 0, 100);
-      assert.equal(between(0), true);
-      assert.equal(between(100), true);
+      expect(between(0)).toBe(true);
+      expect(between(100)).toBe(true);
     });
 
     it("returns false when below lower bound", () => {
       const between = Ord.between(Ord.number, 0, 100);
-      assert.equal(between(-1), false);
+      expect(between(-1)).toBe(false);
     });
 
     it("returns false when above upper bound", () => {
       const between = Ord.between(Ord.number, 0, 100);
-      assert.equal(between(101), false);
+      expect(between(101)).toBe(false);
     });
   });
 
   describe("Ord (callable factory)", () => {
     it("creates a custom Ord from a compare function", () => {
       const byAbsValue = Ord((a, b) => Math.abs(a) - Math.abs(b));
-      assert.equal(byAbsValue.compare(-3, 2), 1);
-      assert.equal(byAbsValue.compare(2, -3), -1);
-      assert.equal(byAbsValue.compare(-3, 3), 0);
+      expect(byAbsValue.compare(-3, 2)).toBe(1);
+      expect(byAbsValue.compare(2, -3)).toBe(-1);
+      expect(byAbsValue.compare(-3, 3)).toBe(0);
     });
 
     it("normalises compare result to -1, 0, or 1", () => {
       const ord = Ord((a, b) => a - b); // may return values other than -1/0/1
-      assert.equal(ord.compare(1, 100), -1);
-      assert.equal(ord.compare(100, 1), 1);
-      assert.equal(ord.compare(5, 5), 0);
+      expect(ord.compare(1, 100)).toBe(-1);
+      expect(ord.compare(100, 1)).toBe(1);
+      expect(ord.compare(5, 5)).toBe(0);
     });
   });
 
   describe("frozen instances", () => {
     it("built-in Ord instances are frozen", () => {
-      assert.equal(Object.isFrozen(Ord.number), true);
-      assert.equal(Object.isFrozen(Ord.string), true);
-      assert.equal(Object.isFrozen(Ord.date), true);
+      expect(Object.isFrozen(Ord.number)).toBe(true);
+      expect(Object.isFrozen(Ord.string)).toBe(true);
+      expect(Object.isFrozen(Ord.date)).toBe(true);
     });
   });
 });
@@ -394,7 +393,7 @@ describe("Match", () => {
         .with({ tag: "Err" }, r => 0)
         .exhaustive();
 
-      assert.equal(result, 84);
+      expect(result).toBe(84);
     });
 
     it("matches Err tag", () => {
@@ -403,7 +402,7 @@ describe("Match", () => {
         .with({ tag: "Err" }, r => `Error: ${r.error}`)
         .exhaustive();
 
-      assert.equal(result, "Error: fail");
+      expect(result).toBe("Error: fail");
     });
 
     it("matches Option tags", () => {
@@ -412,14 +411,14 @@ describe("Match", () => {
         .with({ tag: "None" }, () => -1)
         .exhaustive();
 
-      assert.equal(matchSome, 15);
+      expect(matchSome).toBe(15);
 
       const matchNone = Match(None)
         .with({ tag: "Some" }, o => o.value)
         .with({ tag: "None" }, () => -1)
         .exhaustive();
 
-      assert.equal(matchNone, -1);
+      expect(matchNone).toBe(-1);
     });
   });
 
@@ -440,7 +439,7 @@ describe("Match", () => {
         )
         .otherwise(() => "F");
 
-      assert.equal(label, "A");
+      expect(label).toBe("A");
     });
 
     it("falls through to later predicates", () => {
@@ -455,7 +454,7 @@ describe("Match", () => {
         )
         .otherwise(() => "F");
 
-      assert.equal(label, "B");
+      expect(label).toBe("B");
     });
 
     it("reaches otherwise when no predicate matches", () => {
@@ -470,7 +469,7 @@ describe("Match", () => {
         )
         .otherwise(() => "F");
 
-      assert.equal(label, "F");
+      expect(label).toBe("F");
     });
   });
 
@@ -481,7 +480,7 @@ describe("Match", () => {
         .with({ tag: "Err" }, () => "err")
         .otherwise(v => `fallback: ${v.tag}`);
 
-      assert.equal(result, "fallback: Unknown");
+      expect(result).toBe("fallback: Unknown");
     });
 
     it("is not reached when a prior arm matches", () => {
@@ -489,7 +488,7 @@ describe("Match", () => {
         .with({ tag: "Ok" }, r => r.value)
         .otherwise(() => -1);
 
-      assert.equal(result, 1);
+      expect(result).toBe(1);
     });
   });
 
@@ -500,22 +499,16 @@ describe("Match", () => {
         .with({ tag: "Err" }, () => 0)
         .exhaustive();
 
-      assert.equal(result, 10);
+      expect(result).toBe(10);
     });
 
     it("throws TypeError when no pattern matches", () => {
-      assert.throws(
-        () => {
-          Match({ tag: "Unexpected" })
-            .with({ tag: "Ok" }, () => 1)
-            .with({ tag: "Err" }, () => 2)
-            .exhaustive();
-        },
-        {
-          name: "TypeError",
-          message: /no pattern matched/,
-        },
-      );
+      expect(() => {
+        Match({ tag: "Unexpected" })
+          .with({ tag: "Ok" }, () => 1)
+          .with({ tag: "Err" }, () => 2)
+          .exhaustive();
+      }).toThrow();
     });
   });
 
@@ -527,9 +520,9 @@ describe("Match", () => {
           .with({ tag: "Err" }, r => `err:${r.error}`)
           .otherwise(() => "unknown");
 
-      assert.equal(classify(Ok("yes")), "ok:yes");
-      assert.equal(classify(Err("no")), "err:no");
-      assert.equal(classify({ tag: "Other" }), "unknown");
+      expect(classify(Ok("yes"))).toBe("ok:yes");
+      expect(classify(Err("no"))).toBe("err:no");
+      expect(classify({ tag: "Other" })).toBe("unknown");
     });
 
     it("mixes .with() and .when() arms", () => {
@@ -542,7 +535,7 @@ describe("Match", () => {
         .with({ tag: "Ok" }, r => `ok:${r.value}`)
         .exhaustive();
 
-      assert.equal(result, "ok:42");
+      expect(result).toBe("ok:42");
     });
   });
 
@@ -559,7 +552,7 @@ describe("Match", () => {
         )
         .otherwise(() => "short");
 
-      assert.equal(result, "medium");
+      expect(result).toBe("medium");
     });
   });
 });
@@ -573,15 +566,15 @@ describe("State", () => {
     it("wraps a value without modifying state", () => {
       const s = State.of(42);
       const [value, state] = s.run("initial");
-      assert.equal(value, 42);
-      assert.equal(state, "initial");
+      expect(value).toBe(42);
+      expect(state).toBe("initial");
     });
 
     it("works with different state types", () => {
       const s = State.of("hello");
       const [value, state] = s.run(0);
-      assert.equal(value, "hello");
-      assert.equal(state, 0);
+      expect(value).toBe("hello");
+      expect(state).toBe(0);
     });
   });
 
@@ -589,14 +582,14 @@ describe("State", () => {
     it("reads the current state as the value", () => {
       const s = State.get();
       const [value, state] = s.run(99);
-      assert.equal(value, 99);
-      assert.equal(state, 99);
+      expect(value).toBe(99);
+      expect(state).toBe(99);
     });
 
     it("does not modify the state", () => {
       const s = State.get();
       const [_, state] = s.run("keep");
-      assert.equal(state, "keep");
+      expect(state).toBe("keep");
     });
   });
 
@@ -604,8 +597,8 @@ describe("State", () => {
     it("replaces the state", () => {
       const s = State.set("new");
       const [value, state] = s.run("old");
-      assert.equal(value, undefined);
-      assert.equal(state, "new");
+      expect(value).toBe(undefined);
+      expect(state).toBe("new");
     });
   });
 
@@ -613,14 +606,14 @@ describe("State", () => {
     it("transforms the state via a function", () => {
       const s = State.modify(n => n + 1);
       const [value, state] = s.run(10);
-      assert.equal(value, undefined);
-      assert.equal(state, 11);
+      expect(value).toBe(undefined);
+      expect(state).toBe(11);
     });
 
     it("applies transformation correctly", () => {
       const double = State.modify(n => n * 2);
       const [_, state] = double.run(5);
-      assert.equal(state, 10);
+      expect(state).toBe(10);
     });
   });
 
@@ -628,8 +621,8 @@ describe("State", () => {
     it("transforms the produced value", () => {
       const s = State.of(10).map(n => n * 3);
       const [value, state] = s.run("s");
-      assert.equal(value, 30);
-      assert.equal(state, "s");
+      expect(value).toBe(30);
+      expect(state).toBe("s");
     });
   });
 
@@ -640,8 +633,8 @@ describe("State", () => {
         .flatMap(() => State.get());
 
       const [value, state] = s.run(10);
-      assert.equal(value, 11);
-      assert.equal(state, 11);
+      expect(value).toBe(11);
+      expect(state).toBe(11);
     });
 
     it("threads state through multiple steps", () => {
@@ -650,8 +643,8 @@ describe("State", () => {
       const program = increment.flatMap(first => increment.map(second => [first, second]));
 
       const [values, finalState] = program.run(0);
-      assert.deepEqual(values, [0, 1]);
-      assert.equal(finalState, 2);
+      expect(values).toEqual([0, 1]);
+      expect(finalState).toBe(2);
     });
   });
 
@@ -660,35 +653,35 @@ describe("State", () => {
       const sideEffects = [];
       const s = State.of(42).tap(v => sideEffects.push(v));
       const [value, state] = s.run("s");
-      assert.equal(value, 42);
-      assert.equal(state, "s");
-      assert.deepEqual(sideEffects, [42]);
+      expect(value).toBe(42);
+      expect(state).toBe("s");
+      expect(sideEffects).toEqual([42]);
     });
   });
 
   describe(".eval", () => {
     it("returns only the value, discarding final state", () => {
       const value = State.of(42).eval("ignored");
-      assert.equal(value, 42);
+      expect(value).toBe(42);
     });
 
     it("discards state changes", () => {
       const value = State.modify(n => n + 100)
         .flatMap(() => State.of("result"))
         .eval(0);
-      assert.equal(value, "result");
+      expect(value).toBe("result");
     });
   });
 
   describe(".exec", () => {
     it("returns only the final state, discarding the value", () => {
       const finalState = State.modify(n => n + 5).exec(10);
-      assert.equal(finalState, 15);
+      expect(finalState).toBe(15);
     });
 
     it("discards the produced value", () => {
       const finalState = State.of("ignored").exec(42);
-      assert.equal(finalState, 42);
+      expect(finalState).toBe(42);
     });
   });
 
@@ -700,8 +693,8 @@ describe("State", () => {
       const program = counter.flatMap(a => counter.flatMap(b => counter.map(c => [a, b, c])));
 
       const [values, finalState] = program.run(0);
-      assert.deepEqual(values, [0, 1, 2]);
-      assert.equal(finalState, 3);
+      expect(values).toEqual([0, 1, 2]);
+      expect(finalState).toBe(3);
     });
 
     it("stack push/pop example", () => {
@@ -716,8 +709,8 @@ describe("State", () => {
         .flatMap(() => pop);
 
       const [value, state] = program.run([]);
-      assert.equal(value, 3);
-      assert.deepEqual(state, [1, 2]);
+      expect(value).toBe(3);
+      expect(state).toEqual([1, 2]);
     });
   });
 });
@@ -730,29 +723,29 @@ describe("Lens", () => {
   describe("Lens.prop", () => {
     it("gets a property from an object", () => {
       const name = Lens.prop()("name");
-      assert.equal(name.get({ name: "Alice", age: 30 }), "Alice");
+      expect(name.get({ name: "Alice", age: 30 })).toBe("Alice");
     });
 
     it("sets a property on an object immutably", () => {
       const name = Lens.prop()("name");
       const original = { name: "Alice", age: 30 };
       const updated = name.set("Bob")(original);
-      assert.equal(updated.name, "Bob");
-      assert.equal(updated.age, 30);
-      assert.equal(original.name, "Alice"); // original unchanged
+      expect(updated.name).toBe("Bob");
+      expect(updated.age).toBe(30);
+      expect(original.name).toBe("Alice");
     });
 
     it("modifies a property on an object immutably", () => {
       const name = Lens.prop()("name");
       const result = name.modify(s => s.toUpperCase())({ name: "alice", age: 30 });
-      assert.equal(result.name, "ALICE");
-      assert.equal(result.age, 30);
+      expect(result.name).toBe("ALICE");
+      expect(result.age).toBe(30);
     });
 
     it("works with nested objects via get", () => {
       const address = Lens.prop()("address");
       const obj = { address: { city: "Melbourne" } };
-      assert.deepEqual(address.get(obj), { city: "Melbourne" });
+      expect(address.get(obj)).toEqual({ city: "Melbourne" });
     });
   });
 
@@ -764,7 +757,7 @@ describe("Lens", () => {
 
       const user = { name: "Alice", address: { city: "Melbourne", zip: "3000" } };
 
-      assert.equal(deepCity.get(user), "Melbourne");
+      expect(deepCity.get(user)).toBe("Melbourne");
     });
 
     it("sets deeply nested property immutably", () => {
@@ -775,10 +768,10 @@ describe("Lens", () => {
       const user = { name: "Alice", address: { city: "Melbourne", zip: "3000" } };
       const updated = deepCity.set("Sydney")(user);
 
-      assert.equal(updated.address.city, "Sydney");
-      assert.equal(updated.address.zip, "3000");
-      assert.equal(updated.name, "Alice");
-      assert.equal(user.address.city, "Melbourne"); // original unchanged
+      expect(updated.address.city).toBe("Sydney");
+      expect(updated.address.zip).toBe("3000");
+      expect(updated.name).toBe("Alice");
+      expect(user.address.city).toBe("Melbourne");
     });
 
     it("modifies deeply nested property", () => {
@@ -789,7 +782,7 @@ describe("Lens", () => {
       const user = { name: "Alice", address: { city: "Melbourne", zip: "3000" } };
       const updated = deepCity.modify(c => c.toUpperCase())(user);
 
-      assert.equal(updated.address.city, "MELBOURNE");
+      expect(updated.address.city).toBe("MELBOURNE");
     });
   });
 
@@ -797,7 +790,7 @@ describe("Lens", () => {
     it("identity lens gets the whole object", () => {
       const id = Lens.id();
       const obj = { a: 1, b: 2 };
-      assert.deepEqual(id.get(obj), obj);
+      expect(id.get(obj)).toEqual(obj);
     });
 
     it("identity lens set replaces the whole object", () => {
@@ -805,19 +798,19 @@ describe("Lens", () => {
       const original = { a: 1 };
       const replacement = { a: 99 };
       const result = id.set(replacement)(original);
-      assert.deepEqual(result, replacement);
+      expect(result).toEqual(replacement);
     });
 
     it("identity lens modify transforms the whole object", () => {
       const id = Lens.id();
       const result = id.modify(obj => ({ ...obj, added: true }))({ x: 1 });
-      assert.deepEqual(result, { x: 1, added: true });
+      expect(result).toEqual({ x: 1, added: true });
     });
 
     it("composing with id is a no-op", () => {
       const name = Lens.prop()("name");
       const composed = Lens.id().compose(name);
-      assert.equal(composed.get({ name: "test" }), "test");
+      expect(composed.get({ name: "test" })).toBe("test");
     });
   });
 
@@ -828,8 +821,8 @@ describe("Lens", () => {
         (value, arr) => [value, ...arr.slice(1)],
       );
 
-      assert.equal(headLens.get([10, 20, 30]), 10);
-      assert.deepEqual(headLens.set(99)([10, 20, 30]), [99, 20, 30]);
+      expect(headLens.get([10, 20, 30])).toBe(10);
+      expect(headLens.set(99)([10, 20, 30])).toEqual([99, 20, 30]);
     });
   });
 });
@@ -839,59 +832,59 @@ describe("LensOptional", () => {
     it("gets from a valid index", () => {
       const at1 = LensOptional.index(1);
       const result = at1.getOption([10, 20, 30]);
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), 20);
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe(20);
     });
 
     it("returns None for out-of-bounds index", () => {
       const at5 = LensOptional.index(5);
       const result = at5.getOption([10, 20, 30]);
-      assert.equal(result.isNone, true);
+      expect(result.isNone).toBe(true);
     });
 
     it("returns None for empty array", () => {
       const at0 = LensOptional.index(0);
-      assert.equal(at0.getOption([]).isNone, true);
+      expect(at0.getOption([]).isNone).toBe(true);
     });
 
     it("supports negative indices", () => {
       const atLast = LensOptional.index(-1);
       const result = atLast.getOption([10, 20, 30]);
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), 30);
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe(30);
     });
 
     it("returns None for negative index beyond array length", () => {
       const atNeg5 = LensOptional.index(-5);
-      assert.equal(atNeg5.getOption([10, 20]).isNone, true);
+      expect(atNeg5.getOption([10, 20]).isNone).toBe(true);
     });
 
     it("sets at a valid index immutably", () => {
       const at1 = LensOptional.index(1);
       const original = [10, 20, 30];
       const updated = at1.set(99)(original);
-      assert.deepEqual(updated, [10, 99, 30]);
-      assert.deepEqual(original, [10, 20, 30]); // original unchanged
+      expect(updated).toEqual([10, 99, 30]);
+      expect(original).toEqual([10, 20, 30]);
     });
 
     it("returns original array when setting at out-of-bounds index", () => {
       const at5 = LensOptional.index(5);
       const original = [10, 20];
       const result = at5.set(99)(original);
-      assert.deepEqual(result, [10, 20]);
+      expect(result).toEqual([10, 20]);
     });
 
     it("modifies at a valid index", () => {
       const at0 = LensOptional.index(0);
       const result = at0.modify(n => n * 10)([5, 6, 7]);
-      assert.deepEqual(result, [50, 6, 7]);
+      expect(result).toEqual([50, 6, 7]);
     });
 
     it("modify is a no-op for out-of-bounds index", () => {
       const at5 = LensOptional.index(5);
       const original = [1, 2];
       const result = at5.modify(n => n * 10)(original);
-      assert.equal(result, original); // same reference
+      expect(result).toBe(original);
     });
   });
 
@@ -900,27 +893,27 @@ describe("LensOptional", () => {
       const bio = LensOptional.fromNullable()("bio");
       const user = { name: "Alice", bio: "Developer" };
       const result = bio.getOption(user);
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), "Developer");
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe("Developer");
     });
 
     it("returns None when the field is null", () => {
       const bio = LensOptional.fromNullable()("bio");
       const user = { name: "Alice", bio: null };
-      assert.equal(bio.getOption(user).isNone, true);
+      expect(bio.getOption(user).isNone).toBe(true);
     });
 
     it("returns None when the field is undefined", () => {
       const bio = LensOptional.fromNullable()("bio");
       const user = { name: "Alice", bio: undefined };
-      assert.equal(bio.getOption(user).isNone, true);
+      expect(bio.getOption(user).isNone).toBe(true);
     });
 
     it("sets a nullable field", () => {
       const bio = LensOptional.fromNullable()("bio");
       const updated = bio.set("New bio")({ name: "Alice", bio: null });
-      assert.equal(updated.bio, "New bio");
-      assert.equal(updated.name, "Alice");
+      expect(updated.bio).toBe("New bio");
+      expect(updated.name).toBe("Alice");
     });
   });
 
@@ -937,8 +930,8 @@ describe("LensOptional", () => {
         [40, 50],
       ];
       const result = composed.getOption(data);
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), 20);
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe(20);
     });
 
     it("returns None when first optional misses", () => {
@@ -946,7 +939,7 @@ describe("LensOptional", () => {
       const at0 = LensOptional.index(0);
       const composed = at5.compose(at0);
 
-      assert.equal(composed.getOption([[1]]).isNone, true);
+      expect(composed.getOption([[1]]).isNone).toBe(true);
     });
   });
 
@@ -957,7 +950,7 @@ describe("LensOptional", () => {
       const firstItem = items.composeOptional(at0);
 
       const data = { items: [10, 20, 30] };
-      assert.equal(firstItem.getOption(data).unwrap(), 10);
+      expect(firstItem.getOption(data).unwrap()).toBe(10);
     });
 
     it("returns None when optional part misses", () => {
@@ -966,7 +959,7 @@ describe("LensOptional", () => {
       const fifthItem = items.composeOptional(at5);
 
       const data = { items: [10, 20] };
-      assert.equal(fifthItem.getOption(data).isNone, true);
+      expect(fifthItem.getOption(data).isNone).toBe(true);
     });
   });
 });
@@ -979,8 +972,8 @@ describe("Prism", () => {
         s => s,
       );
       const result = strPrism.getOption("hello");
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), "hello");
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe("hello");
     });
 
     it("getOption returns None on non-matching variant", () => {
@@ -988,7 +981,7 @@ describe("Prism", () => {
         v => (typeof v === "string" ? Some(v) : None),
         s => s,
       );
-      assert.equal(strPrism.getOption(42).isNone, true);
+      expect(strPrism.getOption(42).isNone).toBe(true);
     });
 
     it("reverseGet constructs the sum type", () => {
@@ -996,7 +989,7 @@ describe("Prism", () => {
         v => (typeof v === "string" ? Some(v) : None),
         s => s,
       );
-      assert.equal(strPrism.reverseGet("test"), "test");
+      expect(strPrism.reverseGet("test")).toBe("test");
     });
 
     it("modify transforms matching values", () => {
@@ -1004,7 +997,7 @@ describe("Prism", () => {
         v => (typeof v === "string" ? Some(v) : None),
         s => s,
       );
-      assert.equal(strPrism.modify(s => s.toUpperCase())("hello"), "HELLO");
+      expect(strPrism.modify(s => s.toUpperCase())("hello")).toBe("HELLO");
     });
 
     it("modify leaves non-matching values unchanged", () => {
@@ -1012,7 +1005,7 @@ describe("Prism", () => {
         v => (typeof v === "string" ? Some(v) : None),
         s => s,
       );
-      assert.equal(strPrism.modify(s => s.toUpperCase())(42), 42);
+      expect(strPrism.modify(s => s.toUpperCase())(42)).toBe(42);
     });
 
     it("works with Ok/Err prism on Result", () => {
@@ -1021,10 +1014,10 @@ describe("Prism", () => {
         v => Ok(v),
       );
 
-      assert.equal(okPrism.getOption(Ok(42)).unwrap(), 42);
-      assert.equal(okPrism.getOption(Err("fail")).isNone, true);
-      assert.equal(okPrism.reverseGet(10).isOk, true);
-      assert.equal(okPrism.reverseGet(10).unwrap(), 10);
+      expect(okPrism.getOption(Ok(42)).unwrap()).toBe(42);
+      expect(okPrism.getOption(Err("fail")).isNone).toBe(true);
+      expect(okPrism.reverseGet(10).isOk).toBe(true);
+      expect(okPrism.reverseGet(10).unwrap()).toBe(10);
     });
   });
 
@@ -1044,10 +1037,10 @@ describe("Prism", () => {
 
       const composed = strPrism.compose(headPrism);
 
-      assert.equal(composed.getOption("hello").unwrap(), "h");
-      assert.equal(composed.getOption("").isNone, true);
-      assert.equal(composed.getOption(42).isNone, true);
-      assert.equal(composed.reverseGet("A"), "A");
+      expect(composed.getOption("hello").unwrap()).toBe("h");
+      expect(composed.getOption("").isNone).toBe(true);
+      expect(composed.getOption(42).isNone).toBe(true);
+      expect(composed.reverseGet("A")).toBe("A");
     });
   });
 
@@ -1059,8 +1052,8 @@ describe("Prism", () => {
       );
 
       const opt = strPrism.toOptional();
-      assert.equal(opt.getOption("hello").unwrap(), "hello");
-      assert.equal(opt.getOption(42).isNone, true);
+      expect(opt.getOption("hello").unwrap()).toBe("hello");
+      expect(opt.getOption(42).isNone).toBe(true);
     });
   });
 
@@ -1070,7 +1063,7 @@ describe("Prism", () => {
         v => Some(v),
         v => v,
       );
-      assert.equal(Object.isFrozen(p), true);
+      expect(Object.isFrozen(p)).toBe(true);
     });
   });
 });
@@ -1079,37 +1072,37 @@ describe("Traversal", () => {
   describe("Traversal.fromArray", () => {
     it("getAll returns all elements", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.getAll([1, 2, 3]), [1, 2, 3]);
+      expect(t.getAll([1, 2, 3])).toEqual([1, 2, 3]);
     });
 
     it("getAll returns empty array for empty input", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.getAll([]), []);
+      expect(t.getAll([])).toEqual([]);
     });
 
     it("modify transforms all elements", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.modify(n => n * 2)([1, 2, 3]), [2, 4, 6]);
+      expect(t.modify(n => n * 2)([1, 2, 3])).toEqual([2, 4, 6]);
     });
 
     it("modify on empty array returns empty array", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.modify(n => n * 2)([]), []);
+      expect(t.modify(n => n * 2)([])).toEqual([]);
     });
 
     it("set replaces all elements with the same value", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.set(0)([1, 2, 3]), [0, 0, 0]);
+      expect(t.set(0)([1, 2, 3])).toEqual([0, 0, 0]);
     });
 
     it("set on empty array returns empty array", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.set(99)([]), []);
+      expect(t.set(99)([])).toEqual([]);
     });
 
     it("works with string arrays", () => {
       const t = Traversal.fromArray();
-      assert.deepEqual(t.modify(s => s.toUpperCase())(["a", "b", "c"]), ["A", "B", "C"]);
+      expect(t.modify(s => s.toUpperCase())(["a", "b", "c"])).toEqual(["A", "B", "C"]);
     });
   });
 
@@ -1127,16 +1120,16 @@ describe("Traversal", () => {
         },
       );
 
-      assert.deepEqual(t.getAll({ a: 1, b: 2 }), [1, 2]);
-      assert.deepEqual(t.modify(n => n * 10)({ a: 1, b: 2 }), { a: 10, b: 20 });
-      assert.deepEqual(t.set(0)({ a: 1, b: 2 }), { a: 0, b: 0 });
+      expect(t.getAll({ a: 1, b: 2 })).toEqual([1, 2]);
+      expect(t.modify(n => n * 10)({ a: 1, b: 2 })).toEqual({ a: 10, b: 20 });
+      expect(t.set(0)({ a: 1, b: 2 })).toEqual({ a: 0, b: 0 });
     });
   });
 
   describe("frozen instances", () => {
     it("traversals are frozen", () => {
       const t = Traversal.fromArray();
-      assert.equal(Object.isFrozen(t), true);
+      expect(Object.isFrozen(t)).toBe(true);
     });
   });
 });
@@ -1148,8 +1141,8 @@ describe("Traversal", () => {
 describe("Result.traverse", () => {
   it("collects all successes", () => {
     const result = Result.traverse([1, 2, 3], n => Ok(n * 2));
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [2, 4, 6]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([2, 4, 6]);
   });
 
   it("short-circuits on the first failure", () => {
@@ -1158,77 +1151,77 @@ describe("Result.traverse", () => {
       count++;
       return n > 0 ? Ok(n) : Err(`negative: ${n}`);
     });
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "negative: -2");
-    assert.equal(count, 2); // stopped after the second element
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("negative: -2");
+    expect(count).toBe(2);
   });
 
   it("returns Ok with empty array for empty input", () => {
     const result = Result.traverse([], n => Ok(n));
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("single element success", () => {
     const result = Result.traverse([42], n => Ok(n));
-    assert.deepEqual(result.unwrap(), [42]);
+    expect(result.unwrap()).toEqual([42]);
   });
 
   it("single element failure", () => {
     const result = Result.traverse([42], () => Err("fail"));
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 });
 
 describe("Result.sequence (alias for collect)", () => {
   it("collects all Ok results", () => {
     const result = Result.sequence([Ok(1), Ok(2), Ok(3)]);
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [1, 2, 3]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("short-circuits on first Err", () => {
     const result = Result.sequence([Ok(1), Err("bad"), Ok(3)]);
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "bad");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("bad");
   });
 
   it("handles empty array", () => {
     const result = Result.sequence([]);
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("single Err", () => {
     const result = Result.sequence([Err("only error")]);
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "only error");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("only error");
   });
 });
 
 describe("Result.fromNullable", () => {
   it("non-null value returns Ok", () => {
     const result = Result.fromNullable(42, () => "was null");
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, 42);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(42);
   });
 
   it("null returns Err", () => {
     const result = Result.fromNullable(null, () => "was null");
-    assert.equal(result.isErr, true);
-    assert.equal(result.error, "was null");
+    expect(result.isErr).toBe(true);
+    expect(result.error).toBe("was null");
   });
 
   it("undefined returns Err", () => {
     const result = Result.fromNullable(undefined, () => "missing");
-    assert.equal(result.isErr, true);
-    assert.equal(result.error, "missing");
+    expect(result.isErr).toBe(true);
+    expect(result.error).toBe("missing");
   });
 
   it("falsy values (0, empty string, false) return Ok", () => {
-    assert.equal(Result.fromNullable(0, () => "err").isOk, true);
-    assert.equal(Result.fromNullable("", () => "err").isOk, true);
-    assert.equal(Result.fromNullable(false, () => "err").isOk, true);
+    expect(Result.fromNullable(0, () => "err").isOk).toBe(true);
+    expect(Result.fromNullable("", () => "err").isOk).toBe(true);
+    expect(Result.fromNullable(false, () => "err").isOk).toBe(true);
   });
 });
 
@@ -1236,26 +1229,26 @@ describe("Result.partition", () => {
   it("separates Ok and Err values", () => {
     const results = [Ok(1), Err("a"), Ok(2), Err("b"), Ok(3)];
     const { ok, err } = Result.partition(results);
-    assert.deepEqual(ok, [1, 2, 3]);
-    assert.deepEqual(err, ["a", "b"]);
+    expect(ok).toEqual([1, 2, 3]);
+    expect(err).toEqual(["a", "b"]);
   });
 
   it("all Ok returns empty err array", () => {
     const { ok, err } = Result.partition([Ok(1), Ok(2)]);
-    assert.deepEqual(ok, [1, 2]);
-    assert.deepEqual(err, []);
+    expect(ok).toEqual([1, 2]);
+    expect(err).toEqual([]);
   });
 
   it("all Err returns empty ok array", () => {
     const { ok, err } = Result.partition([Err("x"), Err("y")]);
-    assert.deepEqual(ok, []);
-    assert.deepEqual(err, ["x", "y"]);
+    expect(ok).toEqual([]);
+    expect(err).toEqual(["x", "y"]);
   });
 
   it("empty array returns empty groups", () => {
     const { ok, err } = Result.partition([]);
-    assert.deepEqual(ok, []);
-    assert.deepEqual(err, []);
+    expect(ok).toEqual([]);
+    expect(err).toEqual([]);
   });
 });
 
@@ -1263,34 +1256,34 @@ describe("Option.partition", () => {
   it("separates Some and None values", () => {
     const options = [Some(1), None, Some(2), None, Some(3)];
     const { some, none } = Option.partition(options);
-    assert.deepEqual(some, [1, 2, 3]);
-    assert.equal(none, 2);
+    expect(some).toEqual([1, 2, 3]);
+    expect(none).toBe(2);
   });
 
   it("all Some returns zero none count", () => {
     const { some, none } = Option.partition([Some("a"), Some("b")]);
-    assert.deepEqual(some, ["a", "b"]);
-    assert.equal(none, 0);
+    expect(some).toEqual(["a", "b"]);
+    expect(none).toBe(0);
   });
 
   it("all None returns empty some array", () => {
     const { some, none } = Option.partition([None, None, None]);
-    assert.deepEqual(some, []);
-    assert.equal(none, 3);
+    expect(some).toEqual([]);
+    expect(none).toBe(3);
   });
 
   it("empty array returns empty result", () => {
     const { some, none } = Option.partition([]);
-    assert.deepEqual(some, []);
-    assert.equal(none, 0);
+    expect(some).toEqual([]);
+    expect(none).toBe(0);
   });
 });
 
 describe("Option.traverse", () => {
   it("collects all present values", () => {
     const result = Option.traverse([1, 2, 3], n => Some(n * 10));
-    assert.equal(result.isSome, true);
-    assert.deepEqual(result.unwrap(), [10, 20, 30]);
+    expect(result.isSome).toBe(true);
+    expect(result.unwrap()).toEqual([10, 20, 30]);
   });
 
   it("short-circuits on first None", () => {
@@ -1299,38 +1292,38 @@ describe("Option.traverse", () => {
       count++;
       return n === 2 ? None : Some(n);
     });
-    assert.equal(result.isNone, true);
-    assert.equal(count, 2); // stopped after second element
+    expect(result.isNone).toBe(true);
+    expect(count).toBe(2);
   });
 
   it("returns Some with empty array for empty input", () => {
     const result = Option.traverse([], () => None);
-    assert.equal(result.isSome, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isSome).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 });
 
 describe("Option.sequence (alias for collect)", () => {
   it("collects all Some values", () => {
     const result = Option.sequence([Some(1), Some(2), Some(3)]);
-    assert.equal(result.isSome, true);
-    assert.deepEqual(result.unwrap(), [1, 2, 3]);
+    expect(result.isSome).toBe(true);
+    expect(result.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("short-circuits on first None", () => {
     const result = Option.sequence([Some(1), None, Some(3)]);
-    assert.equal(result.isNone, true);
+    expect(result.isNone).toBe(true);
   });
 
   it("handles empty array", () => {
     const result = Option.sequence([]);
-    assert.equal(result.isSome, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isSome).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("single None", () => {
     const result = Option.sequence([None]);
-    assert.equal(result.isNone, true);
+    expect(result.isNone).toBe(true);
   });
 });
 
@@ -1342,8 +1335,8 @@ describe("Task.traverse", () => {
   it("runs all items in parallel and collects results", async () => {
     const result = await Task.traverse([1, 2, 3], n => Task(async () => Ok(n * 10))).run();
 
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [10, 20, 30]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([10, 20, 30]);
   });
 
   it("short-circuits on first error (collects after parallel execution)", async () => {
@@ -1351,14 +1344,14 @@ describe("Task.traverse", () => {
       Task(async () => (n > 0 ? Ok(n) : Err(`negative: ${n}`))),
     ).run();
 
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "negative: -2");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("negative: -2");
   });
 
   it("handles empty array", async () => {
     const result = await Task.traverse([], n => Task.of(n)).run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 
   it("all tasks execute (parallel semantics)", async () => {
@@ -1371,7 +1364,7 @@ describe("Task.traverse", () => {
     ).run();
 
     // All three should have executed since they run in parallel
-    assert.equal(executed.length, 3);
+    expect(executed.length).toBe(3);
   });
 });
 
@@ -1380,22 +1373,22 @@ describe("Task.sequence", () => {
     const tasks = [Task.of(1), Task.of(2), Task.of(3)];
     const result = await Task.sequence(tasks).run();
 
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), [1, 2, 3]);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("short-circuits when any task returns Err", async () => {
     const tasks = [Task.of(1), Task(async () => Err("fail")), Task.of(3)];
     const result = await Task.sequence(tasks).run();
 
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "fail");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("fail");
   });
 
   it("handles empty task list", async () => {
     const result = await Task.sequence([]).run();
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), []);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual([]);
   });
 });
 
@@ -1405,8 +1398,8 @@ describe("Task.ap", () => {
     const argTask = Task.of(21);
     const result = await Task.ap(fnTask, argTask).run();
 
-    assert.equal(result.isOk, true);
-    assert.equal(result.unwrap(), 42);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toBe(42);
   });
 
   it("returns Err when function task fails", async () => {
@@ -1414,8 +1407,8 @@ describe("Task.ap", () => {
     const argTask = Task.of(21);
     const result = await Task.ap(fnTask, argTask).run();
 
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "fn failed");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("fn failed");
   });
 
   it("returns Err when argument task fails", async () => {
@@ -1423,8 +1416,8 @@ describe("Task.ap", () => {
     const argTask = Task(async () => Err("arg failed"));
     const result = await Task.ap(fnTask, argTask).run();
 
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr(), "arg failed");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr()).toBe("arg failed");
   });
 
   it("returns first Err when both tasks fail", async () => {
@@ -1432,9 +1425,9 @@ describe("Task.ap", () => {
     const argTask = Task(async () => Err("arg failed"));
     const result = await Task.ap(fnTask, argTask).run();
 
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
     // fn is checked first
-    assert.equal(result.unwrapErr(), "fn failed");
+    expect(result.unwrapErr()).toBe("fn failed");
   });
 
   it("runs both tasks in parallel", async () => {
@@ -1449,8 +1442,8 @@ describe("Task.ap", () => {
     });
 
     const result = await Task.ap(fnTask, argTask).run();
-    assert.equal(result.unwrap(), 11);
-    assert.equal(executed.length, 2);
+    expect(result.unwrap()).toBe(11);
+    expect(executed.length).toBe(2);
   });
 });
 
@@ -1462,38 +1455,38 @@ describe("List.sortByOrd", () => {
   it("sorts using Ord.number in ascending order", () => {
     const list = List([3, 1, 4, 1, 5, 9, 2, 6]);
     const sorted = list.sortByOrd(Ord.number);
-    assert.deepEqual([...sorted], [1, 1, 2, 3, 4, 5, 6, 9]);
+    expect([...sorted]).toEqual([1, 1, 2, 3, 4, 5, 6, 9]);
   });
 
   it("sorts in descending order with Ord.reverse", () => {
     const list = List([3, 1, 4, 1, 5]);
     const sorted = list.sortByOrd(Ord.reverse(Ord.number));
-    assert.deepEqual([...sorted], [5, 4, 3, 1, 1]);
+    expect([...sorted]).toEqual([5, 4, 3, 1, 1]);
   });
 
   it("does not mutate the original list", () => {
     const list = List([3, 1, 2]);
     const sorted = list.sortByOrd(Ord.number);
-    assert.deepEqual([...list], [3, 1, 2]); // original unchanged
-    assert.deepEqual([...sorted], [1, 2, 3]);
+    expect([...list]).toEqual([3, 1, 2]);
+    expect([...sorted]).toEqual([1, 2, 3]);
   });
 
   it("handles empty list", () => {
     const list = List([]);
     const sorted = list.sortByOrd(Ord.number);
-    assert.deepEqual([...sorted], []);
+    expect([...sorted]).toEqual([]);
   });
 
   it("handles single element list", () => {
     const list = List([42]);
     const sorted = list.sortByOrd(Ord.number);
-    assert.deepEqual([...sorted], [42]);
+    expect([...sorted]).toEqual([42]);
   });
 
   it("sorts strings", () => {
     const list = List(["banana", "apple", "cherry"]);
     const sorted = list.sortByOrd(Ord.string);
-    assert.deepEqual([...sorted], ["apple", "banana", "cherry"]);
+    expect([...sorted]).toEqual(["apple", "banana", "cherry"]);
   });
 
   it("sorts by derived ordering", () => {
@@ -1505,9 +1498,9 @@ describe("List.sortByOrd", () => {
     ]);
 
     const sorted = list.sortByOrd(byAge);
-    assert.equal(sorted.at(0).unwrap().name, "Alice");
-    assert.equal(sorted.at(1).unwrap().name, "Bob");
-    assert.equal(sorted.at(2).unwrap().name, "Charlie");
+    expect(sorted.at(0).unwrap().name).toBe("Alice");
+    expect(sorted.at(1).unwrap().name).toBe("Bob");
+    expect(sorted.at(2).unwrap().name).toBe("Charlie");
   });
 });
 
@@ -1515,7 +1508,7 @@ describe("List.uniqBy", () => {
   it("deduplicates using Eq.number", () => {
     const list = List([1, 2, 3, 2, 1, 4, 3]);
     const unique = list.uniqBy(Eq.number);
-    assert.deepEqual([...unique], [1, 2, 3, 4]);
+    expect([...unique]).toEqual([1, 2, 3, 4]);
   });
 
   it("preserves first occurrence", () => {
@@ -1527,33 +1520,33 @@ describe("List.uniqBy", () => {
     ]);
 
     const unique = list.uniqBy(eqById);
-    assert.equal(unique.length, 2);
-    assert.equal(unique.at(0).unwrap().name, "first"); // first occurrence kept
-    assert.equal(unique.at(1).unwrap().name, "second");
+    expect(unique.length).toBe(2);
+    expect(unique.at(0).unwrap().name).toBe("first");
+    expect(unique.at(1).unwrap().name).toBe("second");
   });
 
   it("handles empty list", () => {
     const list = List([]);
     const unique = list.uniqBy(Eq.number);
-    assert.deepEqual([...unique], []);
+    expect([...unique]).toEqual([]);
   });
 
   it("handles all-unique list", () => {
     const list = List([1, 2, 3, 4]);
     const unique = list.uniqBy(Eq.number);
-    assert.deepEqual([...unique], [1, 2, 3, 4]);
+    expect([...unique]).toEqual([1, 2, 3, 4]);
   });
 
   it("handles all-same list", () => {
     const list = List([5, 5, 5, 5]);
     const unique = list.uniqBy(Eq.number);
-    assert.deepEqual([...unique], [5]);
+    expect([...unique]).toEqual([5]);
   });
 
   it("deduplicates strings", () => {
     const list = List(["a", "b", "a", "c", "b"]);
     const unique = list.uniqBy(Eq.string);
-    assert.deepEqual([...unique], ["a", "b", "c"]);
+    expect([...unique]).toEqual(["a", "b", "c"]);
   });
 
   it("uses custom Eq for deduplication", () => {
@@ -1561,16 +1554,16 @@ describe("List.uniqBy", () => {
     const eqCaseInsensitive = Eq((a, b) => a.toLowerCase() === b.toLowerCase());
     const list = List(["Hello", "HELLO", "hello", "World"]);
     const unique = list.uniqBy(eqCaseInsensitive);
-    assert.equal(unique.length, 2);
-    assert.equal(unique.at(0).unwrap(), "Hello"); // first occurrence
-    assert.equal(unique.at(1).unwrap(), "World");
+    expect(unique.length).toBe(2);
+    expect(unique.at(0).unwrap()).toBe("Hello");
+    expect(unique.at(1).unwrap()).toBe("World");
   });
 
   it("does not mutate the original list", () => {
     const list = List([1, 2, 1]);
     const unique = list.uniqBy(Eq.number);
-    assert.deepEqual([...list], [1, 2, 1]);
-    assert.deepEqual([...unique], [1, 2]);
+    expect([...list]).toEqual([1, 2, 1]);
+    expect([...unique]).toEqual([1, 2]);
   });
 });
 
@@ -1579,37 +1572,37 @@ describe("List.groupBy", () => {
     const list = List([1, 2, 3, 4, 5, 6]);
     const groups = list.groupBy(n => (n % 2 === 0 ? "even" : "odd"));
 
-    assert.deepEqual([...groups.even], [2, 4, 6]);
-    assert.deepEqual([...groups.odd], [1, 3, 5]);
+    expect([...groups.even]).toEqual([2, 4, 6]);
+    expect([...groups.odd]).toEqual([1, 3, 5]);
   });
 
   it("returns correct record of lists", () => {
     const list = List(["apple", "avocado", "banana", "blueberry", "cherry"]);
     const grouped = list.groupBy(s => s[0]);
 
-    assert.deepEqual([...grouped["a"]], ["apple", "avocado"]);
-    assert.deepEqual([...grouped["b"]], ["banana", "blueberry"]);
-    assert.deepEqual([...grouped["c"]], ["cherry"]);
+    expect([...grouped["a"]]).toEqual(["apple", "avocado"]);
+    expect([...grouped["b"]]).toEqual(["banana", "blueberry"]);
+    expect([...grouped["c"]]).toEqual(["cherry"]);
   });
 
   it("handles empty list", () => {
     const list = List([]);
     const groups = list.groupBy(() => "any");
-    assert.deepEqual(Object.keys(groups), []);
+    expect(Object.keys(groups)).toEqual([]);
   });
 
   it("single group for all-same key", () => {
     const list = List([1, 2, 3]);
     const groups = list.groupBy(() => "all");
-    assert.deepEqual([...groups["all"]], [1, 2, 3]);
+    expect([...groups["all"]]).toEqual([1, 2, 3]);
   });
 
   it("each element in its own group", () => {
     const list = List(["a", "b", "c"]);
     const groups = list.groupBy(s => s);
-    assert.deepEqual([...groups["a"]], ["a"]);
-    assert.deepEqual([...groups["b"]], ["b"]);
-    assert.deepEqual([...groups["c"]], ["c"]);
+    expect([...groups["a"]]).toEqual(["a"]);
+    expect([...groups["b"]]).toEqual(["b"]);
+    expect([...groups["c"]]).toEqual(["c"]);
   });
 
   it("preserves order within groups", () => {
@@ -1624,18 +1617,18 @@ describe("List.groupBy", () => {
     const eng = groups["engineering"];
     const sales = groups["sales"];
 
-    assert.equal(eng.at(0).unwrap().name, "Alice");
-    assert.equal(eng.at(1).unwrap().name, "Charlie");
-    assert.equal(sales.at(0).unwrap().name, "Bob");
-    assert.equal(sales.at(1).unwrap().name, "Diana");
+    expect(eng.at(0).unwrap().name).toBe("Alice");
+    expect(eng.at(1).unwrap().name).toBe("Charlie");
+    expect(sales.at(0).unwrap().name).toBe("Bob");
+    expect(sales.at(1).unwrap().name).toBe("Diana");
   });
 
   it("result lists are immutable", () => {
     const list = List([1, 2, 3]);
     const groups = list.groupBy(n => (n % 2 === 0 ? "even" : "odd"));
 
-    assert.equal(groups.odd.$immutable, true);
-    assert.equal(groups.even.$immutable, true);
+    expect(groups.odd.$immutable).toBe(true);
+    expect(groups.even.$immutable).toBe(true);
   });
 });
 
@@ -1652,24 +1645,24 @@ describe("Iso", () => {
 
   describe("get / reverseGet roundtrip", () => {
     it("get converts S to A", () => {
-      assert.equal(celsiusToFahrenheit.get(0), 32);
-      assert.equal(celsiusToFahrenheit.get(100), 212);
+      expect(celsiusToFahrenheit.get(0)).toBe(32);
+      expect(celsiusToFahrenheit.get(100)).toBe(212);
     });
 
     it("reverseGet converts A back to S", () => {
-      assert.equal(celsiusToFahrenheit.reverseGet(32), 0);
-      assert.equal(celsiusToFahrenheit.reverseGet(212), 100);
+      expect(celsiusToFahrenheit.reverseGet(32)).toBe(0);
+      expect(celsiusToFahrenheit.reverseGet(212)).toBe(100);
     });
 
     it("roundtrip: reverseGet(get(s)) === s", () => {
       const value = 37;
-      assert.equal(celsiusToFahrenheit.reverseGet(celsiusToFahrenheit.get(value)), value);
+      expect(celsiusToFahrenheit.reverseGet(celsiusToFahrenheit.get(value))).toBe(value);
     });
 
     it("roundtrip: get(reverseGet(a)) === a", () => {
       const value = 98.6;
       const result = celsiusToFahrenheit.get(celsiusToFahrenheit.reverseGet(value));
-      assert.ok(Math.abs(result - value) < 1e-10);
+      expect(Math.abs(result - value) < 1e-10).toBe(true);
     });
   });
 
@@ -1679,11 +1672,11 @@ describe("Iso", () => {
       const result = celsiusToFahrenheit.modify(f => f * 2)(0);
       // 0C -> 32F -> 64F -> ~17.78C
       const expected = ((64 - 32) * 5) / 9;
-      assert.ok(Math.abs(result - expected) < 1e-10);
+      expect(Math.abs(result - expected) < 1e-10).toBe(true);
     });
 
     it("identity function returns same value", () => {
-      assert.equal(celsiusToFahrenheit.modify(x => x)(100), 100);
+      expect(celsiusToFahrenheit.modify(x => x)(100)).toBe(100);
     });
   });
 
@@ -1704,10 +1697,10 @@ describe("Iso", () => {
       const composed = strToCharCodes.compose(codesToJson);
 
       const json = composed.get("AB");
-      assert.equal(json, "[65,66]");
+      expect(json).toBe("[65,66]");
 
       const back = composed.reverseGet("[65,66]");
-      assert.equal(back, "AB");
+      expect(back).toBe("AB");
     });
 
     it("composed roundtrip holds", () => {
@@ -1721,8 +1714,8 @@ describe("Iso", () => {
       );
       const composed = double.compose(addTen);
 
-      assert.equal(composed.get(5), 20); // 5*2=10, 10+10=20
-      assert.equal(composed.reverseGet(20), 5); // 20-10=10, 10/2=5
+      expect(composed.get(5)).toBe(20);
+      expect(composed.reverseGet(20)).toBe(5);
     });
   });
 
@@ -1731,18 +1724,18 @@ describe("Iso", () => {
       const reversed = celsiusToFahrenheit.reverse();
 
       // reversed.get is the original reverseGet (fahrenheit -> celsius)
-      assert.equal(reversed.get(32), 0);
-      assert.equal(reversed.get(212), 100);
+      expect(reversed.get(32)).toBe(0);
+      expect(reversed.get(212)).toBe(100);
 
       // reversed.reverseGet is the original get (celsius -> fahrenheit)
-      assert.equal(reversed.reverseGet(0), 32);
-      assert.equal(reversed.reverseGet(100), 212);
+      expect(reversed.reverseGet(0)).toBe(32);
+      expect(reversed.reverseGet(100)).toBe(212);
     });
 
     it("double reverse is equivalent to original", () => {
       const doubleReversed = celsiusToFahrenheit.reverse().reverse();
-      assert.equal(doubleReversed.get(100), 212);
-      assert.equal(doubleReversed.reverseGet(212), 100);
+      expect(doubleReversed.get(100)).toBe(212);
+      expect(doubleReversed.reverseGet(212)).toBe(100);
     });
   });
 
@@ -1750,8 +1743,8 @@ describe("Iso", () => {
     it("returns a working Lens", () => {
       const lens = celsiusToFahrenheit.toLens();
 
-      assert.equal(lens.get(0), 32);
-      assert.equal(lens.get(100), 212);
+      expect(lens.get(0)).toBe(32);
+      expect(lens.get(100)).toBe(212);
     });
 
     it("lens.set replaces the value through reverseGet", () => {
@@ -1759,7 +1752,7 @@ describe("Iso", () => {
 
       // set fahrenheit to 212, get back celsius
       const result = lens.set(212)(0);
-      assert.equal(result, 100);
+      expect(result).toBe(100);
     });
 
     it("lens.modify works", () => {
@@ -1768,7 +1761,7 @@ describe("Iso", () => {
       // 0C -> 32F, double -> 64F -> back to celsius
       const result = lens.modify(f => f * 2)(0);
       const expected = ((64 - 32) * 5) / 9;
-      assert.ok(Math.abs(result - expected) < 1e-10);
+      expect(Math.abs(result - expected) < 1e-10).toBe(true);
     });
   });
 
@@ -1777,14 +1770,14 @@ describe("Iso", () => {
       const prism = celsiusToFahrenheit.toPrism();
 
       const result = prism.getOption(100);
-      assert.equal(result.isSome, true);
-      assert.equal(result.unwrap(), 212);
+      expect(result.isSome).toBe(true);
+      expect(result.unwrap()).toBe(212);
     });
 
     it("reverseGet constructs the source", () => {
       const prism = celsiusToFahrenheit.toPrism();
 
-      assert.equal(prism.reverseGet(212), 100);
+      expect(prism.reverseGet(212)).toBe(100);
     });
 
     it("prism.modify works", () => {
@@ -1793,32 +1786,32 @@ describe("Iso", () => {
       const result = prism.modify(f => f + 1)(0);
       // 0C -> 32F -> 33F -> back to celsius
       const expected = ((33 - 32) * 5) / 9;
-      assert.ok(Math.abs(result - expected) < 1e-10);
+      expect(Math.abs(result - expected) < 1e-10).toBe(true);
     });
   });
 
   describe("Iso.id", () => {
     it("get returns the same value", () => {
       const id = Iso.id();
-      assert.equal(id.get(42), 42);
-      assert.equal(id.get("hello"), "hello");
+      expect(id.get(42)).toBe(42);
+      expect(id.get("hello")).toBe("hello");
     });
 
     it("reverseGet returns the same value", () => {
       const id = Iso.id();
-      assert.equal(id.reverseGet(42), 42);
+      expect(id.reverseGet(42)).toBe(42);
     });
 
     it("modify applies fn directly", () => {
       const id = Iso.id();
-      assert.equal(id.modify(n => n + 1)(41), 42);
+      expect(id.modify(n => n + 1)(41)).toBe(42);
     });
 
     it("reverse of id is still id", () => {
       const id = Iso.id();
       const rev = id.reverse();
-      assert.equal(rev.get(42), 42);
-      assert.equal(rev.reverseGet(42), 42);
+      expect(rev.get(42)).toBe(42);
+      expect(rev.reverseGet(42)).toBe(42);
     });
   });
 
@@ -1828,7 +1821,7 @@ describe("Iso", () => {
         n => n.toString(),
         s => Number(s),
       );
-      assert.equal(Object.isFrozen(iso), true);
+      expect(Object.isFrozen(iso)).toBe(true);
     });
 
     it("composed isos are frozen", () => {
@@ -1840,7 +1833,7 @@ describe("Iso", () => {
         n => n + 1,
         n => n - 1,
       );
-      assert.equal(Object.isFrozen(a.compose(b)), true);
+      expect(Object.isFrozen(a.compose(b))).toBe(true);
     });
 
     it("reversed isos are frozen", () => {
@@ -1848,7 +1841,7 @@ describe("Iso", () => {
         n => n * 2,
         n => n / 2,
       );
-      assert.equal(Object.isFrozen(iso.reverse()), true);
+      expect(Object.isFrozen(iso.reverse())).toBe(true);
     });
   });
 });
@@ -1864,78 +1857,78 @@ describe("ErrType cause chain", () => {
   it("creates error with cause from a native Error", () => {
     const original = new Error("connection refused");
     const err = NotFound("User not found", { cause: original });
-    assert.equal(err.cause, original);
-    assert.equal(err.message, "User not found");
-    assert.equal(err.tag, "NotFound");
+    expect(err.cause).toBe(original);
+    expect(err.message).toBe("User not found");
+    expect(err.tag).toBe("NotFound");
   });
 
   it("cause is preserved on the frozen instance", () => {
     const original = new TypeError("bad input");
     const err = NotFound("gone", { cause: original });
-    assert.equal(Object.isFrozen(err), true);
-    assert.equal(err.cause, original);
+    expect(Object.isFrozen(err)).toBe(true);
+    expect(err.cause).toBe(original);
   });
 
   it("cause defaults to undefined when not provided", () => {
     const err = NotFound("gone");
-    assert.equal(err.cause, undefined);
+    expect(err.cause).toBe(undefined);
   });
 
   it("toString appends cause when present", () => {
     const original = new Error("timeout");
     const err = NotFound("User not found", { cause: original });
     const str = err.toString();
-    assert.equal(str.startsWith("NotFound(NOT_FOUND): User not found [caused by: "), true);
-    assert.equal(str.includes("timeout"), true);
+    expect(str.startsWith("NotFound(NOT_FOUND): User not found [caused by: ")).toBe(true);
+    expect(str.includes("timeout")).toBe(true);
   });
 
   it("toString omits cause suffix when cause is undefined", () => {
     const err = NotFound("User not found");
-    assert.equal(err.toString(), "NotFound(NOT_FOUND): User not found");
+    expect(err.toString()).toBe("NotFound(NOT_FOUND): User not found");
   });
 
   it("toJSON includes cause when it is a native Error", () => {
     const original = new Error("disk full");
     const err = NotFound("write failed", { cause: original });
     const json = err.toJSON();
-    assert.deepEqual(json.cause, { name: "Error", message: "disk full" });
+    expect(json.cause).toEqual({ name: "Error", message: "disk full" });
   });
 
   it("toJSON includes cause as-is for primitive values", () => {
     const err = NotFound("failed", { cause: "some reason" });
     const json = err.toJSON();
-    assert.equal(json.cause, "some reason");
+    expect(json.cause).toBe("some reason");
   });
 
   it("toJSON omits cause key when cause is undefined", () => {
     const err = NotFound("gone");
     const json = err.toJSON();
-    assert.equal("cause" in json, false);
+    expect("cause" in json).toBe(false);
   });
 
   it("toJSON serializes ErrType cause via its own toJSON", () => {
     const inner = DbError("connection lost");
     const outer = NotFound("User not found", { cause: inner });
     const json = outer.toJSON();
-    assert.equal(json.cause.tag, "DbError");
-    assert.equal(json.cause.code, "DB_ERROR");
-    assert.equal(json.cause.message, "connection lost");
-    assert.equal("stack" in json.cause, false);
+    expect(json.cause.tag).toBe("DbError");
+    expect(json.cause.code).toBe("DB_ERROR");
+    expect(json.cause.message).toBe("connection lost");
+    expect("stack" in json.cause).toBe(false);
   });
 
   it("backward compatibility: plain metadata object still works", () => {
     const err = NotFound("User not found", { userId: "u_123", role: "admin" });
-    assert.deepEqual(err.metadata, { userId: "u_123", role: "admin" });
-    assert.equal(err.cause, undefined);
-    assert.equal(err.tag, "NotFound");
-    assert.equal(err.message, "User not found");
+    expect(err.metadata).toEqual({ userId: "u_123", role: "admin" });
+    expect(err.cause).toBe(undefined);
+    expect(err.tag).toBe("NotFound");
+    expect(err.message).toBe("User not found");
   });
 
   it("backward compatibility: metadata is deep frozen", () => {
     const err = NotFound("gone", { nested: { value: 1 } });
-    assert.throws(() => {
+    expect(() => {
       err.metadata.nested.value = 2;
-    }, TypeError);
+    }).toThrow();
   });
 
   it("options-style: metadata and cause together", () => {
@@ -1944,8 +1937,8 @@ describe("ErrType cause chain", () => {
       cause: original,
       metadata: { userId: "u_456" },
     });
-    assert.equal(err.cause, original);
-    assert.deepEqual(err.metadata, { userId: "u_456" });
+    expect(err.cause).toBe(original);
+    expect(err.metadata).toEqual({ userId: "u_456" });
   });
 
   it("nested causes: ErrType wrapping ErrType wrapping Error", () => {
@@ -1954,32 +1947,32 @@ describe("ErrType cause chain", () => {
     const outer = NotFound("User not found", { cause: mid });
 
     // Outer cause is the mid ErrType
-    assert.equal(outer.cause, mid);
-    assert.equal(outer.cause.tag, "DbError");
+    expect(outer.cause).toBe(mid);
+    expect(outer.cause.tag).toBe("DbError");
 
     // Mid cause is the root Error
-    assert.equal(mid.cause, root);
-    assert.equal(mid.cause.message, "ECONNREFUSED");
+    expect(mid.cause).toBe(root);
+    expect(mid.cause.message).toBe("ECONNREFUSED");
 
     // toString chain
-    assert.equal(outer.toString().includes("[caused by: "), true);
-    assert.equal(mid.toString().includes("[caused by: "), true);
+    expect(outer.toString().includes("[caused by: ")).toBe(true);
+    expect(mid.toString().includes("[caused by: ")).toBe(true);
 
     // toJSON chain
     const outerJson = outer.toJSON();
-    assert.equal(outerJson.cause.tag, "DbError");
-    assert.deepEqual(outerJson.cause.cause, { name: "Error", message: "ECONNREFUSED" });
+    expect(outerJson.cause.tag).toBe("DbError");
+    expect(outerJson.cause.cause).toEqual({ name: "Error", message: "ECONNREFUSED" });
   });
 
   it("ErrType.is() still works with cause field present", () => {
     const err = NotFound("gone", { cause: new Error("x") });
-    assert.equal(ErrType.is(err), true);
-    assert.equal(NotFound.is(err), true);
+    expect(ErrType.is(err)).toBe(true);
+    expect(NotFound.is(err)).toBe(true);
   });
 
   it("Constructor.is() still rejects wrong error types with cause", () => {
     const Forbidden = ErrType("Forbidden");
     const err = NotFound("gone", { cause: new Error("x") });
-    assert.equal(Forbidden.is(err), false);
+    expect(Forbidden.is(err)).toBe(false);
   });
 });

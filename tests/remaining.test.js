@@ -2,13 +2,12 @@
  * remaining.test.js - Tests for the 7 previously untested modules:
  * Dns, Net, nodeAdapter, bunAdapter, denoAdapter, lambdaAdapter, nominal Type.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output (black-box).
  */
 
-import assert from "node:assert/strict";
 import { createServer } from "node:net";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const { Dns, Net, Server, json, Cron, Duration } = await import("../dist/index.js");
 
@@ -19,47 +18,47 @@ const { Dns, Net, Server, json, Cron, Duration } = await import("../dist/index.j
 describe("Dns", () => {
   it("lookup resolves localhost", async () => {
     const result = await Dns.lookup("localhost").run();
-    assert.equal(result.isOk, true);
-    assert.equal(typeof result.value.address, "string");
-    assert.ok(result.value.family === 4 || result.value.family === 6);
+    expect(result.isOk).toBe(true);
+    expect(typeof result.value.address).toBe("string");
+    expect(result.value.family === 4 || result.value.family === 6).toBe(true);
   });
 
   it("lookup fails for nonexistent domain", async () => {
     const result = await Dns.lookup("this-domain-does-not-exist-xyz.invalid").run();
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 
   it("lookup returns a TaskLike with lazy run()", () => {
     const task = Dns.lookup("localhost");
-    assert.equal(typeof task.run, "function");
+    expect(typeof task.run).toBe("function");
     // Should not have executed yet (lazy)
   });
 
   it("resolve returns a result (may succeed or fail depending on DNS config)", async () => {
     const result = await Dns.resolve("localhost").run();
-    assert.ok(result.isOk || result.isErr);
+    expect(result.isOk || result.isErr).toBe(true);
   });
 
   it("resolve defaults to A record type", async () => {
     // Calling resolve without a type defaults to "A"
     const result = await Dns.resolve("localhost").run();
-    assert.ok(result.isOk || result.isErr);
+    expect(result.isOk || result.isErr).toBe(true);
   });
 
   it("resolve with explicit record type", async () => {
     const result = await Dns.resolve("localhost", "A").run();
-    assert.ok(result.isOk || result.isErr);
+    expect(result.isOk || result.isErr).toBe(true);
   });
 
   it("resolve fails for nonexistent domain", async () => {
     const result = await Dns.resolve("this-domain-does-not-exist-xyz.invalid").run();
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 
   it("DnsError has correct tag", async () => {
     const result = await Dns.lookup("this-domain-does-not-exist-xyz.invalid").run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.error.tag, "DnsError");
+    expect(result.isErr).toBe(true);
+    expect(result.error.tag).toBe("DnsError");
   });
 });
 
@@ -83,42 +82,42 @@ describe("Net", () => {
         resolve();
       });
     });
-    assert.ok(port > 0);
+    expect(port > 0).toBe(true);
   });
 
   it("connect returns a TaskLike with lazy run()", () => {
     const task = Net.connect({ host: "127.0.0.1", port });
-    assert.equal(typeof task.run, "function");
+    expect(typeof task.run).toBe("function");
   });
 
   it("connects to TCP server", async () => {
     const result = await Net.connect({ host: "127.0.0.1", port }).run();
-    assert.equal(result.isOk, true);
-    assert.equal(typeof result.value.send, "function");
-    assert.equal(typeof result.value.receive, "function");
-    assert.equal(typeof result.value.close, "function");
+    expect(result.isOk).toBe(true);
+    expect(typeof result.value.send).toBe("function");
+    expect(typeof result.value.receive).toBe("function");
+    expect(typeof result.value.close).toBe("function");
     result.value.close();
   });
 
   it("sends data and echo server returns it", async () => {
     const connResult = await Net.connect({ host: "127.0.0.1", port }).run();
-    assert.equal(connResult.isOk, true);
+    expect(connResult.isOk).toBe(true);
     const conn = connResult.value;
 
     // send() writes to the socket regardless of its Result status
     await conn.send("hello").run();
 
     const recvResult = await conn.receive().run();
-    assert.equal(recvResult.isOk, true);
+    expect(recvResult.isOk).toBe(true);
     const text = new TextDecoder().decode(recvResult.value);
-    assert.equal(text, "hello");
+    expect(text).toBe("hello");
 
     conn.close();
   });
 
   it("sends Uint8Array data and echo server returns it", async () => {
     const connResult = await Net.connect({ host: "127.0.0.1", port }).run();
-    assert.equal(connResult.isOk, true);
+    expect(connResult.isOk).toBe(true);
     const conn = connResult.value;
 
     const bytes = new TextEncoder().encode("binary-data");
@@ -126,17 +125,17 @@ describe("Net", () => {
     await conn.send(bytes).run();
 
     const recvResult = await conn.receive().run();
-    assert.equal(recvResult.isOk, true);
+    expect(recvResult.isOk).toBe(true);
     const text = new TextDecoder().decode(recvResult.value);
-    assert.equal(text, "binary-data");
+    expect(text).toBe("binary-data");
 
     conn.close();
   });
 
   it("fails to connect to closed port", async () => {
     const result = await Net.connect({ host: "127.0.0.1", port: 1 }).run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.error.tag, "NetError");
+    expect(result.isErr).toBe(true);
+    expect(result.error.tag).toBe("NetError");
   });
 
   it("cleanup: stop echo server", async () => {
@@ -151,27 +150,27 @@ describe("Net", () => {
 describe("Runtime Adapters", () => {
   it("nodeAdapter has serve method", async () => {
     const { nodeAdapter } = await import("../dist/runtime/adapter/node.js");
-    assert.equal(typeof nodeAdapter.serve, "function");
+    expect(typeof nodeAdapter.serve).toBe("function");
   });
 
   it("bunAdapter has serve method", async () => {
     const { bunAdapter } = await import("../dist/runtime/adapter/bun.js");
-    assert.equal(typeof bunAdapter.serve, "function");
+    expect(typeof bunAdapter.serve).toBe("function");
   });
 
   it("denoAdapter has serve method", async () => {
     const { denoAdapter } = await import("../dist/runtime/adapter/deno.js");
-    assert.equal(typeof denoAdapter.serve, "function");
+    expect(typeof denoAdapter.serve).toBe("function");
   });
 
   it("lambdaAdapter exports toLambdaHandler", async () => {
     const { toLambdaHandler } = await import("../dist/runtime/adapter/lambda.js");
-    assert.equal(typeof toLambdaHandler, "function");
+    expect(typeof toLambdaHandler).toBe("function");
   });
 
   it("lambdaAdapter exports toLambdaStreamHandler", async () => {
     const { toLambdaStreamHandler } = await import("../dist/runtime/adapter/lambda.js");
-    assert.equal(typeof toLambdaStreamHandler, "function");
+    expect(typeof toLambdaStreamHandler).toBe("function");
   });
 });
 
@@ -183,17 +182,17 @@ describe("bunAdapter (no Bun runtime)", () => {
   it("throws when Bun.serve is not available", async () => {
     const { bunAdapter } = await import("../dist/runtime/adapter/bun.js");
     const ac = new AbortController();
-    await assert.rejects(
-      () =>
-        bunAdapter.serve(async () => new Response(""), {
-          port: 0,
-          signal: ac.signal,
-        }),
-      err => {
-        assert.ok(err.message.includes("Bun"));
-        return true;
-      },
-    );
+    let threw = false;
+    try {
+      await bunAdapter.serve(async () => new Response(""), {
+        port: 0,
+        signal: ac.signal,
+      });
+    } catch (err) {
+      expect(err.message).toMatch(/Bun/);
+      threw = true;
+    }
+    expect(threw).toBe(true);
   });
 });
 
@@ -205,17 +204,17 @@ describe("denoAdapter (no Deno runtime)", () => {
   it("throws when Deno.serve is not available", async () => {
     const { denoAdapter } = await import("../dist/runtime/adapter/deno.js");
     const ac = new AbortController();
-    await assert.rejects(
-      () =>
-        denoAdapter.serve(async () => new Response(""), {
-          port: 0,
-          signal: ac.signal,
-        }),
-      err => {
-        assert.ok(err.message.includes("Deno"));
-        return true;
-      },
-    );
+    let threw = false;
+    try {
+      await denoAdapter.serve(async () => new Response(""), {
+        port: 0,
+        signal: ac.signal,
+      });
+    } catch (err) {
+      expect(err.message).toMatch(/Deno/);
+      threw = true;
+    }
+    expect(threw).toBe(true);
   });
 });
 
@@ -244,8 +243,8 @@ describe("nodeAdapter (integration)", () => {
 
     const res = await fetch(`http://127.0.0.1:${port}/test`);
     const body = await res.json();
-    assert.equal(body.path, "/test");
-    assert.equal(res.headers.get("content-type"), "application/json");
+    expect(body.path).toBe("/test");
+    expect(res.headers.get("content-type")).toBe("application/json");
 
     ac.abort();
     await servePromise;
@@ -289,7 +288,7 @@ describe("nodeAdapter (integration)", () => {
 
     const res = await fetch(`http://127.0.0.1:${port}/stream`);
     const text = await res.text();
-    assert.equal(text, "chunk1chunk2");
+    expect(text).toBe("chunk1chunk2");
 
     ac.abort();
     await servePromise;
@@ -309,7 +308,7 @@ describe("nodeAdapter (integration)", () => {
     await new Promise(r => setTimeout(r, 200));
 
     const res = await fetch(`http://127.0.0.1:${port}/empty`);
-    assert.equal(res.status, 204);
+    expect(res.status).toBe(204);
 
     ac.abort();
     await servePromise;
@@ -334,11 +333,11 @@ describe("toLambdaHandler", () => {
       requestContext: { http: { method: "GET" } },
     });
 
-    assert.equal(result.statusCode, 200);
-    assert.equal(result.isBase64Encoded, false);
+    expect(result.statusCode).toBe(200);
+    expect(result.isBase64Encoded).toBe(false);
     const body = JSON.parse(result.body);
-    assert.equal(body.ok, true);
-    assert.ok(result.headers["content-type"].includes("json"));
+    expect(body.ok).toBe(true);
+    expect(result.headers["content-type"].includes("json")).toBe(true);
   });
 
   it("handles query string parameters", async () => {
@@ -356,9 +355,9 @@ describe("toLambdaHandler", () => {
       requestContext: { http: { method: "GET" } },
     });
 
-    assert.equal(result.statusCode, 200);
+    expect(result.statusCode).toBe(200);
     const body = JSON.parse(result.body);
-    assert.equal(body.q, "hello");
+    expect(body.q).toBe("hello");
   });
 
   it("handles POST request with body", async () => {
@@ -380,9 +379,9 @@ describe("toLambdaHandler", () => {
       body: "hello lambda",
     });
 
-    assert.equal(result.statusCode, 200);
-    assert.equal(result.body, "hello lambda");
-    assert.equal(result.isBase64Encoded, false);
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toBe("hello lambda");
+    expect(result.isBase64Encoded).toBe(false);
   });
 
   it("handles base64-encoded request body", async () => {
@@ -405,8 +404,8 @@ describe("toLambdaHandler", () => {
       isBase64Encoded: true,
     });
 
-    assert.equal(result.statusCode, 200);
-    assert.equal(result.body, "base64 body");
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toBe("base64 body");
   });
 
   it("uses lambda.local as default host", async () => {
@@ -424,9 +423,9 @@ describe("toLambdaHandler", () => {
       requestContext: { http: { method: "GET" } },
     });
 
-    assert.equal(result.statusCode, 200);
+    expect(result.statusCode).toBe(200);
     const body = JSON.parse(result.body);
-    assert.equal(body.host, "lambda.local");
+    expect(body.host).toBe("lambda.local");
   });
 
   it("base64-encodes binary responses", async () => {
@@ -447,14 +446,14 @@ describe("toLambdaHandler", () => {
       requestContext: { http: { method: "GET" } },
     });
 
-    assert.equal(result.statusCode, 200);
-    assert.equal(result.isBase64Encoded, true);
+    expect(result.statusCode).toBe(200);
+    expect(result.isBase64Encoded).toBe(true);
     // Decode base64 and verify
     const decoded = atob(result.body);
-    assert.equal(decoded.charCodeAt(0), 0x00);
-    assert.equal(decoded.charCodeAt(1), 0x01);
-    assert.equal(decoded.charCodeAt(2), 0x02);
-    assert.equal(decoded.charCodeAt(3), 0xff);
+    expect(decoded.charCodeAt(0)).toBe(0x00);
+    expect(decoded.charCodeAt(1)).toBe(0x01);
+    expect(decoded.charCodeAt(2)).toBe(0x02);
+    expect(decoded.charCodeAt(3)).toBe(0xff);
   });
 
   it("treats text/* content types as text", async () => {
@@ -476,8 +475,8 @@ describe("toLambdaHandler", () => {
       requestContext: { http: { method: "GET" } },
     });
 
-    assert.equal(result.isBase64Encoded, false);
-    assert.equal(result.body, "<p>hi</p>");
+    expect(result.isBase64Encoded).toBe(false);
+    expect(result.body).toBe("<p>hi</p>");
   });
 });
 
@@ -514,12 +513,12 @@ describe("toLambdaStreamHandler", () => {
       mockStream,
     );
 
-    assert.equal(ended, true);
-    assert.ok(contentTypeSet.includes("json"));
+    expect(ended).toBe(true);
+    expect(contentTypeSet.includes("json")).toBe(true);
     // Reassemble chunks and parse
     const combined = Buffer.concat(chunks.map(c => (c instanceof Uint8Array ? c : Buffer.from(c))));
     const body = JSON.parse(combined.toString());
-    assert.equal(body.streaming, true);
+    expect(body.streaming).toBe(true);
   });
 
   it("handles null response body", async () => {
@@ -551,7 +550,7 @@ describe("toLambdaStreamHandler", () => {
       mockStream,
     );
 
-    assert.equal(ended, true);
+    expect(ended).toBe(true);
   });
 });
 
@@ -562,29 +561,29 @@ describe("toLambdaStreamHandler", () => {
 describe("Type (nominal branding)", () => {
   it("Duration uses branded number at runtime", () => {
     const d = Duration.seconds(5);
-    assert.equal(Duration.toMilliseconds(d), 5000);
+    expect(Duration.toMilliseconds(d)).toBe(5000);
     // At runtime the branded type is just a number
-    assert.equal(typeof d, "number");
+    expect(typeof d).toBe("number");
   });
 
   it("CronExpression uses branded string at runtime", () => {
     const result = Cron.parse("* * * * *");
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     // The branded value can be used with Cron.matches
-    assert.equal(typeof Cron.matches(result.value, new Date()), "boolean");
+    expect(typeof Cron.matches(result.value, new Date())).toBe("boolean");
     // At runtime the branded type is just a string
-    assert.equal(typeof result.value, "string");
+    expect(typeof result.value).toBe("string");
   });
 
   it("branded values are equal to their base values", () => {
     const d = Duration.milliseconds(42);
-    assert.equal(d, 42);
+    expect(d).toBe(42);
   });
 
   it("different Duration constructors produce correct values", () => {
-    assert.equal(Duration.toMilliseconds(Duration.seconds(1)), 1000);
-    assert.equal(Duration.toMilliseconds(Duration.minutes(1)), 60000);
-    assert.equal(Duration.toMilliseconds(Duration.hours(1)), 3600000);
-    assert.equal(Duration.toMilliseconds(Duration.milliseconds(500)), 500);
+    expect(Duration.toMilliseconds(Duration.seconds(1))).toBe(1000);
+    expect(Duration.toMilliseconds(Duration.minutes(1))).toBe(60000);
+    expect(Duration.toMilliseconds(Duration.hours(1))).toBe(3600000);
+    expect(Duration.toMilliseconds(Duration.milliseconds(500))).toBe(500);
   });
 });

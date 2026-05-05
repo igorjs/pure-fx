@@ -7,11 +7,10 @@
  * Run: node --test tests/program.test.js
  */
 
-import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
-import { before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { beforeAll, describe, expect, it } from "@igorjs/pure-test";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -78,28 +77,28 @@ const LOG_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[test\] /;
 
 describe("Program.run() Ok path", () => {
   let r;
-  before(async () => {
+  beforeAll(async () => {
     r = await runFixture("program-ok.js");
   });
 
   it("exits 0 on Ok result", () => {
-    assert.equal(r.code, 0);
+    expect(r.code).toBe(0);
   });
 
   it('logs "started" then "completed" to stdout', () => {
-    assert.ok(r.stdout.includes("started"));
-    assert.ok(r.stdout.includes("completed"));
-    assert.ok(r.stdout.indexOf("started") < r.stdout.indexOf("completed"));
+    expect(r.stdout.includes("started")).toBe(true);
+    expect(r.stdout.includes("completed")).toBe(true);
+    expect(r.stdout.indexOf("started") < r.stdout.indexOf("completed")).toBe(true);
   });
 
   it("log lines match ISO timestamp and [name] tag format", () => {
     for (const line of r.stdout.trim().split("\n")) {
-      assert.match(line, LOG_RE);
+      expect(line).toMatch(LOG_RE);
     }
   });
 
   it("produces no stderr output", () => {
-    assert.equal(r.stderr, "");
+    expect(r.stderr).toBe("");
   });
 });
 
@@ -108,39 +107,39 @@ describe("Program.run() Ok path", () => {
 describe("Program.run() Err path", () => {
   it("exits 1 on Err with string", async () => {
     const r = await runFixture("program-err-string.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stdout.includes("started"));
-    assert.ok(r.stderr.includes("error: fail"));
+    expect(r.code).toBe(1);
+    expect(r.stdout.includes("started")).toBe(true);
+    expect(r.stderr.includes("error: fail")).toBe(true);
   });
 
   it("exits 1 on Err with Error object", async () => {
     const r = await runFixture("program-err-error.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stderr.includes("error: Error: boom"));
+    expect(r.code).toBe(1);
+    expect(r.stderr.includes("error: Error: boom")).toBe(true);
   });
 
   it("exits 1 on Err with plain object (JSON.stringify)", async () => {
     const r = await runFixture("program-err-object.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stderr.includes('error: {"code":42}'));
+    expect(r.code).toBe(1);
+    expect(r.stderr.includes('error: {"code":42}')).toBe(true);
   });
 
   it("exits 1 on Err with custom toString", async () => {
     const r = await runFixture("program-err-custom-tostring.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stderr.includes("error: CustomErr"));
+    expect(r.code).toBe(1);
+    expect(r.stderr.includes("error: CustomErr")).toBe(true);
   });
 
   it("exits 1 on Err with circular object (fallback)", async () => {
     const r = await runFixture("program-err-circular.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stderr.includes("error: [object Object]"));
+    expect(r.code).toBe(1);
+    expect(r.stderr.includes("error: [object Object]")).toBe(true);
   });
 
   it("exits 1 on Err with ErrType formatted as Tag(CODE): message", async () => {
     const r = await runFixture("program-errtype.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stderr.includes("error: NotFound(NOT_FOUND): missing"));
+    expect(r.code).toBe(1);
+    expect(r.stderr.includes("error: NotFound(NOT_FOUND): missing")).toBe(true);
   });
 });
 
@@ -149,8 +148,8 @@ describe("Program.run() Err path", () => {
 describe("Program.run() unhandled exception", () => {
   it("exits 1 and logs error when task throws", async () => {
     const r = await runFixture("program-throw.js");
-    assert.equal(r.code, 1);
-    assert.ok(r.stderr.includes("error: Error: kaboom"));
+    expect(r.code).toBe(1);
+    expect(r.stderr.includes("error: Error: kaboom")).toBe(true);
   });
 });
 
@@ -159,9 +158,9 @@ describe("Program.run() unhandled exception", () => {
 describe("Program.run() effect function", () => {
   it("accepts (signal) => Task form and exits 0", async () => {
     const r = await runFixture("program-effect-fn.js");
-    assert.equal(r.code, 0);
-    assert.ok(r.stdout.includes("started"));
-    assert.ok(r.stdout.includes("completed"));
+    expect(r.code).toBe(0);
+    expect(r.stdout.includes("started")).toBe(true);
+    expect(r.stdout.includes("completed")).toBe(true);
   });
 });
 
@@ -174,8 +173,8 @@ describe("Program.run() signal handling", () => {
     const exit = waitForExit(child, out);
     child.kill("SIGINT");
     const r = await exit;
-    assert.equal(r.code, 130);
-    assert.ok(r.stderr.includes("interrupted"));
+    expect(r.code).toBe(130);
+    expect(r.stderr.includes("interrupted")).toBe(true);
   });
 
   it('SIGTERM logs "interrupted" to stderr and exits 130', async () => {
@@ -184,8 +183,8 @@ describe("Program.run() signal handling", () => {
     const exit = waitForExit(child, out);
     child.kill("SIGTERM");
     const r = await exit;
-    assert.equal(r.code, 130);
-    assert.ok(r.stderr.includes("interrupted"));
+    expect(r.code).toBe(130);
+    expect(r.stderr.includes("interrupted")).toBe(true);
   });
 
   it("second SIGINT force-exits with 130", async () => {
@@ -196,7 +195,7 @@ describe("Program.run() signal handling", () => {
     await waitForOutput(child, out, "stderr", "interrupted");
     child.kill("SIGINT");
     const r = await exit;
-    assert.equal(r.code, 130);
+    expect(r.code).toBe(130);
   });
 
   it("interrupt takes priority over Ok result", async () => {
@@ -205,9 +204,9 @@ describe("Program.run() signal handling", () => {
     const exit = waitForExit(child, out);
     child.kill("SIGINT");
     const r = await exit;
-    assert.equal(r.code, 130);
-    assert.ok(!r.stdout.includes("completed"));
-    assert.ok(r.stderr.includes("interrupted"));
+    expect(r.code).toBe(130);
+    expect(r.stdout.includes("completed")).toBe(false);
+    expect(r.stderr.includes("interrupted")).toBe(true);
   });
 
   it("teardown timeout force-exits without second signal", async () => {
@@ -218,9 +217,9 @@ describe("Program.run() signal handling", () => {
     child.kill("SIGINT");
     const r = await exit;
     const elapsed = Date.now() - start;
-    assert.equal(r.code, 130);
-    assert.ok(r.stderr.includes("interrupted"));
-    assert.ok(elapsed < 3000, `Expected exit within 3s, took ${elapsed}ms`);
+    expect(r.code).toBe(130);
+    expect(r.stderr.includes("interrupted")).toBe(true);
+    expect(elapsed < 3000).toBe(true);
   });
 });
 
@@ -229,16 +228,16 @@ describe("Program.run() signal handling", () => {
 describe("Program.run() silent option", () => {
   it("suppresses started/completed logs on Ok", async () => {
     const r = await runFixture("program-silent.js");
-    assert.equal(r.code, 0);
-    assert.equal(r.stdout, "", "stdout should be empty with silent: true");
-    assert.equal(r.stderr, "", "stderr should be empty on silent Ok");
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe("");
   });
 
   it("still logs errors to stderr even when silent", async () => {
     const r = await runFixture("program-silent-err.js");
-    assert.equal(r.code, 1);
-    assert.equal(r.stdout, "", "stdout should be empty with silent: true");
-    assert.ok(r.stderr.includes("error: silent-fail"), "errors are never suppressed");
+    expect(r.code).toBe(1);
+    expect(r.stdout).toBe("");
+    expect(r.stderr.includes("error: silent-fail")).toBe(true);
   });
 });
 
@@ -247,17 +246,17 @@ describe("Program.run() silent option", () => {
 describe("Program.run() custom logger", () => {
   it("uses Logger for lifecycle messages instead of console", async () => {
     const r = await runFixture("program-logger.js");
-    assert.equal(r.code, 0);
+    expect(r.code).toBe(0);
     // Logger.json writes to stdout. Parse each line as JSON.
     const lines = r.stdout.trim().split("\n").filter(Boolean);
-    assert.ok(lines.length >= 2, `Expected at least 2 log lines, got ${lines.length}`);
+    expect(lines.length >= 2).toBe(true);
     const started = JSON.parse(lines[0]);
-    assert.equal(started.name, "custom");
-    assert.equal(started.level, "info");
-    assert.equal(started.message, "started");
+    expect(started.name).toBe("custom");
+    expect(started.level).toBe("info");
+    expect(started.message).toBe("started");
     const completed = JSON.parse(lines[lines.length - 1]);
-    assert.equal(completed.message, "completed");
+    expect(completed.message).toBe("completed");
     // No raw console.log output (no [test] tag)
-    assert.ok(!r.stdout.includes("[test]"), "should not use console.log when logger is provided");
+    expect(r.stdout.includes("[test]")).toBe(false);
   });
 });

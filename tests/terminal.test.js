@@ -1,16 +1,15 @@
 /**
  * terminal.test.js - Tests for the Terminal module.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output (black-box).
  *
  * Terminal is inherently I/O-bound, so some features (interactive readLine,
  * readPassword) are tested by spawning child processes with piped stdin.
  */
 
-import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const { Terminal, TerminalError, Ok, Err, Some, None } = await import("../dist/index.js");
 
@@ -21,11 +20,11 @@ const { Terminal, TerminalError, Ok, Err, Some, None } = await import("../dist/i
 describe("Terminal.isInteractive", () => {
   it("returns false when stdin is piped (test runner)", () => {
     // Node test runner pipes stdin, so this should be false
-    assert.equal(Terminal.isInteractive(), false);
+    expect(Terminal.isInteractive()).toBe(false);
   });
 
   it("returns a boolean", () => {
-    assert.equal(typeof Terminal.isInteractive(), "boolean");
+    expect(typeof Terminal.isInteractive()).toBe("boolean");
   });
 });
 
@@ -39,12 +38,12 @@ describe("Terminal.size", () => {
     // In a piped environment, may be None or Some depending on stdout
     if (result.isSome) {
       const size = result.unwrap();
-      assert.equal(typeof size.columns, "number");
-      assert.equal(typeof size.rows, "number");
-      assert.ok(size.columns > 0);
-      assert.ok(size.rows > 0);
+      expect(typeof size.columns).toBe("number");
+      expect(typeof size.rows).toBe("number");
+      expect(size.columns > 0).toBe(true);
+      expect(size.rows > 0).toBe(true);
     } else {
-      assert.equal(result.isNone, true);
+      expect(result.isNone).toBe(true);
     }
   });
 });
@@ -56,7 +55,7 @@ describe("Terminal.size", () => {
 describe("Terminal.clear", () => {
   it("does not throw in non-TTY mode", () => {
     // clear is a no-op when not interactive
-    assert.doesNotThrow(() => Terminal.clear());
+    expect(() => Terminal.clear()).not.toThrow();
   });
 });
 
@@ -67,26 +66,26 @@ describe("Terminal.clear", () => {
 describe("Terminal.write", () => {
   it("returns Ok(undefined) on success", () => {
     const result = Terminal.write("");
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, undefined);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(undefined);
   });
 
   it("writes text to stdout without error", () => {
     const result = Terminal.write("test output");
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
   });
 });
 
 describe("Terminal.writeLine", () => {
   it("returns Ok(undefined) on success", () => {
     const result = Terminal.writeLine("");
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, undefined);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(undefined);
   });
 
   it("writes text with newline to stdout", () => {
     const result = Terminal.writeLine("test line");
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
   });
 });
 
@@ -97,7 +96,7 @@ describe("Terminal.writeLine", () => {
 describe("Terminal.readAll", () => {
   it("returns a TaskLike with lazy run()", () => {
     const task = Terminal.readAll();
-    assert.equal(typeof task.run, "function");
+    expect(typeof task.run).toBe("function");
   });
 
   it("returns Ok(string) when stdin is piped", async () => {
@@ -119,8 +118,8 @@ describe("Terminal.readAll", () => {
       child.stdin.write("hello from pipe");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, "hello from pipe");
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe("hello from pipe");
   });
 
   it("handles multi-line piped input", async () => {
@@ -140,8 +139,8 @@ describe("Terminal.readAll", () => {
       child.stdin.write("line1\nline2\nline3");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, "line1\nline2\nline3");
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe("line1\nline2\nline3");
   });
 
   it("handles empty piped input", async () => {
@@ -160,8 +159,8 @@ describe("Terminal.readAll", () => {
       );
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, "");
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe("");
   });
 });
 
@@ -172,7 +171,7 @@ describe("Terminal.readAll", () => {
 describe("Terminal.readLine", () => {
   it("returns a TaskLike with lazy run()", () => {
     const task = Terminal.readLine("prompt: ");
-    assert.equal(typeof task.run, "function");
+    expect(typeof task.run).toBe("function");
   });
 
   it("reads a line from piped stdin", async () => {
@@ -192,9 +191,9 @@ describe("Terminal.readLine", () => {
       child.stdin.write("hello\n");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.isSome, true);
-    assert.equal(result.value, "hello");
+    expect(result.isOk).toBe(true);
+    expect(result.isSome).toBe(true);
+    expect(result.value).toBe("hello");
   });
 
   it("returns None on EOF (empty stdin)", async () => {
@@ -213,8 +212,8 @@ describe("Terminal.readLine", () => {
       );
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.isNone, true);
+    expect(result.isOk).toBe(true);
+    expect(result.isNone).toBe(true);
   });
 
   it("with timeout returns None when no input arrives", async () => {
@@ -235,8 +234,8 @@ describe("Terminal.readLine", () => {
       // But we need to eventually end it for the process to exit
       setTimeout(() => child.stdin.end(), 500);
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.isNone, true);
+    expect(result.isOk).toBe(true);
+    expect(result.isNone).toBe(true);
   });
 });
 
@@ -247,14 +246,14 @@ describe("Terminal.readLine", () => {
 describe("Terminal.readPassword", () => {
   it("returns a TaskLike with lazy run()", () => {
     const task = Terminal.readPassword("Password: ");
-    assert.equal(typeof task.run, "function");
+    expect(typeof task.run).toBe("function");
   });
 
   it("returns Err(TerminalError) when stdin is not a TTY", async () => {
     const result = await Terminal.readPassword("Password: ").run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.error.tag, "TerminalError");
-    assert.ok(result.error.message.includes("TTY"));
+    expect(result.isErr).toBe(true);
+    expect(result.error.tag).toBe("TerminalError");
+    expect(result.error.message).toMatch(/TTY/);
   });
 });
 
@@ -265,7 +264,7 @@ describe("Terminal.readPassword", () => {
 describe("Terminal.confirm", () => {
   it("returns a TaskLike with lazy run()", () => {
     const task = Terminal.confirm("Continue?");
-    assert.equal(typeof task.run, "function");
+    expect(typeof task.run).toBe("function");
   });
 
   it("returns true for 'y' input", async () => {
@@ -285,8 +284,8 @@ describe("Terminal.confirm", () => {
       child.stdin.write("y\n");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, true);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(true);
   });
 
   it("returns true for 'yes' input", async () => {
@@ -306,8 +305,8 @@ describe("Terminal.confirm", () => {
       child.stdin.write("yes\n");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, true);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(true);
   });
 
   it("returns false for 'n' input", async () => {
@@ -327,8 +326,8 @@ describe("Terminal.confirm", () => {
       child.stdin.write("n\n");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, false);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(false);
   });
 
   it("returns false for invalid input in non-interactive mode", async () => {
@@ -348,8 +347,8 @@ describe("Terminal.confirm", () => {
       child.stdin.write("maybe\n");
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, false);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(false);
   });
 
   it("returns false on EOF", async () => {
@@ -368,8 +367,8 @@ describe("Terminal.confirm", () => {
       );
       child.stdin.end();
     });
-    assert.equal(result.isOk, true);
-    assert.equal(result.value, false);
+    expect(result.isOk).toBe(true);
+    expect(result.value).toBe(false);
   });
 });
 
@@ -380,7 +379,7 @@ describe("Terminal.confirm", () => {
 describe("TerminalError", () => {
   it("is exported and has correct tag", () => {
     const err = TerminalError("test error");
-    assert.equal(err.tag, "TerminalError");
-    assert.equal(err.message, "test error");
+    expect(err.tag).toBe("TerminalError");
+    expect(err.message).toBe("test error");
   });
 });

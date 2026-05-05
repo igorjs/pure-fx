@@ -1,15 +1,14 @@
 /**
  * integration.test.js - Cross-module integration & full program simulation.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output, not the source.
  *
  * Proves that modules compose correctly at their boundaries:
- * Schema→Record, Result↔Option, ErrType→Task, pipe/flow with monads, etc.
+ * Schema->Record, Result<->Option, ErrType->Task, pipe/flow with monads, etc.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
   Record,
@@ -52,37 +51,37 @@ describe("Schema -> Record -> List pipeline", () => {
   it("parses raw objects into plain validated data and collects with Result.collect", () => {
     const results = rawProducts.map(p => ProductSchema.parse(p));
     const collected = Result.collect(results);
-    assert.equal(collected.isOk, true);
+    expect(collected.isOk).toBe(true);
 
     const products = collected.unwrap();
-    assert.equal(products.length, 3);
-    assert.equal(products[0].name, "Widget");
-    assert.equal(products[1].name, "Gadget");
+    expect(products.length).toBe(3);
+    expect(products[0].name).toBe("Widget");
+    expect(products[1].name).toBe("Gadget");
   });
 
   it("converts parsed Records to List and queries with Option-returning methods", () => {
     const parsed = rawProducts.map(p => ProductSchema.parse(p).unwrap());
     const list = List(parsed);
 
-    assert.equal(list.length, 3);
-    assert.equal(list.first().unwrap().name, "Widget");
-    assert.equal(list.last().unwrap().name, "Gizmo");
-    assert.equal(list.at(1).unwrap().name, "Gadget");
+    expect(list.length).toBe(3);
+    expect(list.first().unwrap().name).toBe("Widget");
+    expect(list.last().unwrap().name).toBe("Gizmo");
+    expect(list.at(1).unwrap().name).toBe("Gadget");
 
     const found = list.find(p => p.name === "Gadget");
-    assert.equal(found.isSome, true);
-    assert.equal(found.unwrap().price, 24.95);
+    expect(found.isSome).toBe(true);
+    expect(found.unwrap().price).toBe(24.95);
 
     const missing = list.find(p => p.name === "Nope");
-    assert.equal(missing.isNone, true);
+    expect(missing.isNone).toBe(true);
   });
 
   it("schema failure stays in Result and never reaches Record/List", () => {
     const bad = { id: "not-a-number", name: "Bad", price: 10 };
     const result = ProductSchema.parse(bad);
-    assert.equal(result.isErr, true);
-    assert.deepEqual(result.unwrapErr().path, ["id"]);
-    assert.equal(result.unwrapErr().expected, "number");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr().path).toEqual(["id"]);
+    expect(result.unwrapErr().expected).toBe("number");
   });
 });
 
@@ -90,22 +89,22 @@ describe("Result <-> Option conversions", () => {
   it("Ok -> toOption -> Some -> toResult -> Ok round-trip", () => {
     const original = Ok(42);
     const opt = original.toOption();
-    assert.equal(opt.isSome, true);
-    assert.equal(opt.unwrap(), 42);
+    expect(opt.isSome).toBe(true);
+    expect(opt.unwrap()).toBe(42);
 
     const backToResult = opt.toResult("missing");
-    assert.equal(backToResult.isOk, true);
-    assert.equal(backToResult.unwrap(), 42);
+    expect(backToResult.isOk).toBe(true);
+    expect(backToResult.unwrap()).toBe(42);
   });
 
   it("Err -> toOption -> None -> toResult(newError) -> Err round-trip", () => {
     const original = Err("first error");
     const opt = original.toOption();
-    assert.equal(opt.isNone, true);
+    expect(opt.isNone).toBe(true);
 
     const backToResult = opt.toResult("replacement error");
-    assert.equal(backToResult.isErr, true);
-    assert.equal(backToResult.unwrapErr(), "replacement error");
+    expect(backToResult.isErr).toBe(true);
+    expect(backToResult.unwrapErr()).toBe("replacement error");
   });
 
   it("Option.fromNullable chains into toResult for null-safe lookup", () => {
@@ -115,12 +114,12 @@ describe("Result <-> Option conversions", () => {
     };
 
     const found = lookup("admin").toResult("not found");
-    assert.equal(found.isOk, true);
-    assert.equal(found.unwrap(), "Alice");
+    expect(found.isOk).toBe(true);
+    expect(found.unwrap()).toBe("Alice");
 
     const missing = lookup("guest").toResult("not found");
-    assert.equal(missing.isErr, true);
-    assert.equal(missing.unwrapErr(), "not found");
+    expect(missing.isErr).toBe(true);
+    expect(missing.unwrapErr()).toBe("not found");
   });
 });
 
@@ -136,8 +135,8 @@ describe("ErrType -> Result -> Task error pipeline", () => {
       .flatMap(v => save(v))
       .run();
 
-    assert.equal(result.isOk, true);
-    assert.deepEqual(result.unwrap(), { saved: true, value: "data" });
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap()).toEqual({ saved: true, value: "data" });
   });
 
   it("validation failure short-circuits flatMap", async () => {
@@ -154,12 +153,12 @@ describe("ErrType -> Result -> Task error pipeline", () => {
       .flatMap(() => save())
       .run();
 
-    assert.equal(result.isErr, true);
-    assert.equal(secondRan, false);
+    expect(result.isErr).toBe(true);
+    expect(secondRan).toBe(false);
     const err = result.unwrapErr();
-    assert.equal(err.tag, "ValidationError");
-    assert.equal(err.code, "VALIDATION_ERROR");
-    assert.deepEqual(err.metadata, { field: "email" });
+    expect(err.tag).toBe("ValidationError");
+    expect(err.code).toBe("VALIDATION_ERROR");
+    expect(err.metadata).toEqual({ field: "email" });
   });
 
   it("network failure propagates with full ErrType structure", async () => {
@@ -170,13 +169,13 @@ describe("ErrType -> Result -> Task error pipeline", () => {
       .map(d => d.toUpperCase())
       .run();
 
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
     const err = result.unwrapErr();
-    assert.equal(err.tag, "NetworkError");
-    assert.equal(err.code, "NETWORK_ERROR");
-    assert.equal(err.message, "connection refused");
-    assert.deepEqual(err.metadata, { host: "api.example.com" });
-    assert.equal(typeof err.timestamp, "number");
+    expect(err.tag).toBe("NetworkError");
+    expect(err.code).toBe("NETWORK_ERROR");
+    expect(err.message).toBe("connection refused");
+    expect(err.metadata).toEqual({ host: "api.example.com" });
+    expect(typeof err.timestamp).toBe("number");
   });
 });
 
@@ -192,7 +191,7 @@ describe("pipe/flow with monadic types", () => {
       opt => opt.unwrapOr("INVALID"),
     );
 
-    assert.equal(result, "USER@EXAMPLE.COM");
+    expect(result).toBe("USER@EXAMPLE.COM");
   });
 
   it("schema failure flows through Err -> None -> fallback", () => {
@@ -206,7 +205,7 @@ describe("pipe/flow with monadic types", () => {
       opt => opt.unwrapOr("INVALID"),
     );
 
-    assert.equal(result, "INVALID");
+    expect(result).toBe("INVALID");
   });
 
   it("flow creates a reusable validation pipeline", () => {
@@ -215,8 +214,8 @@ describe("pipe/flow with monadic types", () => {
       s => s.toLowerCase(),
     );
 
-    assert.equal(normalise("  HELLO@WORLD.COM  "), "hello@world.com");
-    assert.equal(normalise("TEST"), "test");
+    expect(normalise("  HELLO@WORLD.COM  ")).toBe("hello@world.com");
+    expect(normalise("TEST")).toBe("test");
   });
 });
 
@@ -230,18 +229,18 @@ describe("Lazy with Schema + Record", () => {
       return Record(UserSchema.parse({ name: "Alice", age: 30 }).unwrap());
     });
 
-    assert.equal(lazy.isEvaluated, false);
-    assert.equal(evalCount, 0);
+    expect(lazy.isEvaluated).toBe(false);
+    expect(evalCount).toBe(0);
 
     const record = lazy.value;
-    assert.equal(record.$immutable, true);
-    assert.equal(record.name, "Alice");
-    assert.equal(evalCount, 1);
+    expect(record.$immutable).toBe(true);
+    expect(record.name).toBe("Alice");
+    expect(evalCount).toBe(1);
 
     // Second access: no re-evaluation
     const again = lazy.value;
-    assert.equal(again.name, "Alice");
-    assert.equal(evalCount, 1);
+    expect(again.name).toBe("Alice");
+    expect(evalCount).toBe(1);
   });
 
   it("Lazy.toResult converts thrown exceptions from failed parsing", () => {
@@ -251,7 +250,7 @@ describe("Lazy with Schema + Record", () => {
     });
 
     const result = lazy.toResult(e => e.message);
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
   });
 
   it("Lazy.toOption returns None on error", () => {
@@ -259,7 +258,7 @@ describe("Lazy with Schema + Record", () => {
       throw new Error("boom");
     });
 
-    assert.equal(lazy.toOption().isNone, true);
+    expect(lazy.toOption().isNone).toBe(true);
   });
 });
 
@@ -270,11 +269,11 @@ describe("List of Results -> Result.collect -> Task", () => {
 
     const results = items.map(n => PositiveNum.parse(n));
     const collected = Result.collect(results);
-    assert.equal(collected.isOk, true);
+    expect(collected.isOk).toBe(true);
 
     const task = Task.fromResult(collected).map(nums => nums.reduce((a, b) => a + b, 0));
     const output = await task.run();
-    assert.equal(output.unwrap(), 15);
+    expect(output.unwrap()).toBe(15);
   });
 
   it("Result.collect short-circuits on first invalid; Task.map never runs", async () => {
@@ -284,15 +283,15 @@ describe("List of Results -> Result.collect -> Task", () => {
 
     const results = items.map(n => PositiveNum.parse(n));
     const collected = Result.collect(results);
-    assert.equal(collected.isErr, true);
+    expect(collected.isErr).toBe(true);
 
     const task = Task.fromResult(collected).map(nums => {
       taskRan = true;
       return nums.reduce((a, b) => a + b, 0);
     });
     const output = await task.run();
-    assert.equal(output.isErr, true);
-    assert.equal(taskRan, false);
+    expect(output.isErr).toBe(true);
+    expect(taskRan).toBe(false);
   });
 });
 
@@ -311,15 +310,15 @@ describe("Record.produce with nested structures", () => {
     });
 
     // Original untouched
-    assert.equal(order.items.$raw.length, 2);
+    expect(order.items.$raw.length).toBe(2);
     // Updated has new item
-    assert.equal(updated.items.$raw.length, 3);
+    expect(updated.items.$raw.length).toBe(3);
 
     // Convert to List for querying
     const itemList = List([...updated.items.$raw]);
-    assert.equal(itemList.length, 3);
-    assert.equal(itemList.find(i => i.sku === "C").unwrap().qty, 5);
-    assert.equal(itemList.last().unwrap().sku, "C");
+    expect(itemList.length).toBe(3);
+    expect(itemList.find(i => i.sku === "C").unwrap().qty).toBe(5);
+    expect(itemList.last().unwrap().sku).toBe("C");
   });
 });
 
@@ -336,11 +335,11 @@ describe("Nested Schema -> Record methods", () => {
 
   it("nested Schema.object returns plain validated data", () => {
     const result = UserSchema.parse({ name: "Bob", address: { city: "Melbourne", zip: "3000" } });
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
 
     const user = result.unwrap();
-    assert.equal(user.name, "Bob");
-    assert.equal(user.address.city, "Melbourne");
+    expect(user.name).toBe("Bob");
+    expect(user.address.city).toBe("Melbourne");
   });
 
   it("wrapping parsed data in Record enables set/update/at", () => {
@@ -351,28 +350,28 @@ describe("Nested Schema -> Record methods", () => {
       }).unwrap(),
     );
 
-    assert.equal(user.$immutable, true);
-    assert.equal(user.address.$immutable, true);
+    expect(user.$immutable).toBe(true);
+    expect(user.address.$immutable).toBe(true);
 
     const moved = user.set(u => u.address.city, "Sydney");
-    assert.equal(moved.address.city, "Sydney");
-    assert.equal(user.address.city, "Melbourne");
+    expect(moved.address.city).toBe("Sydney");
+    expect(user.address.city).toBe("Melbourne");
 
     const upperName = user.update(
       u => u.name,
       n => n.toUpperCase(),
     );
-    assert.equal(upperName.name, "BOB");
+    expect(upperName.name).toBe("BOB");
 
     const cityOpt = user.at(u => u.address.city);
-    assert.equal(cityOpt.isSome, true);
-    assert.equal(cityOpt.unwrap(), "Melbourne");
+    expect(cityOpt.isSome).toBe(true);
+    expect(cityOpt.unwrap()).toBe("Melbourne");
   });
 
   it("nested validation errors include full path", () => {
     const result = UserSchema.parse({ name: "Bob", address: { city: 42, zip: "3000" } });
-    assert.equal(result.isErr, true);
-    assert.deepEqual(result.unwrapErr().path, ["address", "city"]);
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr().path).toEqual(["address", "city"]);
   });
 });
 
@@ -381,12 +380,12 @@ describe("Nested Schema -> Record methods", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Program: Order Processing Pipeline", () => {
-  // ── Error types ──
+  // -- Error types --
   const ValidationError = ErrType("ValidationError");
   const PricingError = ErrType("PricingError");
   const InventoryError = ErrType("InventoryError");
 
-  // ── Schemas ──
+  // -- Schemas --
   const ItemSchema = Schema.object({
     sku: Schema.string,
     name: Schema.string,
@@ -406,7 +405,7 @@ describe("Program: Order Processing Pipeline", () => {
     discountCode: Schema.string.optional(),
   });
 
-  // ── Helpers ──
+  // -- Helpers --
   const lineTotal = item => item.qty * item.unitPrice;
 
   const lookupDiscount = code => {
@@ -416,7 +415,7 @@ describe("Program: Order Processing Pipeline", () => {
 
   const makeTaxCalculator = rate => Lazy(() => rate);
 
-  // ── Async checks ──
+  // -- Async checks --
   const checkPricing = items =>
     Task(async () => {
       for (const item of items) {
@@ -443,7 +442,7 @@ describe("Program: Order Processing Pipeline", () => {
       return Ok(true);
     });
 
-  // ── Pipeline builder ──
+  // -- Pipeline builder --
   const processOrder = rawInput => {
     return Program("order-processor", () => {
       // Step 1: Schema validation
@@ -508,7 +507,7 @@ describe("Program: Order Processing Pipeline", () => {
     });
   };
 
-  // ── Valid order fixtures ──
+  // -- Valid order fixtures --
   const validOrderWithDiscount = {
     orderId: "ORD-001",
     customer: { email: "alice@example.com", name: "Alice" },
@@ -525,38 +524,38 @@ describe("Program: Order Processing Pipeline", () => {
     items: [{ sku: "W1", name: "Widget", qty: 3, unitPrice: 10.0 }],
   };
 
-  // ── Tests ──
+  // -- Tests --
 
   it("happy path with discount: full pipeline Schema->Record->List->pipe->Lazy->Option->Task.zip->Program", async () => {
     const prog = processOrder(validOrderWithDiscount);
     const result = await prog.execute();
 
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     const summary = result.unwrap();
-    assert.equal(summary.orderId, "ORD-001");
+    expect(summary.orderId).toBe("ORD-001");
     // subtotal: (2 * 9.99) + (1 * 24.95) = 19.98 + 24.95 = 44.93
-    assert.equal(summary.subtotal, 44.93);
+    expect(summary.subtotal).toBe(44.93);
     // tax: 44.93 * 0.1 = 4.493 -> 4.49
-    assert.equal(summary.tax, 4.49);
+    expect(summary.tax).toBe(4.49);
     // discount: 44.93 * 0.1 = 4.493 -> 4.49
-    assert.equal(summary.discount, 4.49);
+    expect(summary.discount).toBe(4.49);
     // total: 44.93 + 4.49 - 4.49 = 44.93
-    assert.equal(summary.total, 44.93);
-    assert.equal(summary.itemCount, 2);
+    expect(summary.total).toBe(44.93);
+    expect(summary.itemCount).toBe(2);
   });
 
   it("happy path no discount: Option.fromNullable(undefined) -> None -> unwrapOr(0)", async () => {
     const prog = processOrder(validOrderNoDiscount);
     const result = await prog.execute();
 
-    assert.equal(result.isOk, true);
+    expect(result.isOk).toBe(true);
     const summary = result.unwrap();
-    assert.equal(summary.orderId, "ORD-002");
-    assert.equal(summary.subtotal, 30);
-    assert.equal(summary.tax, 3);
-    assert.equal(summary.discount, 0);
-    assert.equal(summary.total, 33);
-    assert.equal(summary.itemCount, 1);
+    expect(summary.orderId).toBe("ORD-002");
+    expect(summary.subtotal).toBe(30);
+    expect(summary.tax).toBe(3);
+    expect(summary.discount).toBe(0);
+    expect(summary.total).toBe(33);
+    expect(summary.itemCount).toBe(1);
   });
 
   it("invalid discount code: lookupDiscount returns None, pipeline still succeeds", async () => {
@@ -566,8 +565,8 @@ describe("Program: Order Processing Pipeline", () => {
     };
     const result = await processOrder(order).execute();
 
-    assert.equal(result.isOk, true);
-    assert.equal(result.unwrap().discount, 0);
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap().discount).toBe(0);
   });
 
   it("schema validation failure: bad email wrapped in ValidationError", async () => {
@@ -578,10 +577,10 @@ describe("Program: Order Processing Pipeline", () => {
     };
     const result = await processOrder(order).execute();
 
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
     const err = result.unwrapErr();
-    assert.equal(err.tag, "ValidationError");
-    assert.equal(err.code, "VALIDATION_ERROR");
+    expect(err.tag).toBe("ValidationError");
+    expect(err.code).toBe("VALIDATION_ERROR");
   });
 
   it("pricing error: unitPrice > 1000 triggers PricingError in Task.zip", async () => {
@@ -592,11 +591,11 @@ describe("Program: Order Processing Pipeline", () => {
     };
     const result = await processOrder(order).execute();
 
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
     const err = result.unwrapErr();
-    assert.equal(err.tag, "PricingError");
-    assert.equal(err.code, "PRICING_ERROR");
-    assert.deepEqual(err.metadata, { sku: "D1", unitPrice: 5000 });
+    expect(err.tag).toBe("PricingError");
+    expect(err.code).toBe("PRICING_ERROR");
+    expect(err.metadata).toEqual({ sku: "D1", unitPrice: 5000 });
   });
 
   it("inventory error: qty > 100 triggers InventoryError in Task.zip", async () => {
@@ -607,11 +606,11 @@ describe("Program: Order Processing Pipeline", () => {
     };
     const result = await processOrder(order).execute();
 
-    assert.equal(result.isErr, true);
+    expect(result.isErr).toBe(true);
     const err = result.unwrapErr();
-    assert.equal(err.tag, "InventoryError");
-    assert.equal(err.code, "INVENTORY_ERROR");
-    assert.deepEqual(err.metadata, { sku: "B1", requested: 500 });
+    expect(err.tag).toBe("InventoryError");
+    expect(err.code).toBe("INVENTORY_ERROR");
+    expect(err.metadata).toEqual({ sku: "B1", requested: 500 });
   });
 
   it("match() on final result: exhaustive Ok/Err pattern matching", async () => {
@@ -620,7 +619,7 @@ describe("Program: Order Processing Pipeline", () => {
       Ok: summary => `Order ${summary.orderId} total: ${summary.total}`,
       Err: err => `Failed: ${err.message}`,
     });
-    assert.equal(okOutput, "Order ORD-001 total: 44.93");
+    expect(okOutput).toBe("Order ORD-001 total: 44.93");
 
     const errResult = await processOrder({
       orderId: "X",
@@ -631,18 +630,18 @@ describe("Program: Order Processing Pipeline", () => {
       Ok: () => "should not reach",
       Err: err => `Failed: ${err.tag}`,
     });
-    assert.equal(errOutput, "Failed: ValidationError");
+    expect(errOutput).toBe("Failed: ValidationError");
   });
 
   it("isImmutable verification: Record-wrapped parsed data is immutable", async () => {
     const parsed = OrderSchema.parse(validOrderWithDiscount);
-    assert.equal(parsed.isOk, true);
+    expect(parsed.isOk).toBe(true);
 
     // Schema returns plain data; wrap in Record for immutability
     const order = Record(parsed.unwrap());
-    assert.equal(isImmutable(order), true);
-    assert.equal(isImmutable(order.customer), true);
-    assert.equal(order.items.$immutable, true);
+    expect(isImmutable(order)).toBe(true);
+    expect(isImmutable(order.customer)).toBe(true);
+    expect(order.items.$immutable).toBe(true);
   });
 
   it("tryCatch integration: wraps JSON.parse errors into ValidationError", () => {
@@ -653,13 +652,13 @@ describe("Program: Order Processing Pipeline", () => {
       );
 
     const good = safeParse('{"ok":true}');
-    assert.equal(good.isOk, true);
-    assert.deepEqual(good.unwrap(), { ok: true });
+    expect(good.isOk).toBe(true);
+    expect(good.unwrap()).toEqual({ ok: true });
 
     const bad = safeParse("{broken");
-    assert.equal(bad.isErr, true);
-    assert.equal(bad.unwrapErr().tag, "ValidationError");
-    assert.equal(bad.unwrapErr().code, "VALIDATION_ERROR");
+    expect(bad.isErr).toBe(true);
+    expect(bad.unwrapErr().tag).toBe("ValidationError");
+    expect(bad.unwrapErr().code).toBe("VALIDATION_ERROR");
   });
 
   it("flow composes reusable transformers", () => {
@@ -674,8 +673,8 @@ describe("Program: Order Processing Pipeline", () => {
       { qty: 1, unitPrice: 5 },
     ]);
 
-    assert.equal(result.subtotal, 25);
-    assert.equal(result.tax, 2.5);
-    assert.equal(Math.round(result.total * 100) / 100, 27.5);
+    expect(result.subtotal).toBe(25);
+    expect(result.tax).toBe(2.5);
+    expect(Math.round(result.total * 100) / 100).toBe(27.5);
   });
 });

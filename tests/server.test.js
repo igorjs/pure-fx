@@ -1,15 +1,14 @@
 /**
  * server.test.js - Server module runtime correctness tests.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output (black-box).
  *
  * Covers: builder pattern, response helpers, trie routing, middleware
  * composition, derive() context extension, error handling, streaming.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
   Server,
@@ -33,47 +32,47 @@ const {
 describe("Response helpers", () => {
   it("json() creates response with correct content-type and body", async () => {
     const res = json({ ok: true });
-    assert.equal(res.status, 200);
-    assert.equal(res.headers.get("content-type"), "application/json; charset=utf-8");
-    assert.equal(await res.text(), '{"ok":true}');
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    expect(await res.text()).toBe('{"ok":true}');
   });
 
   it("json() accepts custom status via init", async () => {
     const res = json({ error: "bad" }, { status: 400 });
-    assert.equal(res.status, 400);
-    assert.equal(await res.text(), '{"error":"bad"}');
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe('{"error":"bad"}');
   });
 
   it("json() merges custom headers with content-type", async () => {
     const res = json("x", { headers: { "x-custom": "yes" } });
-    assert.equal(res.headers.get("content-type"), "application/json; charset=utf-8");
-    assert.equal(res.headers.get("x-custom"), "yes");
+    expect(res.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    expect(res.headers.get("x-custom")).toBe("yes");
   });
 
   it("text() creates response with text/plain content-type", async () => {
     const res = text("hello");
-    assert.equal(res.status, 200);
-    assert.equal(res.headers.get("content-type"), "text/plain; charset=utf-8");
-    assert.equal(await res.text(), "hello");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(await res.text()).toBe("hello");
   });
 
   it("html() creates response with text/html content-type", async () => {
     const res = html("<h1>Hi</h1>");
-    assert.equal(res.status, 200);
-    assert.equal(res.headers.get("content-type"), "text/html; charset=utf-8");
-    assert.equal(await res.text(), "<h1>Hi</h1>");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(await res.text()).toBe("<h1>Hi</h1>");
   });
 
   it("redirect() creates 302 response with location header", () => {
     const res = redirect("/login");
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.get("location"), "/login");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/login");
   });
 
   it("redirect() accepts custom status", () => {
     const res = redirect("/new", 301);
-    assert.equal(res.status, 301);
-    assert.equal(res.headers.get("location"), "/new");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("/new");
   });
 });
 
@@ -84,32 +83,32 @@ describe("Response helpers", () => {
 describe("Server builder", () => {
   it("Server() returns a builder with .name", () => {
     const app = Server("test-api");
-    assert.equal(app.name, "test-api");
+    expect(app.name).toBe("test-api");
   });
 
   it("builder is frozen (immutable)", () => {
     const app = Server("test");
-    assert.ok(Object.isFrozen(app));
+    expect(Object.isFrozen(app)).toBe(true);
   });
 
   it("each .get() returns a new frozen builder", () => {
     const a = Server("test");
     const b = a.get("/x", () => text("x"));
-    assert.notStrictEqual(a, b);
-    assert.ok(Object.isFrozen(b));
+    expect(a).not.toBe(b);
+    expect(Object.isFrozen(b)).toBe(true);
   });
 
   it(".use() returns a new builder", () => {
     const a = Server("test");
     const mw = next => req => next(req);
     const b = a.use(mw);
-    assert.notStrictEqual(a, b);
+    expect(a).not.toBe(b);
   });
 
   it(".onError() returns a new builder", () => {
     const a = Server("test");
     const b = a.onError(() => text("custom error", { status: 500 }));
-    assert.notStrictEqual(a, b);
+    expect(a).not.toBe(b);
   });
 });
 
@@ -130,47 +129,47 @@ describe("Route matching", () => {
 
   it("matches static route", async () => {
     const res = await app.fetch(new Request("http://localhost/health"));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { ok: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
   });
 
   it("matches route with single param", async () => {
     const res = await app.fetch(new Request("http://localhost/users/42"));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { id: "42" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: "42" });
   });
 
   it("matches route with multiple params", async () => {
     const res = await app.fetch(new Request("http://localhost/users/u1/posts/p2"));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { userId: "u1", postId: "p2" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ userId: "u1", postId: "p2" });
   });
 
   it("matches wildcard route", async () => {
     const res = await app.fetch(new Request("http://localhost/files/a/b/c.txt"));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { path: "a/b/c.txt" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ path: "a/b/c.txt" });
   });
 
   it("matches correct HTTP method", async () => {
     const res = await app.fetch(new Request("http://localhost/users", { method: "POST" }));
-    assert.equal(res.status, 201);
-    assert.deepEqual(await res.json(), { created: true });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ created: true });
   });
 
   it("returns 404 for unmatched path", async () => {
     const res = await app.fetch(new Request("http://localhost/nonexistent"));
-    assert.equal(res.status, 404);
+    expect(res.status).toBe(404);
   });
 
   it("returns 405 for wrong method", async () => {
     const res = await app.fetch(new Request("http://localhost/users", { method: "DELETE" }));
-    assert.equal(res.status, 405);
+    expect(res.status).toBe(405);
   });
 
   it("handles trailing slash", async () => {
     const res = await app.fetch(new Request("http://localhost/health/"));
-    assert.equal(res.status, 200);
+    expect(res.status).toBe(200);
   });
 
   it("matches static route over param route", async () => {
@@ -179,10 +178,10 @@ describe("Route matching", () => {
       .get("/users/:id", ctx => text(`user-${ctx.params.id}`));
 
     const resList = await app2.fetch(new Request("http://localhost/users"));
-    assert.equal(await resList.text(), "list");
+    expect(await resList.text()).toBe("list");
 
     const resParam = await app2.fetch(new Request("http://localhost/users/42"));
-    assert.equal(await resParam.text(), "user-42");
+    expect(await resParam.text()).toBe("user-42");
   });
 });
 
@@ -194,13 +193,13 @@ describe("Handler normalization", () => {
   it("sync handler returning Response works", async () => {
     const app = Server("test").get("/sync", () => text("sync"));
     const res = await app.fetch(new Request("http://localhost/sync"));
-    assert.equal(await res.text(), "sync");
+    expect(await res.text()).toBe("sync");
   });
 
   it("async handler returning Task works", async () => {
     const app = Server("test").get("/async", () => Task.of(text("async")));
     const res = await app.fetch(new Request("http://localhost/async"));
-    assert.equal(await res.text(), "async");
+    expect(await res.text()).toBe("async");
   });
 
   it("handler throwing is caught and returns 500", async () => {
@@ -208,7 +207,7 @@ describe("Handler normalization", () => {
       throw new Error("boom");
     });
     const res = await app.fetch(new Request("http://localhost/throw"));
-    assert.equal(res.status, 500);
+    expect(res.status).toBe(500);
   });
 });
 
@@ -220,22 +219,22 @@ describe("app.handle", () => {
   it("returns Task<Response, ServerError> for matched route", async () => {
     const app = Server("test").get("/ok", () => text("ok"));
     const result = await app.handle(new Request("http://localhost/ok")).run();
-    assert.equal(result.isOk, true);
-    assert.equal(result.value.status, 200);
+    expect(result.isOk).toBe(true);
+    expect(result.value.status).toBe(200);
   });
 
   it("returns Err(RouteNotFound) for unmatched path", async () => {
     const app = Server("test").get("/ok", () => text("ok"));
     const result = await app.handle(new Request("http://localhost/missing")).run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr().tag, "RouteNotFound");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr().tag).toBe("RouteNotFound");
   });
 
   it("returns Err(MethodNotAllowed) for wrong method", async () => {
     const app = Server("test").get("/ok", () => text("ok"));
     const result = await app.handle(new Request("http://localhost/ok", { method: "POST" })).run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr().tag, "MethodNotAllowed");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr().tag).toBe("MethodNotAllowed");
   });
 });
 
@@ -259,8 +258,8 @@ describe("Middleware", () => {
       .get("/ok", () => text("ok"));
 
     const res = await app.fetch(new Request("http://localhost/ok"));
-    assert.equal(res.headers.get("x-test"), "1");
-    assert.equal(await res.text(), "ok");
+    expect(res.headers.get("x-test")).toBe("1");
+    expect(await res.text()).toBe("ok");
   });
 
   it("middleware can short-circuit without calling next", async () => {
@@ -275,9 +274,9 @@ describe("Middleware", () => {
       });
 
     const res = await app.fetch(new Request("http://localhost/ok"));
-    assert.equal(res.status, 403);
-    assert.equal(await res.text(), "blocked");
-    assert.equal(handlerCalled, false);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("blocked");
+    expect(handlerCalled).toBe(false);
   });
 
   it("middleware execution order: first .use() runs outermost", async () => {
@@ -293,7 +292,7 @@ describe("Middleware", () => {
       .get("/ok", () => text("ok"));
 
     await app.fetch(new Request("http://localhost/ok"));
-    assert.deepEqual(order, ["A-before", "B-before", "B-after", "A-after"]);
+    expect(order).toEqual(["A-before", "B-before", "B-after", "A-after"]);
   });
 
   it("compose() creates a single middleware from multiple", async () => {
@@ -320,8 +319,8 @@ describe("Middleware", () => {
       .get("/ok", () => text("ok"));
 
     const res = await app.fetch(new Request("http://localhost/ok"));
-    assert.equal(res.headers.get("x-a"), "1");
-    assert.equal(res.headers.get("x-b"), "2");
+    expect(res.headers.get("x-a")).toBe("1");
+    expect(res.headers.get("x-b")).toBe("2");
   });
 });
 
@@ -336,8 +335,8 @@ describe("derive() context extension", () => {
       .get("/profile", ctx => json({ name: ctx.user.name }));
 
     const res = await app.fetch(new Request("http://localhost/profile"));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), { name: "Alice" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ name: "Alice" });
   });
 
   it("multiple derive() calls accumulate context", async () => {
@@ -347,7 +346,7 @@ describe("derive() context extension", () => {
       .get("/info", ctx => json({ user: ctx.user, role: ctx.role }));
 
     const res = await app.fetch(new Request("http://localhost/info"));
-    assert.deepEqual(await res.json(), { user: "Alice", role: "admin" });
+    expect(await res.json()).toEqual({ user: "Alice", role: "admin" });
   });
 
   it("chained derive() receives accumulated context", async () => {
@@ -357,7 +356,7 @@ describe("derive() context extension", () => {
       .get("/val", ctx => json({ count: ctx.count, doubled: ctx.doubled }));
 
     const res = await app.fetch(new Request("http://localhost/val"));
-    assert.deepEqual(await res.json(), { count: 1, doubled: 2 });
+    expect(await res.json()).toEqual({ count: 1, doubled: 2 });
   });
 
   it("derive() failure short-circuits to error handler", async () => {
@@ -370,8 +369,8 @@ describe("derive() context extension", () => {
       });
 
     const res = await app.fetch(new Request("http://localhost/secret"));
-    assert.equal(res.status, 500);
-    assert.equal(handlerCalled, false);
+    expect(res.status).toBe(500);
+    expect(handlerCalled).toBe(false);
   });
 
   it("derive() context available alongside route params", async () => {
@@ -380,7 +379,7 @@ describe("derive() context extension", () => {
       .get("/users/:id", ctx => json({ id: ctx.params.id, role: ctx.role }));
 
     const res = await app.fetch(new Request("http://localhost/users/42"));
-    assert.deepEqual(await res.json(), { id: "42", role: "viewer" });
+    expect(await res.json()).toEqual({ id: "42", role: "viewer" });
   });
 });
 
@@ -395,8 +394,8 @@ describe("Custom error handler", () => {
       .get("/ok", () => text("ok"));
 
     const res = await app.fetch(new Request("http://localhost/missing"));
-    assert.equal(res.status, 418);
-    assert.deepEqual(await res.json(), { custom: true, tag: "RouteNotFound" });
+    expect(res.status).toBe(418);
+    expect(await res.json()).toEqual({ custom: true, tag: "RouteNotFound" });
   });
 });
 
@@ -409,13 +408,13 @@ describe("Route.all()", () => {
     const app = Server("test").all("/any", () => text("any"));
 
     const get = await app.fetch(new Request("http://localhost/any"));
-    assert.equal(await get.text(), "any");
+    expect(await get.text()).toBe("any");
 
     const post = await app.fetch(new Request("http://localhost/any", { method: "POST" }));
-    assert.equal(await post.text(), "any");
+    expect(await post.text()).toBe("any");
 
     const del = await app.fetch(new Request("http://localhost/any", { method: "DELETE" }));
-    assert.equal(await del.text(), "any");
+    expect(await del.text()).toBe("any");
   });
 });
 
@@ -434,8 +433,8 @@ describe("listen() returns Program", () => {
       .get("/ok", () => text("ok"))
       .listen({ port: 0 }, mockAdapter);
 
-    assert.equal(typeof app.run, "function");
-    assert.equal(typeof app.execute, "function");
+    expect(typeof app.run).toBe("function");
+    expect(typeof app.execute).toBe("function");
   });
 });
 
@@ -448,21 +447,21 @@ describe("Route matching edge cases", () => {
     const app = Server("test").get("/health", () => text("ok"));
     const res = await app.fetch(new Request("http://localhost//health"));
     // Double slashes produce an empty segment that gets filtered out
-    assert.equal(res.status, 200);
+    expect(res.status).toBe(200);
   });
 
   it("handles URL-encoded path segments", async () => {
     const app = Server("test").get("/users/:id", ctx => text(ctx.params.id));
     const res = await app.fetch(new Request("http://localhost/users/hello%20world"));
     // URL constructor decodes percent-encoded paths
-    assert.equal(res.status, 200);
+    expect(res.status).toBe(200);
   });
 
   it("handles root route with param", async () => {
     const app = Server("test").get("/:slug", ctx => text(ctx.params.slug));
     const res = await app.fetch(new Request("http://localhost/about"));
-    assert.equal(res.status, 200);
-    assert.equal(await res.text(), "about");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("about");
   });
 
   it("wildcard captures empty rest when path matches exactly to wildcard level", async () => {
@@ -470,7 +469,7 @@ describe("Route matching edge cases", () => {
     // /files/ with nothing after matches wildcard with empty string
     const result = await app.handle(new Request("http://localhost/files/")).run();
     // Either matches with empty wildcard or falls to leaf; both valid
-    assert.equal(result.isOk || result.isErr, true);
+    expect(result.isOk || result.isErr).toBe(true);
   });
 
   it("param route and static route at same level: static wins", async () => {
@@ -479,10 +478,10 @@ describe("Route matching edge cases", () => {
       .get("/users/:id", ctx => text(`user-${ctx.params.id}`));
 
     const meRes = await app.fetch(new Request("http://localhost/users/me"));
-    assert.equal(await meRes.text(), "me-page");
+    expect(await meRes.text()).toBe("me-page");
 
     const paramRes = await app.fetch(new Request("http://localhost/users/42"));
-    assert.equal(await paramRes.text(), "user-42");
+    expect(await paramRes.text()).toBe("user-42");
   });
 });
 
@@ -504,7 +503,7 @@ describe("Middleware + derive interaction", () => {
 
     await app.fetch(new Request("http://localhost/x"));
     // Middleware before runs, but after may or may not depending on error flow
-    assert.equal(middlewareRan.before, true);
+    expect(middlewareRan.before).toBe(true);
   });
 
   it("middleware can transform error responses from derive failures", async () => {
@@ -525,7 +524,7 @@ describe("Middleware + derive interaction", () => {
 
     const res = await app.fetch(new Request("http://localhost/secret"));
     // Error handler produces the response, then middleware wraps it
-    assert.equal(res.status, 401);
+    expect(res.status).toBe(401);
   });
 });
 
@@ -543,9 +542,9 @@ describe("Streaming responses", () => {
     });
 
     const res = await app.fetch(new Request("http://localhost/stream"));
-    assert.equal(res.status, 200);
+    expect(res.status).toBe(200);
     const body = await res.text();
-    assert.equal(body, "chunk1chunk2");
+    expect(body).toBe("chunk1chunk2");
   });
 });
 
@@ -556,17 +555,17 @@ describe("Handler returning Task with error", () => {
     );
 
     const res = await app.fetch(new Request("http://localhost/fail"));
-    assert.equal(res.status, 404);
+    expect(res.status).toBe(404);
     const body = await res.json();
-    assert.equal(body.error, "custom not found");
+    expect(body.error).toBe("custom not found");
   });
 
   it("app.handle preserves typed errors from Task handlers", async () => {
     const app = Server("test").get("/fail", () => Task.fromResult(Err(HandlerError("oops"))));
 
     const result = await app.handle(new Request("http://localhost/fail")).run();
-    assert.equal(result.isErr, true);
-    assert.equal(result.unwrapErr().tag, "HandlerError");
-    assert.equal(result.unwrapErr().message, "oops");
+    expect(result.isErr).toBe(true);
+    expect(result.unwrapErr().tag).toBe("HandlerError");
+    expect(result.unwrapErr().message).toBe("oops");
   });
 });

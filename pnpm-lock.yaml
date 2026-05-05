@@ -15,6 +15,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.4.14
         version: 2.4.14
+      '@igorjs/pure-test':
+        specifier: ^0.1.0
+        version: 0.1.0(typescript@5.9.3)
       '@typescript/native-preview':
         specifier: latest
         version: 7.0.0-dev.20260318.1
@@ -120,6 +123,16 @@ packages:
 
   '@emnapi/runtime@1.10.0':
     resolution: {integrity: sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==}
+
+  '@igorjs/pure-test@0.1.0':
+    resolution: {integrity: sha512-hLNppk0sBvFgI4+AWIb7R79g+aRk2UJe9eqMyodyfYCrVXWyU4n20jS+tP5+4bUmND8d6tomjgp3+VReWgFqRQ==}
+    engines: {node: '>=22'}
+    hasBin: true
+    peerDependencies:
+      typescript: '>=5.7.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -482,6 +495,10 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@igorjs/pure-test@0.1.0(typescript@5.9.3)':
+    optionalDependencies:
+      typescript: 5.9.3
 
   '@img/colour@1.1.0': {}
 

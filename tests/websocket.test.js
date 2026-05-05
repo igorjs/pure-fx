@@ -1,12 +1,11 @@
 /**
  * websocket.test.js - Tests for the WebSocket router module.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output (black-box).
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const { WebSocket } = await import("../dist/index.js");
 
@@ -18,10 +17,10 @@ describe("WebSocket", () => {
   describe("WebSocket.router()", () => {
     it("creates an empty router", () => {
       const ws = WebSocket.router();
-      assert.equal(typeof ws.route, "function");
-      assert.equal(typeof ws.match, "function");
-      assert.ok(Array.isArray(ws.routes));
-      assert.equal(ws.routes.length, 0);
+      expect(typeof ws.route).toBe("function");
+      expect(typeof ws.match).toBe("function");
+      expect(Array.isArray(ws.routes)).toBe(true);
+      expect(ws.routes.length).toBe(0);
     });
   });
 
@@ -33,8 +32,8 @@ describe("WebSocket", () => {
           /* noop */
         },
       });
-      assert.equal(ws1.routes.length, 0);
-      assert.equal(ws2.routes.length, 1);
+      expect(ws1.routes.length).toBe(0);
+      expect(ws2.routes.length).toBe(1);
     });
 
     it("chains multiple routes", () => {
@@ -54,7 +53,7 @@ describe("WebSocket", () => {
             /* noop */
           },
         });
-      assert.equal(ws.routes.length, 3);
+      expect(ws.routes.length).toBe(3);
     });
 
     it("stores pattern and handler in route definition", () => {
@@ -68,25 +67,22 @@ describe("WebSocket", () => {
       };
       const ws = WebSocket.router().route("/test", handler);
       const route = ws.routes[0];
-      assert.equal(route.pattern, "/test");
-      assert.equal(route.handler, handler);
+      expect(route.pattern).toBe("/test");
+      expect(route.handler).toBe(handler);
     });
   });
 
   describe(".routes", () => {
     it("is a readonly array", () => {
       const ws = WebSocket.router().route("/a", {}).route("/b", {});
-      assert.equal(ws.routes.length, 2);
-      assert.equal(ws.routes[0].pattern, "/a");
-      assert.equal(ws.routes[1].pattern, "/b");
+      expect(ws.routes.length).toBe(2);
+      expect(ws.routes[0].pattern).toBe("/a");
+      expect(ws.routes[1].pattern).toBe("/b");
     });
 
     it("preserves insertion order", () => {
       const ws = WebSocket.router().route("/first", {}).route("/second", {}).route("/third", {});
-      assert.deepEqual(
-        ws.routes.map(r => r.pattern),
-        ["/first", "/second", "/third"],
-      );
+      expect(ws.routes.map(r => r.pattern)).toEqual(["/first", "/second", "/third"]);
     });
   });
 
@@ -99,7 +95,7 @@ describe("WebSocket", () => {
       };
       const ws = WebSocket.router().route("/chat", handler);
       const matched = ws.match("/chat");
-      assert.equal(matched, handler);
+      expect(matched).toBe(handler);
     });
 
     it("returns undefined for non-matching pattern", () => {
@@ -108,7 +104,7 @@ describe("WebSocket", () => {
           /* noop */
         },
       });
-      assert.equal(ws.match("/other"), undefined);
+      expect(ws.match("/other")).toBe(undefined);
     });
 
     it("matches first route when multiple patterns exist", () => {
@@ -123,19 +119,19 @@ describe("WebSocket", () => {
         },
       };
       const ws = WebSocket.router().route("/a", h1).route("/b", h2);
-      assert.equal(ws.match("/a"), h1);
-      assert.equal(ws.match("/b"), h2);
+      expect(ws.match("/a")).toBe(h1);
+      expect(ws.match("/b")).toBe(h2);
     });
 
     it("returns undefined on empty router", () => {
-      assert.equal(WebSocket.router().match("/anything"), undefined);
+      expect(WebSocket.router().match("/anything")).toBe(undefined);
     });
 
     it("uses exact string matching", () => {
       const ws = WebSocket.router().route("/chat", {});
-      assert.equal(ws.match("/chat/room"), undefined);
-      assert.equal(ws.match("/cha"), undefined);
-      assert.equal(ws.match("chat"), undefined);
+      expect(ws.match("/chat/room")).toBe(undefined);
+      expect(ws.match("/cha")).toBe(undefined);
+      expect(ws.match("chat")).toBe(undefined);
     });
   });
 
@@ -156,19 +152,19 @@ describe("WebSocket", () => {
         },
       });
       const handler = ws.match("/full");
-      assert.equal(typeof handler.onOpen, "function");
-      assert.equal(typeof handler.onMessage, "function");
-      assert.equal(typeof handler.onClose, "function");
-      assert.equal(typeof handler.onError, "function");
+      expect(typeof handler.onOpen).toBe("function");
+      expect(typeof handler.onMessage).toBe("function");
+      expect(typeof handler.onClose).toBe("function");
+      expect(typeof handler.onError).toBe("function");
     });
 
     it("all handlers are optional", () => {
       const ws = WebSocket.router().route("/minimal", {});
       const handler = ws.match("/minimal");
-      assert.equal(handler.onOpen, undefined);
-      assert.equal(handler.onMessage, undefined);
-      assert.equal(handler.onClose, undefined);
-      assert.equal(handler.onError, undefined);
+      expect(handler.onOpen).toBe(undefined);
+      expect(handler.onMessage).toBe(undefined);
+      expect(handler.onClose).toBe(undefined);
+      expect(handler.onError).toBe(undefined);
     });
   });
 });

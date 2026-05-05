@@ -2,12 +2,11 @@
  * comprehensive.test.js - Exhaustive tests for Result, Option, Task, Schema,
  * Record, List, and namespace methods. Fills coverage gaps.
  *
- * Uses Node.js built-in test runner (node --test). Zero dependencies.
+ * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output, not the source.
  */
 
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
   Ok,
@@ -39,30 +38,28 @@ const {
 
 describe("Result (Ok)", () => {
   it("map transforms value", () => {
-    assert.equal(
+    expect(
       Ok(2)
         .map(n => n * 3)
         .unwrap(),
-      6,
-    );
+    ).toBe(6);
   });
 
   it("mapErr is a no-op", () => {
     const r = Ok(1).mapErr(() => "nope");
-    assert.equal(r.unwrap(), 1);
+    expect(r.unwrap()).toBe(1);
   });
 
   it("flatMap chains to Ok", () => {
-    assert.equal(
+    expect(
       Ok(5)
         .flatMap(n => Ok(n + 1))
         .unwrap(),
-      6,
-    );
+    ).toBe(6);
   });
 
   it("flatMap chains to Err", () => {
-    assert.equal(Ok(5).flatMap(() => Err("fail")).isErr, true);
+    expect(Ok(5).flatMap(() => Err("fail")).isErr).toBe(true);
   });
 
   it("tap runs side-effect and returns same", () => {
@@ -70,8 +67,8 @@ describe("Result (Ok)", () => {
     const r = Ok(42).tap(v => {
       seen = v;
     });
-    assert.equal(seen, 42);
-    assert.equal(r.unwrap(), 42);
+    expect(seen).toBe(42);
+    expect(r.unwrap()).toBe(42);
   });
 
   it("tapErr is a no-op", () => {
@@ -79,62 +76,59 @@ describe("Result (Ok)", () => {
     Ok(1).tapErr(() => {
       called = true;
     });
-    assert.equal(called, false);
+    expect(called).toBe(false);
   });
 
   it("unwrap returns value", () => {
-    assert.equal(Ok("hi").unwrap(), "hi");
+    expect(Ok("hi").unwrap()).toBe("hi");
   });
 
   it("unwrapOr returns value (ignores fallback)", () => {
-    assert.equal(Ok(1).unwrapOr(99), 1);
+    expect(Ok(1).unwrapOr(99)).toBe(1);
   });
 
   it("unwrapOrElse returns value (ignores fn)", () => {
-    assert.equal(
-      Ok(1).unwrapOrElse(() => 99),
-      1,
-    );
+    expect(Ok(1).unwrapOrElse(() => 99)).toBe(1);
   });
 
   it("unwrapErr throws on Ok", () => {
-    assert.throws(() => Ok(1).unwrapErr(), TypeError);
+    expect(() => Ok(1).unwrapErr()).toThrow();
   });
 
   it("match calls Ok handler", () => {
-    assert.equal(Ok(10).match({ Ok: v => v + 1, Err: () => -1 }), 11);
+    expect(Ok(10).match({ Ok: v => v + 1, Err: () => -1 })).toBe(11);
   });
 
   it("toOption returns Some", () => {
     const opt = Ok(42).toOption();
-    assert.equal(opt.isSome, true);
-    assert.equal(opt.unwrap(), 42);
+    expect(opt.isSome).toBe(true);
+    expect(opt.unwrap()).toBe(42);
   });
 
   it("zip two Ok values", () => {
     const r = Ok("a").zip(Ok(1));
-    assert.deepEqual(r.unwrap(), ["a", 1]);
+    expect(r.unwrap()).toEqual(["a", 1]);
   });
 
   it("zip Ok with Err returns Err", () => {
-    assert.equal(Ok(1).zip(Err("e")).isErr, true);
+    expect(Ok(1).zip(Err("e")).isErr).toBe(true);
   });
 
   it("ap applies wrapped function", () => {
     const r = Ok(5).ap(Ok(n => n * 2));
-    assert.equal(r.unwrap(), 10);
+    expect(r.unwrap()).toBe(10);
   });
 
   it("ap with Err function returns Err", () => {
-    assert.equal(Ok(5).ap(Err("no fn")).isErr, true);
+    expect(Ok(5).ap(Err("no fn")).isErr).toBe(true);
   });
 
   it("toJSON serializes correctly", () => {
-    assert.deepEqual(Ok(42).toJSON(), { tag: "Ok", value: 42 });
+    expect(Ok(42).toJSON()).toEqual({ tag: "Ok", value: 42 });
   });
 
   it("toString formats correctly", () => {
-    assert.equal(Ok(42).toString(), "Ok(42)");
+    expect(Ok(42).toString()).toBe("Ok(42)");
   });
 });
 
@@ -144,25 +138,23 @@ describe("Result (Ok)", () => {
 
 describe("Result (Err)", () => {
   it("map is a no-op", () => {
-    assert.equal(Err("e").map(() => 99).isErr, true);
+    expect(Err("e").map(() => 99).isErr).toBe(true);
   });
 
   it("mapErr transforms error", () => {
-    assert.equal(
+    expect(
       Err("e")
         .mapErr(e => e.toUpperCase())
         .unwrapErr(),
-      "E",
-    );
+    ).toBe("E");
   });
 
   it("flatMap is a no-op", () => {
-    assert.equal(
+    expect(
       Err("e")
         .flatMap(() => Ok(99))
         .unwrapErr(),
-      "e",
-    );
+    ).toBe("e");
   });
 
   it("tap is a no-op", () => {
@@ -170,7 +162,7 @@ describe("Result (Err)", () => {
     Err("e").tap(() => {
       called = true;
     });
-    assert.equal(called, false);
+    expect(called).toBe(false);
   });
 
   it("tapErr runs side-effect", () => {
@@ -178,54 +170,51 @@ describe("Result (Err)", () => {
     Err("oops").tapErr(e => {
       seen = e;
     });
-    assert.equal(seen, "oops");
+    expect(seen).toBe("oops");
   });
 
   it("unwrap throws on Err", () => {
-    assert.throws(() => Err("e").unwrap(), TypeError);
+    expect(() => Err("e").unwrap()).toThrow();
   });
 
   it("unwrapOr returns fallback", () => {
-    assert.equal(Err("e").unwrapOr(99), 99);
+    expect(Err("e").unwrapOr(99)).toBe(99);
   });
 
   it("unwrapOrElse calls recovery fn", () => {
-    assert.equal(
-      Err("err").unwrapOrElse(e => e.length),
-      3,
-    );
+    expect(Err("err").unwrapOrElse(e => e.length)).toBe(3);
   });
 
   it("unwrapErr returns error", () => {
-    assert.equal(Err("oops").unwrapErr(), "oops");
+    expect(Err("oops").unwrapErr()).toBe("oops");
   });
 
   it("match calls Err handler", () => {
-    assert.equal(Err("e").match({ Ok: () => -1, Err: e => e.length }), 1);
+    expect(Err("e").match({ Ok: () => -1, Err: e => e.length })).toBe(1);
   });
 
   it("toOption returns None", () => {
-    assert.equal(Err("e").toOption().isNone, true);
+    expect(Err("e").toOption().isNone).toBe(true);
   });
 
   it("zip Err with Ok returns Err", () => {
-    assert.equal(Err("e").zip(Ok(1)).isErr, true);
+    expect(Err("e").zip(Ok(1)).isErr).toBe(true);
   });
 
   it("zip Err with Err returns first Err", () => {
-    assert.equal(Err("first").zip(Err("second")).unwrapErr(), "first");
+    expect(Err("first").zip(Err("second")).unwrapErr()).toBe("first");
   });
 
   it("ap Err propagates", () => {
-    assert.equal(Err("e").ap(Ok(n => n)).isErr, true);
+    expect(Err("e").ap(Ok(n => n)).isErr).toBe(true);
   });
 
   it("toJSON serializes correctly", () => {
-    assert.deepEqual(Err("oops").toJSON(), { tag: "Err", error: "oops" });
+    expect(Err("oops").toJSON()).toEqual({ tag: "Err", error: "oops" });
   });
 
   it("toString formats correctly", () => {
-    assert.equal(Err("oops").toString(), "Err(oops)");
+    expect(Err("oops").toString()).toBe("Err(oops)");
   });
 });
 
@@ -235,79 +224,79 @@ describe("Result (Err)", () => {
 
 describe("Result namespace", () => {
   it("fromNullable returns Ok for non-null", () => {
-    assert.equal(Result.fromNullable(42, () => "null").unwrap(), 42);
+    expect(Result.fromNullable(42, () => "null").unwrap()).toBe(42);
   });
 
   it("fromNullable returns Err for null", () => {
-    assert.equal(Result.fromNullable(null, () => "was null").isErr, true);
+    expect(Result.fromNullable(null, () => "was null").isErr).toBe(true);
   });
 
   it("fromNullable returns Err for undefined", () => {
-    assert.equal(Result.fromNullable(undefined, () => "undef").isErr, true);
+    expect(Result.fromNullable(undefined, () => "undef").isErr).toBe(true);
   });
 
   it("fromNullable treats 0 as Ok", () => {
-    assert.equal(Result.fromNullable(0, () => "null").unwrap(), 0);
+    expect(Result.fromNullable(0, () => "null").unwrap()).toBe(0);
   });
 
   it("fromNullable treats empty string as Ok", () => {
-    assert.equal(Result.fromNullable("", () => "null").unwrap(), "");
+    expect(Result.fromNullable("", () => "null").unwrap()).toBe("");
   });
 
   it("collect succeeds with all Ok", () => {
-    assert.deepEqual(Result.collect([Ok(1), Ok(2), Ok(3)]).unwrap(), [1, 2, 3]);
+    expect(Result.collect([Ok(1), Ok(2), Ok(3)]).unwrap()).toEqual([1, 2, 3]);
   });
 
   it("collect fails on first Err", () => {
     const r = Result.collect([Ok(1), Err("a"), Ok(3), Err("b")]);
-    assert.equal(r.unwrapErr(), "a");
+    expect(r.unwrapErr()).toBe("a");
   });
 
   it("collect with empty array returns Ok([])", () => {
-    assert.deepEqual(Result.collect([]).unwrap(), []);
+    expect(Result.collect([]).unwrap()).toEqual([]);
   });
 
   it("sequence is alias for collect", () => {
-    assert.deepEqual(Result.sequence([Ok(1), Ok(2)]).unwrap(), [1, 2]);
+    expect(Result.sequence([Ok(1), Ok(2)]).unwrap()).toEqual([1, 2]);
   });
 
   it("traverse maps and collects", () => {
     const r = Result.traverse([1, 2, 3], n => (n > 0 ? Ok(n * 10) : Err("neg")));
-    assert.deepEqual(r.unwrap(), [10, 20, 30]);
+    expect(r.unwrap()).toEqual([10, 20, 30]);
   });
 
   it("traverse short-circuits on first Err", () => {
     const r = Result.traverse([1, -1, 2], n => (n > 0 ? Ok(n) : Err(`${n} neg`)));
-    assert.equal(r.unwrapErr(), "-1 neg");
+    expect(r.unwrapErr()).toBe("-1 neg");
   });
 
   it("partition separates Ok and Err", () => {
     const { ok, err } = Result.partition([Ok(1), Err("a"), Ok(2), Err("b")]);
-    assert.deepEqual(ok, [1, 2]);
-    assert.deepEqual(err, ["a", "b"]);
+    expect(ok).toEqual([1, 2]);
+    expect(err).toEqual(["a", "b"]);
   });
 
   it("partition with all Ok", () => {
     const { ok, err } = Result.partition([Ok(1), Ok(2)]);
-    assert.deepEqual(ok, [1, 2]);
-    assert.deepEqual(err, []);
+    expect(ok).toEqual([1, 2]);
+    expect(err).toEqual([]);
   });
 
   it("partition with all Err", () => {
     const { ok, err } = Result.partition([Err("a"), Err("b")]);
-    assert.deepEqual(ok, []);
-    assert.deepEqual(err, ["a", "b"]);
+    expect(ok).toEqual([]);
+    expect(err).toEqual(["a", "b"]);
   });
 
   it("is returns true for Ok and Err", () => {
-    assert.equal(Result.is(Ok(1)), true);
-    assert.equal(Result.is(Err("e")), true);
+    expect(Result.is(Ok(1))).toBe(true);
+    expect(Result.is(Err("e"))).toBe(true);
   });
 
   it("is returns false for non-Result", () => {
-    assert.equal(Result.is(42), false);
-    assert.equal(Result.is(null), false);
-    assert.equal(Result.is(Some(1)), false);
+    expect(Result.is(42)).toBe(false);
+    expect(Result.is(null)).toBe(false);
+    expect(Result.is(Some(1))).toBe(false);
   });
 });
 
@@ -317,38 +306,35 @@ describe("Result namespace", () => {
 
 describe("Option (Some)", () => {
   it("map transforms value", () => {
-    assert.equal(
+    expect(
       Some(3)
         .map(n => n * 2)
         .unwrap(),
-      6,
-    );
+    ).toBe(6);
   });
 
   it("flatMap chains to Some", () => {
-    assert.equal(
+    expect(
       Some(5)
         .flatMap(n => Some(n + 1))
         .unwrap(),
-      6,
-    );
+    ).toBe(6);
   });
 
   it("flatMap chains to None", () => {
-    assert.equal(Some(5).flatMap(() => None).isNone, true);
+    expect(Some(5).flatMap(() => None).isNone).toBe(true);
   });
 
   it("filter keeps matching value", () => {
-    assert.equal(
+    expect(
       Some(10)
         .filter(n => n > 5)
         .unwrap(),
-      10,
-    );
+    ).toBe(10);
   });
 
   it("filter drops non-matching value", () => {
-    assert.equal(Some(3).filter(n => n > 5).isNone, true);
+    expect(Some(3).filter(n => n > 5).isNone).toBe(true);
   });
 
   it("tap runs side-effect", () => {
@@ -356,55 +342,51 @@ describe("Option (Some)", () => {
     Some(42).tap(v => {
       seen = v;
     });
-    assert.equal(seen, 42);
+    expect(seen).toBe(42);
   });
 
   it("unwrap returns value", () => {
-    assert.equal(Some("x").unwrap(), "x");
+    expect(Some("x").unwrap()).toBe("x");
   });
 
   it("unwrapOr returns value", () => {
-    assert.equal(Some(1).unwrapOr(99), 1);
+    expect(Some(1).unwrapOr(99)).toBe(1);
   });
 
   it("unwrapOrElse returns value", () => {
-    assert.equal(
-      Some(1).unwrapOrElse(() => 99),
-      1,
-    );
+    expect(Some(1).unwrapOrElse(() => 99)).toBe(1);
   });
 
   it("toResult returns Ok", () => {
-    assert.equal(Some(42).toResult("err").unwrap(), 42);
+    expect(Some(42).toResult("err").unwrap()).toBe(42);
   });
 
   it("zip two Some values", () => {
-    assert.deepEqual(Some("a").zip(Some(1)).unwrap(), ["a", 1]);
+    expect(Some("a").zip(Some(1)).unwrap()).toEqual(["a", 1]);
   });
 
   it("zip Some with None returns None", () => {
-    assert.equal(Some(1).zip(None).isNone, true);
+    expect(Some(1).zip(None).isNone).toBe(true);
   });
 
   it("ap applies wrapped function", () => {
-    assert.equal(
+    expect(
       Some(5)
         .ap(Some(n => n * 2))
         .unwrap(),
-      10,
-    );
+    ).toBe(10);
   });
 
   it("or returns self", () => {
-    assert.equal(Some(1).or(Some(99)).unwrap(), 1);
+    expect(Some(1).or(Some(99)).unwrap()).toBe(1);
   });
 
   it("toJSON serializes correctly", () => {
-    assert.deepEqual(Some(42).toJSON(), { tag: "Some", value: 42 });
+    expect(Some(42).toJSON()).toEqual({ tag: "Some", value: 42 });
   });
 
   it("toString formats correctly", () => {
-    assert.equal(Some(42).toString(), "Some(42)");
+    expect(Some(42).toString()).toBe("Some(42)");
   });
 });
 
@@ -414,15 +396,15 @@ describe("Option (Some)", () => {
 
 describe("Option (None)", () => {
   it("map is a no-op", () => {
-    assert.equal(None.map(() => 99).isNone, true);
+    expect(None.map(() => 99).isNone).toBe(true);
   });
 
   it("flatMap is a no-op", () => {
-    assert.equal(None.flatMap(() => Some(99)).isNone, true);
+    expect(None.flatMap(() => Some(99)).isNone).toBe(true);
   });
 
   it("filter is a no-op", () => {
-    assert.equal(None.filter(() => true).isNone, true);
+    expect(None.filter(() => true).isNone).toBe(true);
   });
 
   it("tap is a no-op", () => {
@@ -430,51 +412,48 @@ describe("Option (None)", () => {
     None.tap(() => {
       called = true;
     });
-    assert.equal(called, false);
+    expect(called).toBe(false);
   });
 
   it("unwrap throws", () => {
-    assert.throws(() => None.unwrap(), TypeError);
+    expect(() => None.unwrap()).toThrow();
   });
 
   it("unwrapOr returns fallback", () => {
-    assert.equal(None.unwrapOr(99), 99);
+    expect(None.unwrapOr(99)).toBe(99);
   });
 
   it("unwrapOrElse calls fn", () => {
-    assert.equal(
-      None.unwrapOrElse(() => 99),
-      99,
-    );
+    expect(None.unwrapOrElse(() => 99)).toBe(99);
   });
 
   it("toResult returns Err", () => {
-    assert.equal(None.toResult("missing").isErr, true);
-    assert.equal(None.toResult("missing").unwrapErr(), "missing");
+    expect(None.toResult("missing").isErr).toBe(true);
+    expect(None.toResult("missing").unwrapErr()).toBe("missing");
   });
 
   it("zip returns None", () => {
-    assert.equal(None.zip(Some(1)).isNone, true);
+    expect(None.zip(Some(1)).isNone).toBe(true);
   });
 
   it("ap returns None", () => {
-    assert.equal(None.ap(Some(n => n)).isNone, true);
+    expect(None.ap(Some(n => n)).isNone).toBe(true);
   });
 
   it("or returns the other", () => {
-    assert.equal(None.or(Some(99)).unwrap(), 99);
+    expect(None.or(Some(99)).unwrap()).toBe(99);
   });
 
   it("or with None returns None", () => {
-    assert.equal(None.or(None).isNone, true);
+    expect(None.or(None).isNone).toBe(true);
   });
 
   it("toJSON serializes correctly", () => {
-    assert.deepEqual(None.toJSON(), { tag: "None" });
+    expect(None.toJSON()).toEqual({ tag: "None" });
   });
 
   it("toString formats correctly", () => {
-    assert.equal(None.toString(), "None");
+    expect(None.toString()).toBe("None");
   });
 });
 
@@ -484,61 +463,61 @@ describe("Option (None)", () => {
 
 describe("Option namespace", () => {
   it("fromNullable returns Some for non-null", () => {
-    assert.equal(Option.fromNullable(42).unwrap(), 42);
+    expect(Option.fromNullable(42).unwrap()).toBe(42);
   });
 
   it("fromNullable returns None for null", () => {
-    assert.equal(Option.fromNullable(null).isNone, true);
+    expect(Option.fromNullable(null).isNone).toBe(true);
   });
 
   it("fromNullable returns None for undefined", () => {
-    assert.equal(Option.fromNullable(undefined).isNone, true);
+    expect(Option.fromNullable(undefined).isNone).toBe(true);
   });
 
   it("fromNullable treats 0 as Some", () => {
-    assert.equal(Option.fromNullable(0).unwrap(), 0);
+    expect(Option.fromNullable(0).unwrap()).toBe(0);
   });
 
   it("fromNullable treats false as Some", () => {
-    assert.equal(Option.fromNullable(false).unwrap(), false);
+    expect(Option.fromNullable(false).unwrap()).toBe(false);
   });
 
   it("collect succeeds with all Some", () => {
-    assert.deepEqual(Option.collect([Some(1), Some(2)]).unwrap(), [1, 2]);
+    expect(Option.collect([Some(1), Some(2)]).unwrap()).toEqual([1, 2]);
   });
 
   it("collect fails on first None", () => {
-    assert.equal(Option.collect([Some(1), None, Some(3)]).isNone, true);
+    expect(Option.collect([Some(1), None, Some(3)]).isNone).toBe(true);
   });
 
   it("sequence is alias for collect", () => {
-    assert.deepEqual(Option.sequence([Some("a"), Some("b")]).unwrap(), ["a", "b"]);
+    expect(Option.sequence([Some("a"), Some("b")]).unwrap()).toEqual(["a", "b"]);
   });
 
   it("traverse maps and collects", () => {
     const r = Option.traverse([1, 2, 3], n => Some(n * 10));
-    assert.deepEqual(r.unwrap(), [10, 20, 30]);
+    expect(r.unwrap()).toEqual([10, 20, 30]);
   });
 
   it("traverse short-circuits on None", () => {
     const r = Option.traverse([1, 0, 3], n => (n > 0 ? Some(n) : None));
-    assert.equal(r.isNone, true);
+    expect(r.isNone).toBe(true);
   });
 
   it("partition separates Some and None", () => {
     const { some, none } = Option.partition([Some(1), None, Some(2), None]);
-    assert.deepEqual(some, [1, 2]);
-    assert.equal(none, 2);
+    expect(some).toEqual([1, 2]);
+    expect(none).toBe(2);
   });
 
   it("is returns true for Some and None", () => {
-    assert.equal(Option.is(Some(1)), true);
-    assert.equal(Option.is(None), true);
+    expect(Option.is(Some(1))).toBe(true);
+    expect(Option.is(None)).toBe(true);
   });
 
   it("is returns false for non-Option", () => {
-    assert.equal(Option.is(42), false);
-    assert.equal(Option.is(Ok(1)), false);
+    expect(Option.is(42)).toBe(false);
+    expect(Option.is(Ok(1))).toBe(false);
   });
 });
 
@@ -549,37 +528,37 @@ describe("Option namespace", () => {
 describe("Task", () => {
   it("Task.of creates successful Task", async () => {
     const r = await Task.of(42).run();
-    assert.equal(r.unwrap(), 42);
+    expect(r.unwrap()).toBe(42);
   });
 
   it("Task.fromResult wraps Ok", async () => {
     const r = await Task.fromResult(Ok(1)).run();
-    assert.equal(r.unwrap(), 1);
+    expect(r.unwrap()).toBe(1);
   });
 
   it("Task.fromResult wraps Err", async () => {
     const r = await Task.fromResult(Err("e")).run();
-    assert.equal(r.unwrapErr(), "e");
+    expect(r.unwrapErr()).toBe("e");
   });
 
   it("map transforms success", async () => {
     const r = await Task.of(5)
       .map(n => n * 2)
       .run();
-    assert.equal(r.unwrap(), 10);
+    expect(r.unwrap()).toBe(10);
   });
 
   it("mapErr transforms error", async () => {
     const t = Task(() => Promise.resolve(Err("low")));
     const r = await t.mapErr(e => e.toUpperCase()).run();
-    assert.equal(r.unwrapErr(), "LOW");
+    expect(r.unwrapErr()).toBe("LOW");
   });
 
   it("flatMap chains tasks", async () => {
     const r = await Task.of(5)
       .flatMap(n => Task.of(n + 1))
       .run();
-    assert.equal(r.unwrap(), 6);
+    expect(r.unwrap()).toBe(6);
   });
 
   it("flatMap short-circuits on error", async () => {
@@ -590,8 +569,8 @@ describe("Task", () => {
         return Task.of(99);
       })
       .run();
-    assert.equal(called, false);
-    assert.equal(r.isErr, true);
+    expect(called).toBe(false);
+    expect(r.isErr).toBe(true);
   });
 
   it("tap runs side-effect on success", async () => {
@@ -601,7 +580,7 @@ describe("Task", () => {
         seen = v;
       })
       .run();
-    assert.equal(seen, 42);
+    expect(seen).toBe(42);
   });
 
   it("tapErr runs side-effect on error", async () => {
@@ -611,37 +590,37 @@ describe("Task", () => {
         seen = e;
       })
       .run();
-    assert.equal(seen, "oops");
+    expect(seen).toBe("oops");
   });
 
   it("zip combines two successful Tasks", async () => {
     const r = await Task.of("a").zip(Task.of(1)).run();
-    assert.deepEqual(r.unwrap(), ["a", 1]);
+    expect(r.unwrap()).toEqual(["a", 1]);
   });
 
   it("zip propagates first error", async () => {
     const r = await Task(() => Promise.resolve(Err("e")))
       .zip(Task.of(1))
       .run();
-    assert.equal(r.isErr, true);
+    expect(r.isErr).toBe(true);
   });
 
   it("runGetOr returns value on success", async () => {
-    assert.equal(await Task.of(42).runGetOr(0), 42);
+    expect(await Task.of(42).runGetOr(0)).toBe(42);
   });
 
   it("runGetOr returns fallback on error", async () => {
-    assert.equal(await Task(() => Promise.resolve(Err("e"))).runGetOr(0), 0);
+    expect(await Task(() => Promise.resolve(Err("e"))).runGetOr(0)).toBe(0);
   });
 
   it("Task.all runs all tasks", async () => {
     const r = await Task.all([Task.of(1), Task.of(2), Task.of(3)]).run();
-    assert.deepEqual(r.unwrap(), [1, 2, 3]);
+    expect(r.unwrap()).toEqual([1, 2, 3]);
   });
 
   it("Task.all short-circuits on first error", async () => {
     const r = await Task.all([Task.of(1), Task(() => Promise.resolve(Err("e")))]).run();
-    assert.equal(r.isErr, true);
+    expect(r.isErr).toBe(true);
   });
 
   it("Task.race returns first to complete", async () => {
@@ -649,7 +628,7 @@ describe("Task", () => {
       Task.of(42),
       Task(() => new Promise(resolve => setTimeout(() => resolve(Ok(99)), 100))),
     ]).run();
-    assert.equal(r.unwrap(), 42);
+    expect(r.unwrap()).toBe(42);
   });
 
   it("Task.allSettled collects all results", async () => {
@@ -659,19 +638,19 @@ describe("Task", () => {
       Task.of(3),
     ]).run();
     const arr = results.unwrap();
-    assert.equal(arr[0].isOk, true);
-    assert.equal(arr[1].isErr, true);
-    assert.equal(arr[2].isOk, true);
+    expect(arr[0].isOk).toBe(true);
+    expect(arr[1].isErr).toBe(true);
+    expect(arr[2].isOk).toBe(true);
   });
 
   it("Task.traverse maps and sequences", async () => {
     const r = await Task.traverse([1, 2, 3], n => Task.of(n * 10)).run();
-    assert.deepEqual(r.unwrap(), [10, 20, 30]);
+    expect(r.unwrap()).toEqual([10, 20, 30]);
   });
 
   it("Task.sequence sequences tasks", async () => {
     const r = await Task.sequence([Task.of(1), Task.of(2)]).run();
-    assert.deepEqual(r.unwrap(), [1, 2]);
+    expect(r.unwrap()).toEqual([1, 2]);
   });
 
   it("Task.ap applies function task to value task", async () => {
@@ -679,16 +658,16 @@ describe("Task", () => {
       Task.of(n => n * 3),
       Task.of(10),
     ).run();
-    assert.equal(r.unwrap(), 30);
+    expect(r.unwrap()).toBe(30);
   });
 
   it("Task.is returns true for Tasks", async () => {
-    assert.equal(Task.is(Task.of(1)), true);
+    expect(Task.is(Task.of(1))).toBe(true);
   });
 
   it("Task.is returns false for non-Tasks", async () => {
-    assert.equal(Task.is(42), false);
-    assert.equal(Task.is(Promise.resolve(1)), false);
+    expect(Task.is(42)).toBe(false);
+    expect(Task.is(Promise.resolve(1))).toBe(false);
   });
 
   it("memoize caches result", async () => {
@@ -699,7 +678,7 @@ describe("Task", () => {
     }).memoize();
     await t.run();
     await t.run();
-    assert.equal(calls, 1);
+    expect(calls).toBe(1);
   });
 });
 
@@ -715,64 +694,64 @@ describe("Schema edge cases", () => {
       }),
     });
     const r = s.parse({ user: { name: 123 } });
-    assert.equal(r.isErr, true);
+    expect(r.isErr).toBe(true);
     const err = r.unwrapErr();
-    assert.deepEqual(err.path, ["user", "name"]);
+    expect(err.path).toEqual(["user", "name"]);
   });
 
   it("array errors include index in path", () => {
     const s = Schema.array(Schema.number);
     const r = s.parse([1, "two", 3]);
-    assert.equal(r.isErr, true);
-    assert.deepEqual(r.unwrapErr().path, ["1"]);
+    expect(r.isErr).toBe(true);
+    expect(r.unwrapErr().path).toEqual(["1"]);
   });
 
   it("optional accepts undefined", () => {
     const s = Schema.string.optional();
-    assert.equal(s.parse(undefined).unwrap(), undefined);
-    assert.equal(s.parse("hi").unwrap(), "hi");
+    expect(s.parse(undefined).unwrap()).toBe(undefined);
+    expect(s.parse("hi").unwrap()).toBe("hi");
   });
 
   it("default provides fallback for undefined/null", () => {
     const s = Schema.number.default(0);
-    assert.equal(s.parse(undefined).unwrap(), 0);
-    assert.equal(s.parse(null).unwrap(), 0);
-    assert.equal(s.parse(5).unwrap(), 5);
+    expect(s.parse(undefined).unwrap()).toBe(0);
+    expect(s.parse(null).unwrap()).toBe(0);
+    expect(s.parse(5).unwrap()).toBe(5);
   });
 
   it("transform converts parsed value", () => {
     const s = Schema.string.transform(s => s.length);
-    assert.equal(s.parse("hello").unwrap(), 5);
+    expect(s.parse("hello").unwrap()).toBe(5);
   });
 
   it("refine adds custom validation", () => {
     const s = Schema.number.refine(n => n > 0, "positive");
-    assert.equal(s.parse(5).isOk, true);
-    assert.equal(s.parse(-1).isErr, true);
+    expect(s.parse(5).isOk).toBe(true);
+    expect(s.parse(-1).isErr).toBe(true);
   });
 
   it("is acts as type guard", () => {
-    assert.equal(Schema.string.is("hello"), true);
-    assert.equal(Schema.string.is(123), false);
+    expect(Schema.string.is("hello")).toBe(true);
+    expect(Schema.string.is(123)).toBe(false);
   });
 
   it("literal validates exact value", () => {
     const s = Schema.literal("active");
-    assert.equal(s.parse("active").unwrap(), "active");
-    assert.equal(s.parse("inactive").isErr, true);
+    expect(s.parse("active").unwrap()).toBe("active");
+    expect(s.parse("inactive").isErr).toBe(true);
   });
 
   it("enum validates set of values", () => {
     const s = Schema.enum(["a", "b", "c"]);
-    assert.equal(s.parse("b").unwrap(), "b");
-    assert.equal(s.parse("d").isErr, true);
+    expect(s.parse("b").unwrap()).toBe("b");
+    expect(s.parse("d").isErr).toBe(true);
   });
 
   it("union tries schemas in order", () => {
     const s = Schema.union(Schema.string, Schema.number);
-    assert.equal(s.parse("hi").unwrap(), "hi");
-    assert.equal(s.parse(42).unwrap(), 42);
-    assert.equal(s.parse(true).isErr, true);
+    expect(s.parse("hi").unwrap()).toBe("hi");
+    expect(s.parse(42).unwrap()).toBe(42);
+    expect(s.parse(true).isErr).toBe(true);
   });
 
   it("intersection validates both schemas", () => {
@@ -780,8 +759,8 @@ describe("Schema edge cases", () => {
     const b = Schema.object({ age: Schema.number });
     const s = Schema.intersection(a, b);
     const r = s.parse({ name: "Alice", age: 30 });
-    assert.equal(r.isOk, true);
-    assert.deepEqual(r.unwrap(), { name: "Alice", age: 30 });
+    expect(r.isOk).toBe(true);
+    expect(r.unwrap()).toEqual({ name: "Alice", age: 30 });
   });
 
   it("lazy supports recursive schemas", () => {
@@ -793,7 +772,7 @@ describe("Schema edge cases", () => {
       value: 1,
       children: [{ value: 2, children: [] }],
     });
-    assert.equal(r.isOk, true);
+    expect(r.isOk).toBe(true);
   });
 
   it("discriminatedUnion validates by tag", () => {
@@ -805,48 +784,48 @@ describe("Schema edge cases", () => {
         height: Schema.number,
       }),
     });
-    assert.equal(s.parse({ type: "circle", radius: 5 }).isOk, true);
-    assert.equal(s.parse({ type: "rect", width: 1, height: 2 }).isOk, true);
-    assert.equal(s.parse({ type: "triangle" }).isErr, true);
+    expect(s.parse({ type: "circle", radius: 5 }).isOk).toBe(true);
+    expect(s.parse({ type: "rect", width: 1, height: 2 }).isOk).toBe(true);
+    expect(s.parse({ type: "triangle" }).isErr).toBe(true);
   });
 
   it("tuple validates positional types", () => {
     const s = Schema.tuple(Schema.string, Schema.number, Schema.boolean);
-    assert.deepEqual(s.parse(["hi", 42, true]).unwrap(), ["hi", 42, true]);
-    assert.equal(s.parse(["hi", "42"]).isErr, true);
+    expect(s.parse(["hi", 42, true]).unwrap()).toEqual(["hi", 42, true]);
+    expect(s.parse(["hi", "42"]).isErr).toBe(true);
   });
 
   it("record validates string-keyed objects", () => {
     const s = Schema.record(Schema.number);
     const r = s.parse({ a: 1, b: 2 });
-    assert.deepEqual(r.unwrap(), { a: 1, b: 2 });
-    assert.equal(s.parse({ a: "nope" }).isErr, true);
+    expect(r.unwrap()).toEqual({ a: 1, b: 2 });
+    expect(s.parse({ a: "nope" }).isErr).toBe(true);
   });
 
   it("numeric refinements work", () => {
-    assert.equal(Schema.int.parse(5).isOk, true);
-    assert.equal(Schema.int.parse(5.5).isErr, true);
-    assert.equal(Schema.positive.parse(1).isOk, true);
-    assert.equal(Schema.positive.parse(0).isErr, true);
-    assert.equal(Schema.nonNegative.parse(0).isOk, true);
-    assert.equal(Schema.nonNegative.parse(-1).isErr, true);
-    assert.equal(Schema.min(5).parse(5).isOk, true);
-    assert.equal(Schema.min(5).parse(4).isErr, true);
-    assert.equal(Schema.max(10).parse(10).isOk, true);
-    assert.equal(Schema.max(10).parse(11).isErr, true);
-    assert.equal(Schema.range(1, 10).parse(5).isOk, true);
-    assert.equal(Schema.range(1, 10).parse(0).isErr, true);
+    expect(Schema.int.parse(5).isOk).toBe(true);
+    expect(Schema.int.parse(5.5).isErr).toBe(true);
+    expect(Schema.positive.parse(1).isOk).toBe(true);
+    expect(Schema.positive.parse(0).isErr).toBe(true);
+    expect(Schema.nonNegative.parse(0).isOk).toBe(true);
+    expect(Schema.nonNegative.parse(-1).isErr).toBe(true);
+    expect(Schema.min(5).parse(5).isOk).toBe(true);
+    expect(Schema.min(5).parse(4).isErr).toBe(true);
+    expect(Schema.max(10).parse(10).isOk).toBe(true);
+    expect(Schema.max(10).parse(11).isErr).toBe(true);
+    expect(Schema.range(1, 10).parse(5).isOk).toBe(true);
+    expect(Schema.range(1, 10).parse(0).isErr).toBe(true);
   });
 
   it("string refinements work", () => {
-    assert.equal(Schema.nonEmpty.parse("hi").isOk, true);
-    assert.equal(Schema.nonEmpty.parse("  ").isErr, true);
-    assert.equal(Schema.minLength(3).parse("abc").isOk, true);
-    assert.equal(Schema.minLength(3).parse("ab").isErr, true);
-    assert.equal(Schema.maxLength(3).parse("abc").isOk, true);
-    assert.equal(Schema.maxLength(3).parse("abcd").isErr, true);
-    assert.equal(Schema.email.parse("a@b.c").isOk, true);
-    assert.equal(Schema.email.parse("not-email").isErr, true);
+    expect(Schema.nonEmpty.parse("hi").isOk).toBe(true);
+    expect(Schema.nonEmpty.parse("  ").isErr).toBe(true);
+    expect(Schema.minLength(3).parse("abc").isOk).toBe(true);
+    expect(Schema.minLength(3).parse("ab").isErr).toBe(true);
+    expect(Schema.maxLength(3).parse("abc").isOk).toBe(true);
+    expect(Schema.maxLength(3).parse("abcd").isErr).toBe(true);
+    expect(Schema.email.parse("a@b.c").isOk).toBe(true);
+    expect(Schema.email.parse("not-email").isErr).toBe(true);
   });
 });
 
@@ -858,8 +837,8 @@ describe("Record methods", () => {
   it("set creates new record with updated field", () => {
     const r = Record({ name: "Alice", age: 30 });
     const r2 = r.set(o => o.age, 31);
-    assert.equal(r.age, 30);
-    assert.equal(r2.age, 31);
+    expect(r.age).toBe(30);
+    expect(r2.age).toBe(31);
   });
 
   it("update transforms a field", () => {
@@ -868,35 +847,35 @@ describe("Record methods", () => {
       o => o.count,
       c => c + 1,
     );
-    assert.equal(r2.count, 1);
+    expect(r2.count).toBe(1);
   });
 
   it("merge shallow-merges fields", () => {
     const r = Record({ a: 1, b: 2 });
     const r2 = r.merge({ b: 99 });
-    assert.equal(r2.a, 1);
-    assert.equal(r2.b, 99);
+    expect(r2.a).toBe(1);
+    expect(r2.b).toBe(99);
   });
 
   it("at returns Option", () => {
     const r = Record({ name: "Bob" });
-    assert.equal(r.at(o => o.name).unwrap(), "Bob");
+    expect(r.at(o => o.name).unwrap()).toBe("Bob");
   });
 
   it("equals compares structurally", () => {
     const a = Record({ x: 1 });
     const b = Record({ x: 1 });
     const c = Record({ x: 2 });
-    assert.equal(a.equals(b), true);
-    assert.equal(a.equals(c), false);
+    expect(a.equals(b)).toBe(true);
+    expect(a.equals(c)).toBe(false);
   });
 
   it("toMutable returns mutable copy", () => {
     const r = Record({ a: 1 });
     const m = r.toMutable();
     m.a = 99;
-    assert.equal(r.a, 1);
-    assert.equal(m.a, 99);
+    expect(r.a).toBe(1);
+    expect(m.a).toBe(99);
   });
 
   it("produce allows draft mutations", () => {
@@ -905,21 +884,21 @@ describe("Record methods", () => {
       d.name = "Bob";
       d.age = 31;
     });
-    assert.equal(r.name, "Alice");
-    assert.equal(r2.name, "Bob");
-    assert.equal(r2.age, 31);
+    expect(r.name).toBe("Alice");
+    expect(r2.name).toBe("Bob");
+    expect(r2.age).toBe(31);
   });
 
   it("$raw returns frozen data", () => {
     const r = Record({ x: 1 });
-    assert.equal(r.$raw.x, 1);
-    assert.equal(Object.isFrozen(r.$raw), true);
+    expect(r.$raw.x).toBe(1);
+    expect(Object.isFrozen(r.$raw)).toBe(true);
   });
 
   it("toJSON returns plain object", () => {
     const r = Record({ a: 1, b: "two" });
     const json = r.toJSON();
-    assert.deepEqual(json, { a: 1, b: "two" });
+    expect(json).toEqual({ a: 1, b: "two" });
   });
 });
 
@@ -930,107 +909,103 @@ describe("Record methods", () => {
 describe("List methods", () => {
   it("append adds to end", () => {
     const l = List([1, 2, 3]).append(4);
-    assert.equal(l.length, 4);
-    assert.equal(l[3], 4);
+    expect(l.length).toBe(4);
+    expect(l[3]).toBe(4);
   });
 
   it("prepend adds to start", () => {
     const l = List([2, 3]).prepend(1);
-    assert.equal(l[0], 1);
-    assert.equal(l.length, 3);
+    expect(l[0]).toBe(1);
+    expect(l.length).toBe(3);
   });
 
   it("setAt replaces element", () => {
     const l = List(["a", "b", "c"]).setAt(1, "B");
-    assert.equal(l[1], "B");
+    expect(l[1]).toBe("B");
   });
 
   it("updateAt transforms element", () => {
     const l = List([1, 2, 3]).updateAt(1, n => n * 10);
-    assert.equal(l[1], 20);
+    expect(l[1]).toBe(20);
   });
 
   it("removeAt removes element", () => {
     const l = List([1, 2, 3]).removeAt(1);
-    assert.deepEqual([...l], [1, 3]);
+    expect([...l]).toEqual([1, 3]);
   });
 
   it("map transforms elements", () => {
     const l = List([1, 2, 3]).map(n => n * 2);
-    assert.deepEqual([...l], [2, 4, 6]);
+    expect([...l]).toEqual([2, 4, 6]);
   });
 
   it("filter keeps matching elements", () => {
     const l = List([1, 2, 3, 4]).filter(n => n % 2 === 0);
-    assert.deepEqual([...l], [2, 4]);
+    expect([...l]).toEqual([2, 4]);
   });
 
   it("reduce folds elements", () => {
-    assert.equal(
-      List([1, 2, 3]).reduce((a, b) => a + b, 0),
-      6,
-    );
+    expect(List([1, 2, 3]).reduce((a, b) => a + b, 0)).toBe(6);
   });
 
   it("find returns Option", () => {
-    assert.equal(
+    expect(
       List([1, 2, 3])
         .find(n => n === 2)
         .unwrap(),
-      2,
-    );
-    assert.equal(List([1, 2, 3]).find(n => n === 99).isNone, true);
+    ).toBe(2);
+    expect(List([1, 2, 3]).find(n => n === 99).isNone).toBe(true);
   });
 
   it("at supports negative indices", () => {
     const l = List([10, 20, 30]);
-    assert.equal(l.at(-1).unwrap(), 30);
-    assert.equal(l.at(-2).unwrap(), 20);
+    expect(l.at(-1).unwrap()).toBe(30);
+    expect(l.at(-2).unwrap()).toBe(20);
   });
 
   it("first and last return Option", () => {
     const l = List([1, 2, 3]);
-    assert.equal(l.first().unwrap(), 1);
-    assert.equal(l.last().unwrap(), 3);
-    assert.equal(List([]).first().isNone, true);
-    assert.equal(List([]).last().isNone, true);
+    expect(l.first().unwrap()).toBe(1);
+    expect(l.last().unwrap()).toBe(3);
+    expect(List([]).first().isNone).toBe(true);
+    expect(List([]).last().isNone).toBe(true);
   });
 
   it("concat joins lists", () => {
     const l = List([1, 2]).concat(List([3, 4]));
-    assert.deepEqual([...l], [1, 2, 3, 4]);
+    expect([...l]).toEqual([1, 2, 3, 4]);
   });
 
   it("slice returns sub-range", () => {
     const l = List([1, 2, 3, 4, 5]).slice(1, 4);
-    assert.deepEqual([...l], [2, 3, 4]);
+    expect([...l]).toEqual([2, 3, 4]);
   });
 
   it("flatMap maps and flattens", () => {
     const l = List([1, 2, 3]).flatMap(n => [n, n * 10]);
-    assert.deepEqual([...l], [1, 10, 2, 20, 3, 30]);
+    expect([...l]).toEqual([1, 10, 2, 20, 3, 30]);
   });
 
   it("equals compares structurally", () => {
-    assert.equal(List([1, 2]).equals(List([1, 2])), true);
-    assert.equal(List([1, 2]).equals(List([1, 3])), false);
+    expect(List([1, 2]).equals(List([1, 2]))).toBe(true);
+    expect(List([1, 2]).equals(List([1, 3]))).toBe(false);
   });
 
   it("toMutable returns plain array", () => {
     const arr = List([1, 2]).toMutable();
     arr.push(3);
-    assert.equal(arr.length, 3);
+    expect(arr.length).toBe(3);
   });
 
   it("supports spread and iteration", () => {
     const l = List([1, 2, 3]);
-    assert.deepEqual([...l], [1, 2, 3]);
+    expect([...l]).toEqual([1, 2, 3]);
   });
 
   it("supports destructuring", () => {
     const [a, b] = List([10, 20]);
-    assert.equal(a, 10);
-    assert.equal(b, 20);
+    expect(a).toBe(10);
+    expect(b).toBe(20);
   });
 });
 
@@ -1045,7 +1020,7 @@ describe("pipe and flow", () => {
       n => n * 2,
       n => n + 1,
     );
-    assert.equal(r, 11);
+    expect(r).toBe(11);
   });
 
   it("flow composes functions", () => {
@@ -1053,15 +1028,15 @@ describe("pipe and flow", () => {
       n => n * 2,
       n => n + 1,
     );
-    assert.equal(fn(5), 11);
+    expect(fn(5)).toBe(11);
   });
 
   it("standalone match works with Result", () => {
-    assert.equal(match(Ok(10), { Ok: v => v, Err: () => -1 }), 10);
+    expect(match(Ok(10), { Ok: v => v, Err: () => -1 })).toBe(10);
   });
 
   it("standalone match works with Option", () => {
-    assert.equal(match(Some("hi"), { Some: s => s.length, None: () => 0 }), 2);
+    expect(match(Some("hi"), { Some: s => s.length, None: () => 0 })).toBe(2);
   });
 
   it("standalone tryCatch catches", () => {
@@ -1069,12 +1044,12 @@ describe("pipe and flow", () => {
       () => JSON.parse("invalid"),
       e => String(e),
     );
-    assert.equal(r.isErr, true);
+    expect(r.isErr).toBe(true);
   });
 
   it("standalone tryCatch succeeds", () => {
     const r = tryCatch(() => JSON.parse('{"a":1}'));
-    assert.deepEqual(r.unwrap(), { a: 1 });
+    expect(r.unwrap()).toEqual({ a: 1 });
   });
 });
 
@@ -1084,41 +1059,41 @@ describe("pipe and flow", () => {
 
 describe("Duration", () => {
   it("creates from milliseconds", () => {
-    assert.equal(Duration.milliseconds(500), 500);
+    expect(Duration.milliseconds(500)).toBe(500);
   });
 
   it("creates from seconds", () => {
-    assert.equal(Duration.seconds(2), 2000);
+    expect(Duration.seconds(2)).toBe(2000);
   });
 
   it("creates from minutes", () => {
-    assert.equal(Duration.minutes(1), 60000);
+    expect(Duration.minutes(1)).toBe(60000);
   });
 
   it("creates from hours", () => {
-    assert.equal(Duration.hours(1), 3600000);
+    expect(Duration.hours(1)).toBe(3600000);
   });
 
   it("creates from days", () => {
-    assert.equal(Duration.days(1), 86400000);
+    expect(Duration.days(1)).toBe(86400000);
   });
 
   it("format returns human-readable string", () => {
     const formatted = Duration.format(Duration.hours(2) + Duration.minutes(30));
-    assert.ok(formatted.includes("2h"));
-    assert.ok(formatted.includes("30m"));
+    expect(formatted.includes("2h")).toBe(true);
+    expect(formatted.includes("30m")).toBe(true);
   });
 });
 
 describe("Cron", () => {
   it("validates standard cron expressions", () => {
-    assert.equal(Cron.parse("* * * * *").isOk, true);
-    assert.equal(Cron.parse("0 9 * * 1-5").isOk, true);
+    expect(Cron.parse("* * * * *").isOk).toBe(true);
+    expect(Cron.parse("0 9 * * 1-5").isOk).toBe(true);
   });
 
   it("rejects invalid expressions", () => {
-    assert.equal(Cron.parse("invalid").isErr, true);
-    assert.equal(Cron.parse("* * *").isErr, true);
+    expect(Cron.parse("invalid").isErr).toBe(true);
+    expect(Cron.parse("* * *").isErr).toBe(true);
   });
 });
 
@@ -1130,40 +1105,40 @@ describe("ErrType", () => {
   it("creates tagged error with tag and message", () => {
     const MyError = ErrType("MyError");
     const e = MyError("something went wrong");
-    assert.equal(e.tag, "MyError");
-    assert.equal(e.message, "something went wrong");
+    expect(e.tag).toBe("MyError");
+    expect(e.message).toBe("something went wrong");
   });
 
   it("has name alias for tag", () => {
     const AppError = ErrType("AppError");
     const e = AppError("oops");
-    assert.equal(e.name, "AppError");
+    expect(e.name).toBe("AppError");
   });
 
   it("has auto-derived code", () => {
     const AppError = ErrType("AppError");
     const e = AppError("oops");
-    assert.equal(typeof e.code, "string");
-    assert.ok(e.code.length > 0);
+    expect(typeof e.code).toBe("string");
+    expect(e.code.length > 0).toBe(true);
   });
 
   it("toString includes tag and message", () => {
     const AppError = ErrType("AppError");
     const e = AppError("oops");
-    assert.ok(e.toString().includes("AppError"));
-    assert.ok(e.toString().includes("oops"));
+    expect(e.toString().includes("AppError")).toBe(true);
+    expect(e.toString().includes("oops")).toBe(true);
   });
 
   it("different ErrTypes have different tags", () => {
     const A = ErrType("A");
     const B = ErrType("B");
-    assert.notEqual(A("x").tag, B("x").tag);
+    expect(A("x").tag).not.toBe(B("x").tag);
   });
 
   it("ErrType.is detects ErrType instances", () => {
     const MyErr = ErrType("MyErr");
-    assert.equal(ErrType.is(MyErr("x")), true);
-    assert.equal(ErrType.is({ tag: "fake" }), false);
-    assert.equal(ErrType.is(42), false);
+    expect(ErrType.is(MyErr("x"))).toBe(true);
+    expect(ErrType.is({ tag: "fake" })).toBe(false);
+    expect(ErrType.is(42)).toBe(false);
   });
 });

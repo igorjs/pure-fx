@@ -60,7 +60,7 @@ Pure and web modules work everywhere. Runtime-dependent modules (File, Command, 
 pnpm run lint          # Biome lint + format
 pnpm run check         # Type check (tsgo)
 pnpm run build         # Build to dist/
-pnpm test              # Unit tests (node --test)
+pnpm test              # Unit tests (pure-test)
 pnpm run test:types    # Type tests (compile-time safety)
 node scripts/release.mjs minor  # Bump, changelog, tag, push, GitHub release
 ```

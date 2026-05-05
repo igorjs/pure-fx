@@ -58,7 +58,7 @@ pnpm install
 pnpm run lint       # biome check
 pnpm run check      # type-check (tsgo)
 pnpm run build      # build to dist/
-pnpm test           # unit tests (node --test)
+pnpm test           # unit tests (pure-test)
 pnpm run test:types # type-level tests
 ```
 
