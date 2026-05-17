@@ -65,7 +65,7 @@ const content = await File.read('./config.json').run();
 |-------|------------|------|
 | **Core** | `Result`, `Option`, `Validation`, `pipe`, `flow`, `Match`, `Eq`, `Ord`, `State`, `Lens`, `Prism`, `Iso`, `Traversal`, `LensOptional` | [docs/core.md](docs/core.md) |
 | **Data** | `Record`, `List`, `NonEmptyList`, `HashMap`, `Schema`, `Codec`, `ADT`, `StableVec` | [docs/data.md](docs/data.md) |
-| **Types** | `ErrType`, `Type`, `Duration`, `Cron` | [docs/types.md](docs/types.md) |
+| **Types** | `TypeDef` (+ `Str`, `Num`, `Int`, `UInt`, `Bool`, `Bytes`, `Nil`, `Vec`, `Pair`, `Tuple`, `Dict`, `Maybe`, `Either`), `ErrType`, `Type`, `Duration`, `Cron` | [docs/types.md](docs/types.md) |
 | **Async** | `Task`, `Stream`, `Lazy`, `Env`, `Timer`, `Retry`, `CircuitBreaker`, `Semaphore`, `Mutex`, `RateLimiter`, `Cache`, `Channel`, `StateMachine`, `EventEmitter`, `Pool`, `Queue`, `CronRunner` | [docs/async.md](docs/async.md) |
 | **IO** | `File`, `Command`, `Json`, `Crypto`, `Encoding`, `Compression`, `Clone`, `Url`, `Client`, `Terminal`, `WebSocket`, `Dns`, `Net`, `FFI` | [docs/io.md](docs/io.md) |
 | **Runtime** | `Server`, `Program`, `Logger`, `Config`, `Os`, `Process`, `Path`, `Eol`, `Platform` | [docs/runtime.md](docs/runtime.md) |

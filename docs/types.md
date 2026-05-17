@@ -60,6 +60,120 @@ getUser(userId);   // OK
 getUser(orderId);  // TYPE ERROR
 ```
 
+## TypeDef
+
+`Type<...>` is type-level-only. `TypeDef` adds runtime validation: each
+branded type owns its schema and a uniform `parse`/`new`/`validate`/`is`/
+`unsafe` surface.
+
+```ts
+import { TypeDef, Schema } from '@igorjs/pure-fx'
+
+class UserId extends TypeDef('UserId', Schema.uuid) {}
+
+UserId.parse(input);    // Result<Type<'UserId', string>, SchemaError>
+UserId.is(input);       // input is Type<'UserId', string>
+UserId.tag;             // 'UserId'
+
+// Validation with error accumulation:
+UserId.validate(input); // Validation<Type<'UserId', string>, SchemaError>
+
+// Dev-mode-checked passthrough (zero cost in production):
+const u = UserId.unsafe(knownGoodString);
+```
+
+Extract the branded value type with `TypeDef.Infer`:
+
+```ts
+type UserIdValue = TypeDef.Infer<typeof UserId>;
+// = Type<'UserId', string>
+```
+
+`TypeDef` classes are validators, not data carriers: `new UserId()` throws.
+
+### v0 Catalogue
+
+Seven JS-native primitives ship branded, with a uniform static surface so
+you can extend them directly:
+
+| Type | Backs | Notes |
+|------|-------|-------|
+| `Str` | `string` | any string |
+| `Num` | `number` | rejects `NaN`, allows `Infinity` |
+| `Int` | `number` | `Number.isInteger(value)` must hold |
+| `UInt` | `number` | non-negative integer |
+| `Bool` | `boolean` | strict, no coercion |
+| `Bytes` | `Uint8Array` | accepts Node `Buffer`, rejects `ArrayBuffer` |
+| `Nil` | `null` | strictly the literal `null` |
+
+```ts
+import { Str, Int, UInt, Bool, Bytes, Nil } from '@igorjs/pure-fx'
+
+class Username extends Str {}
+class Score extends Int {}
+
+Username.parse('alice');  // Result<Type<'Str', string>, SchemaError>
+Score.parse(42);
+```
+
+### Composers
+
+Six generic factories build new branded types from existing ones. Outputs
+are deep-frozen at runtime; composers are cached per inner reference so
+`Vec(X) === Vec(X)` holds.
+
+| Composer | Validates | Returns |
+|----------|-----------|---------|
+| `Vec(T)` | `T[]` | `readonly T[]` branded |
+| `Pair(A, B)` | `[A, B]` | `readonly [A, B]` branded |
+| `Tuple(...T)` | n-tuple | `readonly [...T]` branded |
+| `Dict(K, V)` | string-keyed record | `Readonly<Record<K, V>>` branded |
+| `Maybe(T)` | `{tag:'Some',value:T} \| {tag:'None'} \| null \| undefined` | `Option<T>` branded |
+| `Either(L, R)` | `{tag:'Left',value:L} \| {tag:'Right',value:R}` | tagged sum branded |
+
+```ts
+import { TypeDef, Schema, Vec, Pair, Dict, Maybe, Either } from '@igorjs/pure-fx'
+
+class Email   extends TypeDef('Email',   Schema.email) {}
+class Latitude  extends TypeDef('Latitude',  Schema.number.refine(n => n >= -90 && n <= 90,  'lat')) {}
+class Longitude extends TypeDef('Longitude', Schema.number.refine(n => n >= -180 && n <= 180, 'lng')) {}
+
+class Emails    extends Vec(Email) {}
+class GeoPoint  extends Pair(Latitude, Longitude) {}
+class Headers   extends Dict(Str, Str) {}
+class MaybeEmail extends Maybe(Email) {}
+```
+
+### Defining your own types
+
+The catalogue is deliberately minimal. Application types are one-line
+user-side definitions:
+
+```ts
+import { TypeDef, Schema } from '@igorjs/pure-fx'
+
+class Email   extends TypeDef('Email',   Schema.email) {}
+class Uuid    extends TypeDef('Uuid',    Schema.uuid) {}
+class HttpUrl extends TypeDef('HttpUrl', Schema.url) {}
+
+class Port extends TypeDef(
+  'Port',
+  Schema.int.refine(n => n >= 1 && n <= 65535, 'port'),
+) {}
+
+class Money extends TypeDef('Money', Schema.object({
+  amount:   Schema.string.refine(s => /^-?\d+(\.\d+)?$/.test(s), 'decimal'),
+  currency: Schema.string.refine(s => s.length === 3, 'iso 4217'),
+})) {}
+```
+
+Then compose freely:
+
+```ts
+class Wallet extends Dict(Str, Money) {}
+class Failure extends Either(HttpError, NetworkError) {}
+```
+
 ## Duration
 
 Typed time values in milliseconds with conversions.

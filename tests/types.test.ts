@@ -10,18 +10,27 @@
  */
 
 import {
+  Bool,
+  Bytes,
+  Dict,
+  Either,
   Err,
   ErrType,
   type ErrTypeConstructor,
   flow,
   type ImmutableList,
   type ImmutableRecord,
+  Int,
   Lazy,
   List,
+  Maybe,
   match,
+  Nil,
   None,
+  Num,
   Ok,
   Option,
+  Pair,
   Program,
   type Program as ProgramType,
   pipe,
@@ -30,9 +39,14 @@ import {
   Schema,
   type SchemaType,
   Some,
+  Str,
   Task,
+  Tuple,
   type Type,
+  TypeDef,
   tryCatch,
+  UInt,
+  Vec,
 } from "../src/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -446,3 +460,42 @@ const _execResult: Promise<Result<number, never>> = _progTask.execute();
 const _execWithSignal: Promise<Result<number, never>> = _progTask.execute(
   new AbortController().signal,
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TypeDef - brand inference and distinctness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Scalar parse returns Result<Type<Tag, Base>, SchemaError>
+const _strParse = Str.parse("hello"); // Result<Type<'Str', string>, SchemaError>
+const _intParse = Int.parse(42); // Result<Type<'Int', number>, SchemaError>
+
+// Infer extracts the branded value type
+type _StrVal = TypeDef.Infer<typeof Str>;
+type _IntVal = TypeDef.Infer<typeof Int>;
+const _str1: _StrVal = "hello" as _StrVal;
+const _int1: _IntVal = 42 as _IntVal;
+
+// Two TypeDefs over the same base type are NOT assignable
+// @ts-expect-error Int values are not assignable to UInt
+const _crossInt: TypeDef.Infer<typeof UInt> = 42 as TypeDef.Infer<typeof Int>;
+
+// User-defined brands are distinct from each other
+class CustomerId extends TypeDef("CustomerId", Schema.uuid) {}
+class OrderId extends TypeDef("OrderId", Schema.uuid) {}
+type CustomerIdVal = TypeDef.Infer<typeof CustomerId>;
+type OrderIdVal = TypeDef.Infer<typeof OrderId>;
+
+const _cust: CustomerIdVal = "c_001" as CustomerIdVal;
+// @ts-expect-error CustomerId not assignable to OrderId
+const _ord: OrderIdVal = _cust;
+
+// Composers preserve element brands
+const _vec = Vec(Str).parse(["a", "b"]); // Result<readonly Str[], SchemaError>
+const _pair = Pair(Str, Int).parse(["a", 1]); // Result<readonly [Str, Int], SchemaError>
+const _tuple = Tuple(Str, Int, Bool).parse(["a", 1, true]);
+const _dict = Dict(Str, Int).parse({ a: 1 });
+const _maybe = Maybe(Int).parse(null); // Result<Option<Int>, SchemaError>
+const _either = Either(Str, Int).parse({ tag: "Right", value: 1 });
+
+// Verify the unused imports survive (helps tsgo prove they exist)
+const _unused = [Num, UInt, Bytes, Nil];

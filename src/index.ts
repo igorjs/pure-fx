@@ -457,6 +457,43 @@ export type { ErrTypeConstructor } from "./types/error.js";
 /** Phantom-branded nominal type for compile-time domain safety. */
 export type { Type } from "./types/nominal.js";
 
+/** Branded-type factory with parse/new/validate/is/unsafe surface. */
+export { TypeDef } from "./types/type-def.js";
+/** Structural shape of any class returned by `TypeDef(...)`. */
+export type { TypeDefStatic } from "./types/type-def.js";
+
+// ── TypeDef catalogue (v0) ──────────────────────────────────────────────────
+
+/** Branded JS `boolean` primitive. */
+export { Bool } from "./types/runtime/scalars.js";
+/** Branded `Uint8Array` primitive (accepts Node `Buffer`). */
+export { Bytes } from "./types/runtime/scalars.js";
+/** Branded integer `number` primitive. */
+export { Int } from "./types/runtime/scalars.js";
+/** Branded literal-`null` primitive. */
+export { Nil } from "./types/runtime/scalars.js";
+/** Branded `number` primitive (any finite/infinite non-NaN). */
+export { Num } from "./types/runtime/scalars.js";
+/** Branded `string` primitive. */
+export { Str } from "./types/runtime/scalars.js";
+/** Branded non-negative integer primitive. */
+export { UInt } from "./types/runtime/scalars.js";
+
+/** String-keyed object-record composer. */
+export { Dict } from "./types/runtime/composers.js";
+/** Tagged sum-type composer (`Left | Right`). */
+export { Either } from "./types/runtime/composers.js";
+/** Tagged sum value produced by parsing an {@link Either}. */
+export type { EitherValue } from "./types/runtime/composers.js";
+/** Optional-value composer that parses JSON `Option<T>` shapes. */
+export { Maybe } from "./types/runtime/composers.js";
+/** 2-tuple composer. */
+export { Pair } from "./types/runtime/composers.js";
+/** Fixed-length n-tuple composer. */
+export { Tuple } from "./types/runtime/composers.js";
+/** Homogeneous-array composer. */
+export { Vec } from "./types/runtime/composers.js";
+
 // ── WebSocket ───────────────────────────────────────────────────────────────
 
 /** WebSocket routing and handler definitions namespace. */

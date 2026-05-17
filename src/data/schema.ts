@@ -326,6 +326,22 @@ export const Schema: {
   readonly positive: SchemaType<number>;
   /** Validate a non-negative number (greater than or equal to 0). */
   readonly nonNegative: SchemaType<number>;
+  /**
+   * Build a schema from a user-supplied type guard.
+   *
+   * Used for types Schema does not cover natively, such as `Uint8Array`,
+   * `Map`, `Set`, `Symbol`, or any custom class. The guard MUST be a true
+   * type predicate (`(v: unknown): v is T`).
+   *
+   * @example
+   * ```ts
+   * const BytesSchema = Schema.guard(
+   *   (v): v is Uint8Array => v instanceof Uint8Array,
+   *   'Uint8Array',
+   * );
+   * ```
+   */
+  readonly guard: <T>(predicate: (v: unknown) => v is T, label: string) => SchemaType<T>;
 } = {
   /** Validates that input is a `string`. */
   string: stringSchema,
@@ -499,6 +515,10 @@ export const Schema: {
 
   /** Non-negative number (>= 0). */
   nonNegative: numberSchema.refine(n => n >= 0, "non-negative"),
+
+  /** Build a schema from a runtime type guard. */
+  guard: <T>(predicate: (v: unknown) => v is T, label: string): SchemaType<T> =>
+    createSchema<T>(input => (predicate(input) ? Ok(input) : schemaErr([], label, input))),
 } as const;
 
 /** Type-level utilities for Schema inference. */

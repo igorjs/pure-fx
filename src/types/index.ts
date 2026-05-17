@@ -52,3 +52,40 @@ export { ErrType } from "./error.js";
 export type { ErrTypeConstructor } from "./error.js";
 /** Phantom-branded nominal type for compile-time domain safety. */
 export type { Type } from "./nominal.js";
+
+/** Branded-type factory with parse/new/validate/is/unsafe surface. */
+export { TypeDef } from "./type-def.js";
+/** Structural shape of any class returned by `TypeDef(...)`. */
+export type { TypeDefStatic } from "./type-def.js";
+
+// ── Runtime catalogue (v0) ─────────────────────────────────────────────
+
+/** Branded JS `boolean` primitive. */
+export { Bool } from "./runtime/scalars.js";
+/** Branded `Uint8Array` primitive (accepts Node `Buffer`). */
+export { Bytes } from "./runtime/scalars.js";
+/** Branded integer `number` primitive. */
+export { Int } from "./runtime/scalars.js";
+/** Branded literal-`null` primitive. */
+export { Nil } from "./runtime/scalars.js";
+/** Branded `number` primitive (any finite/infinite non-NaN). */
+export { Num } from "./runtime/scalars.js";
+/** Branded `string` primitive. */
+export { Str } from "./runtime/scalars.js";
+/** Branded non-negative integer primitive. */
+export { UInt } from "./runtime/scalars.js";
+
+/** String-keyed object-record composer. */
+export { Dict } from "./runtime/composers.js";
+/** Tagged sum-type composer (`Left | Right`). */
+export { Either } from "./runtime/composers.js";
+/** Tagged sum value produced by parsing an {@link Either}. */
+export type { EitherValue } from "./runtime/composers.js";
+/** Optional-value composer that parses JSON `Option<T>` shapes. */
+export { Maybe } from "./runtime/composers.js";
+/** 2-tuple composer. */
+export { Pair } from "./runtime/composers.js";
+/** Fixed-length n-tuple composer. */
+export { Tuple } from "./runtime/composers.js";
+/** Homogeneous-array composer. */
+export { Vec } from "./runtime/composers.js";
