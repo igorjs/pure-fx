@@ -330,11 +330,11 @@ describe("Nil", () => {
 // =============================================================================
 
 describe("Vec", () => {
-  it("validates an array of inner type", () => {
+  it("validates an array of inner type into an ImmutableList", () => {
     const r = Vec(Int).parse([1, 2, 3]);
     expect(r.isOk).toBe(true);
     expect(r.value.length).toBe(3);
-    expect(r.value[0]).toBe(1);
+    expect(r.value.toMutable()).toEqual([1, 2, 3]);
   });
 
   it("accepts empty array", () => {
@@ -354,17 +354,14 @@ describe("Vec", () => {
     expect(r.error.expected).toBe("number");
   });
 
-  it("deep-freezes the parsed output", () => {
+  it("returns an immutable list (mutation methods return new lists)", () => {
     const r = Vec(Int).parse([1, 2, 3]);
     expect(r.isOk).toBe(true);
-    let threw = false;
-    try {
-      r.value.push(4);
-    } catch (_) {
-      threw = true;
+    if (r.isOk) {
+      const after = r.value.append(4);
+      expect(after.length).toBe(4);
+      expect(r.value.length).toBe(3); // original unchanged
     }
-    expect(threw).toBe(true);
-    expect(Object.isFrozen(r.value)).toBe(true);
   });
 
   it("caches per inner TypeDef (referential equality)", () => {
@@ -386,7 +383,7 @@ describe("Vec", () => {
     expect(Scores.tag).toBe("Vec<Int>");
     const r = Scores.parse([10, 20, 30]);
     expect(r.isOk).toBe(true);
-    expect(r.value[0]).toBe(10);
+    expect(r.value.toMutable()).toEqual([10, 20, 30]);
   });
 });
 
@@ -475,11 +472,18 @@ describe("Tuple", () => {
 // =============================================================================
 
 describe("Dict", () => {
-  it("validates string-keyed records", () => {
+  it("validates string-keyed records into an ImmutableHashMap", () => {
     const r = Dict(Str, Int).parse({ a: 1, b: 2 });
     expect(r.isOk).toBe(true);
-    expect(r.value.a).toBe(1);
-    expect(r.value.b).toBe(2);
+    if (r.isOk) {
+      expect(r.value.size).toBe(2);
+      const a = r.value.get("a");
+      const b = r.value.get("b");
+      expect(a.isSome).toBe(true);
+      expect(b.isSome).toBe(true);
+      if (a.isSome) expect(a.value).toBe(1);
+      if (b.isSome) expect(b.value).toBe(2);
+    }
   });
 
   it("accepts empty object", () => {
@@ -498,9 +502,14 @@ describe("Dict", () => {
     expect(r.error.path).toEqual(["b"]);
   });
 
-  it("deep-freezes the parsed output", () => {
+  it("returns an immutable hash map (set returns a new map)", () => {
     const r = Dict(Str, Int).parse({ a: 1 });
-    expect(Object.isFrozen(r.value)).toBe(true);
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      const m2 = r.value.set("b", 2);
+      expect(m2.size).toBe(2);
+      expect(r.value.size).toBe(1); // original unchanged
+    }
   });
 
   it("caches per (K, V) pair", () => {
@@ -625,7 +634,16 @@ describe("nested composers", () => {
       [3, 4],
     ]);
     expect(r.isOk).toBe(true);
-    expect(r.value[0][1]).toBe(2);
+    if (r.isOk) {
+      // Nested lists: use .at() (index access on object-like elements wraps as record)
+      const row0 = r.value.at(0);
+      expect(row0.isSome).toBe(true);
+      if (row0.isSome) {
+        const cell = row0.value.at(1);
+        expect(cell.isSome).toBe(true);
+        if (cell.isSome) expect(cell.value).toBe(2);
+      }
+    }
   });
 
   it("Vec(Vec(Int)) reports deeply nested error path", () => {
@@ -640,7 +658,15 @@ describe("nested composers", () => {
   it("Dict(Str, Vec(Int)) validates a record of arrays", () => {
     const r = Dict(Str, Vec(Int)).parse({ a: [1, 2], b: [3, 4] });
     expect(r.isOk).toBe(true);
-    expect(r.value.a[0]).toBe(1);
+    if (r.isOk) {
+      const a = r.value.get("a");
+      expect(a.isSome).toBe(true);
+      if (a.isSome) {
+        const first = a.value.at(0);
+        expect(first.isSome).toBe(true);
+        if (first.isSome) expect(first.value).toBe(1);
+      }
+    }
   });
 
   it("Maybe(Vec(Int)) handles missing array", () => {
@@ -688,7 +714,11 @@ describe("user-defined types interop with catalogue composers", () => {
     class User extends TypeDef("User", Schema.object({ name: Schema.string })) {}
     const r = Dict(UserId, User).parse({ u_001: { name: "Alice" } });
     expect(r.isOk).toBe(true);
-    expect(r.value.u_001.name).toBe("Alice");
+    if (r.isOk) {
+      const u = r.value.get("u_001");
+      expect(u.isSome).toBe(true);
+      if (u.isSome) expect(u.value.name).toBe("Alice");
+    }
   });
 
   it("Either with two user-defined types", () => {
