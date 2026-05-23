@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-05-23
+
+### Added
+- `DateTime` runtime type: a Temporal-aware instant primitive backed by `DateTimeValue` (epoch nanoseconds as `bigint`), accepting an ISO string, epoch milliseconds, a `Date`, a `Temporal.Instant`/`ZonedDateTime`, or an existing `DateTimeValue`. Provides `toDate()`/`toISO()`/`toEpochMillis()`, `toTemporal(): Option<Temporal.Instant>`, `equals`/`compare`, and `eq`/`ord` instances. Zero-dependency: Temporal is feature-detected at runtime, no polyfill bundled — `toTemporal()` returns `None` where `globalThis.Temporal` is unavailable.
+- `Struct({ ... })` composer: heterogeneous object validation over named TypeDefs, returning an `ImmutableRecord`.
+
+### Changed
+- **BREAKING:** `Vec(T)` now returns an `ImmutableList<T>` instead of a frozen array. Use `.at(i)`, `.toMutable()`, and the functional `ImmutableList` methods (`append`, `map`, …) in place of array indexing/mutation.
+- **BREAKING:** `Dict(K, V)` now returns an `ImmutableHashMap` instead of a frozen object. Use `.get(key): Option<V>`, `.set`, and `.size` in place of property access.
+
 ## [0.1.0] - 2026-03-15
 
 ### Added
