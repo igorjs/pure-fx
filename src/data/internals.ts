@@ -61,6 +61,25 @@ export const isObjectLike = (val: unknown): val is Record<string | symbol, unkno
   val !== null && typeof val === "object" && !ArrayBuffer.isView(val);
 
 /**
+ * Check whether `val` is a nested value that should be lazily wrapped as a child
+ * `ImmutableRecord` on access: a plain object (prototype `Object.prototype` or
+ * `null`) or a plain array.
+ *
+ * Excludes pure-fx immutables (`ImmutableList`/`ImmutableRecord`, detected via
+ * the `$immutable` marker) and other class instances (`ImmutableHashMap`,
+ * `DateTimeValue`, `Map`, `Set`, ...), which are returned as-is. This lets
+ * collections compose — e.g. a `Record`/`Struct` field holding a `List`,
+ * `HashMap`, or `DateTimeValue` is passed through untouched rather than being
+ * re-wrapped (or, for proxy-backed immutables, throwing when frozen/redefined).
+ */
+export const isWrappable = (val: unknown): val is Record<string, unknown> => {
+  if (!isObjectLike(val)) return false;
+  if ((val as { $immutable?: unknown }).$immutable === true) return false;
+  const proto = Object.getPrototypeOf(val);
+  return proto === Object.prototype || proto === null || Array.isArray(val);
+};
+
+/**
  * Recursively freeze an object and all nested properties.
  *
  * Skips already-frozen objects to avoid redundant work.
@@ -68,6 +87,10 @@ export const isObjectLike = (val: unknown): val is Record<string | symbol, unkno
  */
 export const deepFreezeRaw = (obj: unknown): void => {
   if (!isObjectLike(obj) || Object.isFrozen(obj)) return;
+  // Pure-fx immutables (ImmutableList/ImmutableRecord proxies) manage their own
+  // immutability; calling Object.freeze on them trips their write-guarding
+  // traps. Treat them as opaque leaves.
+  if ((obj as { $immutable?: unknown }).$immutable === true) return;
   Object.freeze(obj);
   const keys = Object.keys(obj);
   // biome-ignore lint/style/useForOf: recursive hot-path during Record creation

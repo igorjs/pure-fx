@@ -33,7 +33,7 @@ import {
   deepEqual,
   deepFreezeRaw,
   getByPath,
-  isObjectLike,
+  isWrappable,
   type Mutation,
   type Primitive,
   recordPath,
@@ -213,7 +213,10 @@ const buildShapeClass = (keys: readonly string[]): (new (raw: object) => any) =>
     Object.defineProperty(proto, key, {
       get(this: { _raw: Record<string, unknown> }) {
         const val = this._raw[key];
-        if (isObjectLike(val)) return getCachedChild(this._raw, key, val as object);
+        // Plain objects and arrays are wrapped as child records; Maps, Sets,
+        // class instances, and pure-fx immutables (List/HashMap/DateTimeValue/
+        // nested Record) are returned as-is.
+        if (isWrappable(val)) return getCachedChild(this._raw, key, val);
         return val;
       },
       set() {
