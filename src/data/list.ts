@@ -24,7 +24,7 @@ import type { Eq } from "../core/eq.js";
 import type { Option } from "../core/option.js";
 import { None, Some } from "../core/option.js";
 import type { Ord } from "../core/ord.js";
-import { type DeepReadonly, deepEqual, isObjectLike } from "./internals.js";
+import { type DeepReadonly, deepEqual, isWrappable } from "./internals.js";
 import { createRecord } from "./record.js";
 
 /**
@@ -294,7 +294,9 @@ const LIST_HANDLER: ProxyHandler<readonly unknown[]> = {
       const idx = Number(prop);
       if (Number.isInteger(idx) && idx >= 0 && idx < target.length) {
         const val = target[idx];
-        if (isObjectLike(val)) {
+        // Plain objects/arrays are wrapped as records; class instances and
+        // pure-fx immutables (nested lists/records/hashmaps) are returned as-is.
+        if (isWrappable(val)) {
           let idxMap = LIST_CHILD_CACHE.get(target);
           if (idxMap === undefined) {
             idxMap = new Map();

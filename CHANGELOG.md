@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - **BREAKING:** `Vec(T)` now returns an `ImmutableList<T>` instead of a frozen array. Use `.at(i)`, `.toMutable()`, and the functional `ImmutableList` methods (`append`, `map`, …) in place of array indexing/mutation.
 - **BREAKING:** `Dict(K, V)` now returns an `ImmutableHashMap` instead of a frozen object. Use `.get(key): Option<V>`, `.set`, and `.size` in place of property access.
 
+### Fixed
+- `Record`, `List`, and the `Struct`/`Vec`/`Dict` composers now compose with nested pure-fx immutables. Previously, putting an `ImmutableList` inside a `Record` (e.g. `Struct({ tags: Vec(Tag) })`) threw at construction, and a `Record`/`HashMap`/`DateTimeValue` nested in a record was incorrectly re-wrapped. The deep-freeze and lazy-wrap paths now treat existing immutables and class instances as opaque leaves.
+
 ## [0.1.0] - 2026-03-15
 
 ### Added

@@ -10,7 +10,20 @@
  * Uses @igorjs/pure-test. Tests the compiled dist/ output, not the source.
  */
 
-import { DateTime, DateTimeValue, Dict, Schema, Str, Struct, TypeDef, Vec } from "@igorjs/pure-fx";
+import {
+  DateTime,
+  DateTimeValue,
+  Dict,
+  HashMap,
+  Int,
+  List,
+  Record,
+  Schema,
+  Str,
+  Struct,
+  TypeDef,
+  Vec,
+} from "@igorjs/pure-fx";
 import { describe, expect, it } from "@igorjs/pure-test";
 
 // ── DateTimeValue ─────────────────────────────────────────────────────────────
@@ -276,4 +289,116 @@ describe("Dict returns ImmutableHashMap", () => {
   it("is still cached by inner references", () => {
     expect(Dict(Str, Str)).toBe(Dict(Str, Str));
   });
+});
+
+// ── Nested composers + immutable collections (v0.2 core-data fix) ─────────────
+
+describe("composers nest with immutable-collection composers", () => {
+  class Tag extends TypeDef("Tag", Schema.string) {}
+
+  it("Struct with a Vec field parses; field is an ImmutableList", () => {
+    class Post extends Struct({ tags: Vec(Tag), title: Str }) {}
+    const r = Post.parse({ tags: ["a", "b"], title: "hi" });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value.title).toBe("hi");
+      expect(typeof r.value.tags.toMutable).toBe("function");
+      expect(r.value.tags.toMutable()).toEqual(["a", "b"]);
+    }
+  });
+
+  it("Struct with a Dict field parses; field is an ImmutableHashMap", () => {
+    class Cfg extends Struct({ headers: Dict(Str, Str) }) {}
+    const r = Cfg.parse({ headers: { "x-id": "1" } });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value.headers.size).toBe(1);
+      expect(r.value.headers.get("x-id").isSome).toBe(true);
+    }
+  });
+
+  it("Struct with a DateTime field parses; field is a DateTimeValue", () => {
+    class Event extends Struct({ at: DateTime }) {}
+    const r = Event.parse({ at: "2026-05-22T10:00:00.000Z" });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value.at).toBeInstanceOf(DateTimeValue);
+      expect(r.value.at.toISO()).toBe("2026-05-22T10:00:00.000Z");
+    }
+  });
+
+  it("Struct nested in Struct parses and exposes the inner record", () => {
+    class Inner extends Struct({ name: Str }) {}
+    class Outer extends Struct({ inner: Inner }) {}
+    const r = Outer.parse({ inner: { name: "Ada" } });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) expect(r.value.inner.name).toBe("Ada");
+  });
+
+  it("Vec(Vec(Int)) supports both index and .at() access", () => {
+    const r = Vec(Vec(Int)).parse([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value[0][1]).toBe(2); // index access works (inner list returned unwrapped)
+      const row = r.value.at(1);
+      expect(row.isSome).toBe(true);
+      if (row.isSome) expect(row.value.at(0).isSome && row.value.at(0).value).toBe(3);
+    }
+  });
+
+  it("Dict(Str, Vec(Int)) exposes inner ImmutableList values", () => {
+    const r = Dict(Str, Vec(Int)).parse({ a: [1, 2] });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      const a = r.value.get("a");
+      expect(a.isSome).toBe(true);
+      if (a.isSome) expect(a.value.toMutable()).toEqual([1, 2]);
+    }
+  });
+
+  it("still wraps plain-object fields as ImmutableRecord", () => {
+    class Money extends TypeDef(
+      "Money",
+      Schema.object({ amount: Schema.number, currency: Schema.string }),
+    ) {}
+    class Wallet extends Struct({ balance: Money }) {}
+    const r = Wallet.parse({ balance: { amount: 5, currency: "USD" } });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value.balance.amount).toBe(5);
+      expect(() => {
+        r.value.balance.amount = 9;
+      }).toThrow();
+    }
+  });
+});
+
+describe("core data: Record/List hold pure-fx immutables as leaves", () => {
+  it("Record can hold an ImmutableList field", () => {
+    const rec = Record({ tags: List([1, 2]) });
+    expect(rec.tags.toMutable()).toEqual([1, 2]);
+  });
+
+  it("Record can hold an ImmutableHashMap field", () => {
+    const rec = Record({ m: HashMap.of([["a", 1]]) });
+    expect(rec.m.get("a").isSome).toBe(true);
+  });
+
+  it("List of Lists supports index access", () => {
+    const l = List([List([1]), List([2])]);
+    expect(l[0][0]).toBe(1);
+    expect(l[1].toMutable()).toEqual([2]);
+  });
+});
+
+it("List index access wraps plain-object elements as immutable records", () => {
+  const l = List([{ a: 1 }, { a: 2 }]);
+  expect(l[0].a).toBe(1);
+  expect(l[0]).toBe(l[0]); // cached: stable identity
+  expect(() => {
+    l[1].a = 9;
+  }).toThrow();
 });
