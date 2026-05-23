@@ -17,7 +17,11 @@
 
 import type { Option } from "../../core/option.js";
 import { None, Some } from "../../core/option.js";
+import { List, Record } from "../../data/constructors.js";
+import { HashMap, type ImmutableHashMap } from "../../data/hash-map.js";
 import { deepFreezeRaw } from "../../data/internals.js";
+import type { ImmutableList } from "../../data/list.js";
+import type { ImmutableRecord } from "../../data/record.js";
 import { Schema, type SchemaError, type SchemaType } from "../../data/schema.js";
 import type { Type } from "../nominal.js";
 import { TypeDef, type TypeDefStatic } from "../type-def.js";
@@ -72,19 +76,20 @@ const deepFreezeT = <T>(value: T): T => {
 // ── Vec(T) ────────────────────────────────────────────────────────────────────
 
 /**
- * Build a {@link TypeDef} class that validates a homogeneous array.
+ * Build a {@link TypeDef} class that validates a homogeneous array and returns
+ * an immutable {@link ImmutableList}.
  *
- * The output is deep-frozen: pushing, splicing, or mutating elements raises
- * a `TypeError` at runtime. Element brand survives: indexing into a parsed
- * `Vec(Email)` yields `Type<'Email', string>`.
+ * Element brand survives: a parsed `Vec(Email)` yields an
+ * `ImmutableList<Type<'Email', string>>`. The list is immutable — `append`,
+ * `map`, etc. return new lists.
  *
  * @example
  * ```ts
  * class UserIds extends Vec(UserId) {}
  * const r = UserIds.parse(['u_001', 'u_002']);
  * if (r.isOk) {
- *   r.value[0]              // Type<'UserId', string>
- *   r.value.push('u_003');  // throws (frozen)
+ *   r.value.toArray()       // [Type<'UserId', string>, ...]
+ *   r.value.append('u_003') // new ImmutableList
  * }
  * ```
  *
@@ -95,13 +100,11 @@ export const Vec = <Tag extends string, T>(inner: TypeDefStatic<Tag, T>) =>
     TypeDef(
       `Vec<${inner.tag}>` as const,
       // Why: Schema.array(inner.schema) yields readonly T[] structurally; the
-      // brand is a phantom only, so the runtime value is just a frozen array.
-      Schema.array(inner.schema).transform(arr => {
-        const out = arr as readonly Type<Tag, T>[];
-        return deepFreezeT(out);
-      }),
+      // brand is a phantom only, so the runtime value is the underlying array,
+      // wrapped in an ImmutableList for an immutable, functional surface.
+      Schema.array(inner.schema).transform(arr => List(arr as readonly Type<Tag, T>[])),
     ),
-  ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, readonly Type<Tag, T>[]>>;
+  ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, ImmutableList<Type<Tag, T>>>>;
 
 // ── Pair(A, B) ────────────────────────────────────────────────────────────────
 
@@ -175,7 +178,8 @@ export const Tuple = <Items extends readonly TypeDefStatic<string, unknown>[]>(.
  * @example
  * ```ts
  * class Headers extends Dict(Str, Str) {}
- * Headers.parse({ 'content-type': 'application/json' });
+ * const r = Headers.parse({ 'content-type': 'application/json' });
+ * if (r.isOk) r.value.get('content-type'); // Option<Type<'Str', string>>
  * ```
  */
 export const Dict = <KTag extends string, K extends string, VTag extends string, V>(
@@ -185,13 +189,15 @@ export const Dict = <KTag extends string, K extends string, VTag extends string,
   dictMemo(key as unknown as object, value as unknown as object, () =>
     TypeDef(
       `Dict<${key.tag},${value.tag}>` as const,
-      Schema.record(value.schema).transform(obj => {
-        const out = obj as Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>;
-        return deepFreezeT(out);
-      }),
+      // Why: Schema.record yields a plain record structurally; wrap it in an
+      // ImmutableHashMap for an immutable, functional surface. Keys are
+      // string-coerced at runtime; the key brand is phantom-only.
+      Schema.record(value.schema).transform(obj =>
+        HashMap.fromObject(obj as Readonly<Record<string, Type<VTag, V>>>),
+      ),
     ),
   ) as ReturnType<
-    typeof TypeDef<`Dict<${KTag},${VTag}>`, Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>>
+    typeof TypeDef<`Dict<${KTag},${VTag}>`, ImmutableHashMap<Type<KTag, K> & string, Type<VTag, V>>>
   >;
 
 // ── Maybe(T) ──────────────────────────────────────────────────────────────────
@@ -289,6 +295,46 @@ export const Either = <LTag extends string, L, RTag extends string, R>(
   }) as ReturnType<
     typeof TypeDef<`Either<${LTag},${RTag}>`, EitherValue<Type<LTag, L>, Type<RTag, R>>>
   >;
+
+// ── Struct({...}) ───────────────────────────────────────────────────────────
+
+/** Field map accepted by {@link Struct}: each value is a TypeDef class. */
+type StructFields = Readonly<Record<string, TypeDefStatic<string, unknown>>>;
+
+/** The branded {@link ImmutableRecord} value produced by parsing a {@link Struct}. */
+type StructValue<F extends StructFields> = ImmutableRecord<{
+  [K in keyof F]: TypeDef.Infer<F[K]>;
+}>;
+
+/**
+ * Build a {@link TypeDef} class that validates a heterogeneous object where each
+ * field has its own TypeDef, returning an immutable {@link ImmutableRecord}.
+ *
+ * Unlike {@link Dict} (homogeneous, string-keyed), `Struct` validates a fixed
+ * set of named fields, each with its own type. Not memoized (the field-map
+ * input space is unbounded, like {@link Tuple}); hold the returned class in a
+ * `const`/`class`.
+ *
+ * @example
+ * ```ts
+ * class User extends Struct({ id: UserId, email: Email }) {}
+ * const r = User.parse({ id: 'u_1', email: 'a@b.com' });
+ * if (r.isOk) r.value.id; // Type<'UserId', string>
+ * ```
+ */
+export const Struct = <F extends StructFields>(fields: F) => {
+  const shape: Record<string, SchemaType<unknown>> = {};
+  const keys = Object.keys(fields);
+  for (const [key, def] of Object.entries(fields)) shape[key] = def.schema;
+  const tag = `Struct<${keys.join(",")}>`;
+  // Why: Schema.object validates each field; Record() wraps the validated plain
+  // object in an ImmutableRecord. The per-field brands are phantom, so the
+  // runtime value is the validated object.
+  const schema = Schema.object(shape).transform(
+    obj => Record(obj as object) as StructValue<F>,
+  ) as SchemaType<StructValue<F>>;
+  return TypeDef(tag, schema);
+};
 
 // Why: re-export SchemaError so consumers don't need to import it from data/
 // when working purely with TypeDef classes built from composers.

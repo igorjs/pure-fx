@@ -479,7 +479,7 @@ export { Str } from "./types/runtime/scalars.js";
 /** Branded non-negative integer primitive. */
 export { UInt } from "./types/runtime/scalars.js";
 
-/** String-keyed object-record composer. */
+/** String-keyed object-record composer (returns `ImmutableHashMap`). */
 export { Dict } from "./types/runtime/composers.js";
 /** Tagged sum-type composer (`Left | Right`). */
 export { Either } from "./types/runtime/composers.js";
@@ -489,10 +489,19 @@ export type { EitherValue } from "./types/runtime/composers.js";
 export { Maybe } from "./types/runtime/composers.js";
 /** 2-tuple composer. */
 export { Pair } from "./types/runtime/composers.js";
+/** Heterogeneous object composer over named TypeDefs (returns `ImmutableRecord`). */
+export { Struct } from "./types/runtime/composers.js";
 /** Fixed-length n-tuple composer. */
 export { Tuple } from "./types/runtime/composers.js";
-/** Homogeneous-array composer. */
+/** Homogeneous-array composer (returns `ImmutableList`). */
 export { Vec } from "./types/runtime/composers.js";
+
+/** Temporal-aware instant TypeDef (extend to create domain instants). */
+export { DateTime } from "./types/runtime/date-time.js";
+/** Immutable instant value (epoch nanoseconds) produced by parsing {@link DateTime}. */
+export { DateTimeValue } from "./types/runtime/date-time.js";
+/** Minimal structural `Temporal.Instant` shape returned by `DateTimeValue.toTemporal`. */
+export type { TemporalInstant } from "./types/runtime/date-time.js";
 
 // ── WebSocket ───────────────────────────────────────────────────────────────
 
