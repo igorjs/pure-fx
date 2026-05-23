@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Fixed
 - `Record`/`List`/`Struct` now compose with nested pure-fx immutables (e.g. `Struct({ tags: ListOf(Tag) })`); the deep-freeze and lazy-wrap paths treat existing immutables and class instances as opaque leaves. `isImmutable` now correctly recognises `ImmutableList`.
 
+
 ## [0.1.0] - 2026-03-15
 
 ### Added
