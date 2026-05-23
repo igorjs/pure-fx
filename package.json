@@ -1,7 +1,7 @@
 {
   "name": "@igorjs/pure-fx",
-  "version": "0.1.0",
-  "description": "Pure FX: functional application framework for TypeScript. Result, Option, Task, Stream, immutable Record/List, Schema, Codec, Lens, Retry, CircuitBreaker, HTTP Server. Zero dependencies.",
+  "version": "0.2.0",
+  "description": "Pure FX: functional application framework for TypeScript. Result, Option, Task, Stream, immutable Record/List, Schema, Codec, Lens, Retry, CircuitBreaker, HTTP Server, runtime TypeDef catalogue (DateTime, Struct). Zero dependencies.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
