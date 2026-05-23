@@ -78,13 +78,12 @@ const deepFreezeT = <T>(value: T): T => {
 // ── Vec(T) ────────────────────────────────────────────────────────────────────
 
 /**
- * Build a {@link TypeDef} class that validates a homogeneous array, returning a
- * deep-frozen `readonly T[]` snapshot.
+ * Build a {@link TypeDef} class that validates a homogeneous array and returns
+ * an immutable {@link ImmutableList}.
  *
- * Pushing, splicing, or mutating elements raises a `TypeError`. Element brand
- * survives: indexing into a parsed `Vec(Email)` yields `Type<'Email', string>`.
- * For a pure-fx {@link ImmutableList} with a functional API + copy-on-write
- * `produce`, use {@link ListOf} instead.
+ * Element brand survives: a parsed `Vec(Email)` yields an
+ * `ImmutableList<Type<'Email', string>>`. The list is immutable — `append`,
+ * `map`, etc. return new lists.
  *
  * @example
  * ```ts
@@ -102,9 +101,10 @@ export const Vec = <Tag extends string, T>(inner: TypeDefStatic<Tag, T>) =>
   vecMemo(inner as unknown as object, () =>
     TypeDef(
       `Vec<${inner.tag}>` as const,
-      // Why: Schema.array yields readonly T[] structurally; the brand is a
-      // phantom only, so the runtime value is a deep-frozen array snapshot.
-      Schema.array(inner.schema).transform(arr => deepFreezeT(arr as readonly Type<Tag, T>[])),
+      // Why: Schema.array(inner.schema) yields readonly T[] structurally; the
+      // brand is a phantom only, so the runtime value is the underlying array,
+      // wrapped in an ImmutableList for an immutable, functional surface.
+      Schema.array(inner.schema).transform(arr => List(arr as readonly Type<Tag, T>[])),
     ),
   ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, ImmutableList<Type<Tag, T>>>>;
 
@@ -181,7 +181,7 @@ export const Tuple = <Items extends readonly TypeDefStatic<string, unknown>[]>(.
  * ```ts
  * class Headers extends Dict(Str, Str) {}
  * const r = Headers.parse({ 'content-type': 'application/json' });
- * if (r.isOk) r.value['content-type']; // Type<'Str', string>
+ * if (r.isOk) r.value.get('content-type'); // Option<Type<'Str', string>>
  * ```
  *
  * For a pure-fx {@link ImmutableHashMap} (functional API + `produce`), use
@@ -194,10 +194,11 @@ export const Dict = <KTag extends string, K extends string, VTag extends string,
   dictMemo(key as unknown as object, value as unknown as object, () =>
     TypeDef(
       `Dict<${key.tag},${value.tag}>` as const,
-      // Why: Schema.record yields a plain record structurally; deep-freeze it
-      // into a snapshot. Keys are string-coerced; the key brand is phantom-only.
+      // Why: Schema.record yields a plain record structurally; wrap it in an
+      // ImmutableHashMap for an immutable, functional surface. Keys are
+      // string-coerced at runtime; the key brand is phantom-only.
       Schema.record(value.schema).transform(obj =>
-        deepFreezeT(obj as Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>),
+        HashMap.fromObject(obj as Readonly<Record<string, Type<VTag, V>>>),
       ),
     ),
   ) as ReturnType<
