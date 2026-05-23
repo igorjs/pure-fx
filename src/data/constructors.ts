@@ -88,7 +88,9 @@ List.clone = <T>(items: readonly T[]): ImmutableList<T> =>
 export const isImmutable = (
   val: unknown,
 ): val is ImmutableRecord<object> | ImmutableList<unknown> =>
+  // Why: read `$immutable` directly rather than via `in`. ImmutableList is a
+  // Proxy whose marker is exposed through the `get` trap (it has no `has`
+  // trap), so `"$immutable" in list` is `false`; property access returns true.
   val !== null &&
   typeof val === "object" &&
-  "$immutable" in val &&
   (val as Record<string, unknown>)["$immutable"] === true;

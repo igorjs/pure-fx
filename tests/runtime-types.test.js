@@ -16,6 +16,7 @@ import {
   Dict,
   HashMap,
   Int,
+  isImmutable,
   List,
   Record,
   Schema,
@@ -401,4 +402,12 @@ it("List index access wraps plain-object elements as immutable records", () => {
   expect(() => {
     l[1].a = 9;
   }).toThrow();
+});
+
+it("isImmutable recognises both ImmutableList and ImmutableRecord", () => {
+  expect(isImmutable(List([1, 2]))).toBe(true);
+  expect(isImmutable(Record({ a: 1 }))).toBe(true);
+  expect(isImmutable([1, 2])).toBe(false);
+  expect(isImmutable({ a: 1 })).toBe(false);
+  expect(isImmutable(null)).toBe(false);
 });
