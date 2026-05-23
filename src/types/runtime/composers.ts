@@ -91,8 +91,8 @@ const deepFreezeT = <T>(value: T): T => {
  * class UserIds extends Vec(UserId) {}
  * const r = UserIds.parse(['u_001', 'u_002']);
  * if (r.isOk) {
- *   r.value[0]              // Type<'UserId', string>
- *   r.value.push('u_003');  // throws (frozen)
+ *   r.value.toArray()       // [Type<'UserId', string>, ...]
+ *   r.value.append('u_003') // new ImmutableList
  * }
  * ```
  *
@@ -106,7 +106,7 @@ export const Vec = <Tag extends string, T>(inner: TypeDefStatic<Tag, T>) =>
       // phantom only, so the runtime value is a deep-frozen array snapshot.
       Schema.array(inner.schema).transform(arr => deepFreezeT(arr as readonly Type<Tag, T>[])),
     ),
-  ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, readonly Type<Tag, T>[]>>;
+  ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, ImmutableList<Type<Tag, T>>>>;
 
 // ── Pair(A, B) ────────────────────────────────────────────────────────────────
 
@@ -201,7 +201,7 @@ export const Dict = <KTag extends string, K extends string, VTag extends string,
       ),
     ),
   ) as ReturnType<
-    typeof TypeDef<`Dict<${KTag},${VTag}>`, Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>>
+    typeof TypeDef<`Dict<${KTag},${VTag}>`, ImmutableHashMap<Type<KTag, K> & string, Type<VTag, V>>>
   >;
 
 // ── ListOf(T) ───────────────────────────────────────────────────────────────
