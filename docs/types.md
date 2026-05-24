@@ -118,26 +118,30 @@ Score.parse(42);
 
 ### Composers
 
-Seven generic factories build new branded types from existing ones. `Vec`,
-`Dict`, and `Struct` return pure-fx immutable collections; the others return
-deep-frozen values. Reference-keyed composers are cached so `Vec(X) === Vec(X)`
-holds (`Tuple` and `Struct` take unbounded shapes and are not cached — hold them
-in a `const`/`class`).
+Nine generic factories build new branded types from existing ones. `Vec`,
+`Dict`, `Pair`, `Tuple`, `Either` return **deep-frozen native snapshots**;
+`Struct`, `ListOf`, `MapOf` return **pure-fx [Immutable](data.md#immutable-protocol)
+collections** (functional API + copy-on-write `produce`). Reference-keyed
+composers are cached so `Vec(X) === Vec(X)` holds (`Tuple`/`Struct` take
+unbounded shapes and are not cached — hold them in a `const`/`class`).
 
 | Composer | Validates | Returns |
 |----------|-----------|---------|
-| `Vec(T)` | `T[]` | `ImmutableList<T>` branded |
-| `Pair(A, B)` | `[A, B]` | `readonly [A, B]` branded |
-| `Tuple(...T)` | n-tuple | `readonly [...T]` branded |
-| `Dict(K, V)` | string-keyed record | `ImmutableHashMap<K, V>` branded |
+| `Vec(T)` | `T[]` | frozen `readonly T[]` branded |
+| `Pair(A, B)` | `[A, B]` | frozen `readonly [A, B]` branded |
+| `Tuple(...T)` | n-tuple | frozen `readonly [...T]` branded |
+| `Dict(K, V)` | string-keyed record | frozen `Readonly<Record<K, V>>` branded |
+| `ListOf(T)` | `T[]` | `ImmutableList<T>` branded |
+| `MapOf(K, V)` | string-keyed record | `ImmutableHashMap<K, V>` branded |
 | `Struct({...})` | named heterogeneous object | `ImmutableRecord<{...}>` branded |
 | `Maybe(T)` | `{tag:'Some',value:T} \| {tag:'None'} \| null \| undefined` | `Option<T>` branded |
 | `Either(L, R)` | `{tag:'Left',value:L} \| {tag:'Right',value:R}` | tagged sum branded |
 
-`Vec` and `Dict` return immutable collections, so access their parsed values
-through the collection API (`.at(i)`, `.toMutable()`, `.get(key)`, `.size`)
-rather than array indexing or property access. `Struct` is the heterogeneous
-counterpart to `Dict`: each field has its own TypeDef.
+`Vec`/`Dict` are lightweight **snapshots** (a branded frozen array/object) — use
+plain indexing/property access. `ListOf`/`MapOf` are the **collection** variants:
+access their parsed values through the collection API (`.at(i)`, `.get(key)`,
+`.size`, `.produce(...)`). `Struct` is the heterogeneous counterpart to `Dict`/
+`MapOf`: each field has its own TypeDef.
 
 ```ts
 import { TypeDef, Schema, Struct } from '@igorjs/pure-fx'
@@ -240,11 +244,24 @@ work via `Date`/`bigint`. `Date`-based conversions (`toDate`, `toISO`,
 `fromISO`, `fromDate`, `fromEpochMillis`) are millisecond-precision; full
 nanosecond fidelity is preserved in `epochNanos` and through Temporal values.
 
+`DateTimeValue` implements the [Immutable protocol](data.md#immutable-protocol)
+(`Immutable.is(dt) === true`). Modifiers are copy-on-write — they always return a
+**new** value, never mutating in place:
+
+```ts
+const later = dt.plus(Duration.hours(1));    // new DateTimeValue
+const reset = dt.withEpochMillis(0);          // new DateTimeValue
+dt.toMutable();                                // a fresh Date (interop)
+```
+
 **Static constructors:** `now`, `fromEpochMillis`, `fromEpochNanos`, `fromDate`,
 `fromISO`, `fromTemporal`
 
-**Instance:** `epochNanos`, `toEpochMillis`, `toDate`, `toISO`, `toTemporal`,
-`equals`, `compare`
+**Instance:** `epochNanos`, `toEpochMillis`, `toDate`, `toISO`, `toJSON`,
+`toMutable`, `toTemporal`, `equals`, `compare`
+
+**Copy-on-write modifiers:** `plus(Duration)`, `minus(Duration)`,
+`withEpochMillis`, `withEpochNanos`
 
 **Typeclass instances:** `eq`, `ord`
 
