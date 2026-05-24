@@ -24,7 +24,8 @@ import type { Eq } from "../core/eq.js";
 import type { Option } from "../core/option.js";
 import { None, Some } from "../core/option.js";
 import type { Ord } from "../core/ord.js";
-import { type DeepReadonly, deepEqual, isWrappable } from "./internals.js";
+import { IMMUTABLE } from "./immutable.js";
+import { type DeepReadonly, deepEqual, isWrappable, revocableDraft } from "./internals.js";
 import { createRecord } from "./record.js";
 
 /**
@@ -76,15 +77,19 @@ export interface ListMethods<T> {
   /** Map each element to an array and flatten. */
   flatMap<U>(fn: (value: T, index: number) => readonly U[]): ImmutableList<U>;
   /** Structural deep equality. */
-  equals(other: ImmutableList<T>): boolean;
+  equals(other: unknown): boolean;
   /** Deep mutable clone. Escape hatch for interop. */
   toMutable(): T[];
   /** JSON-safe raw array output. */
   toJSON(): unknown;
+  /** Copy-on-write edit: mutate a revocable array draft, get a new frozen list. */
+  produce(recipe: (draft: T[]) => void): ImmutableList<T>;
   /** The frozen raw array underlying this list. */
   readonly $raw: ReadonlyArray<DeepReadonly<T>>;
   /** Brand for runtime type checking via {@link isImmutable}. */
   readonly $immutable: true;
+  /** Shared {@link IMMUTABLE} protocol brand. */
+  readonly [IMMUTABLE]: true;
 }
 
 /**
@@ -140,6 +145,7 @@ const LIST_METHOD_KEYS = new Set([
   "equals",
   "toMutable",
   "toJSON",
+  "produce",
   "$raw",
   "$immutable",
 ]);
@@ -265,10 +271,16 @@ const buildListMethods = <T>(raw: readonly T[]): ListMethods<T> => ({
   toJSON() {
     return raw;
   },
+  produce(recipe: (draft: T[]) => void): ImmutableList<T> {
+    const copy = raw.slice() as T[];
+    revocableDraft(copy, recipe);
+    return createListProxy(copy);
+  },
   get $raw() {
     return raw as ReadonlyArray<DeepReadonly<T>>;
   },
   $immutable: true as const,
+  [IMMUTABLE]: true as const,
 });
 
 /**
@@ -335,7 +347,10 @@ const LIST_HANDLER: ProxyHandler<readonly unknown[]> = {
 export const createListProxy = <T>(raw: readonly T[]): ImmutableList<T> => {
   const cached = LIST_PROXY_CACHE.get(raw);
   if (cached) return cached as ImmutableList<T>;
-  // Proxy traps enforce immutability - no Object.freeze needed
+  // Proxy traps enforce immutability - no Object.freeze needed. The IMMUTABLE
+  // brand is defined on the raw target (non-enumerable) so the get-trap exposes
+  // it via Reflect.get for `isImmutable`/`Immutable.is`.
+  Object.defineProperty(raw, IMMUTABLE, { value: true, enumerable: false });
   LIST_METHODS.set(raw, buildListMethods(raw));
   const proxy = new Proxy(
     raw,

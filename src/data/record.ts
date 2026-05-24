@@ -25,6 +25,7 @@
 
 import type { Option } from "../core/option.js";
 import { None, Some } from "../core/option.js";
+import { IMMUTABLE } from "./immutable.js";
 import {
   applyMutations,
   createDraft,
@@ -58,7 +59,7 @@ export interface RecordMethods<T> {
   /** Safe deep access returning an Option. */
   at<R>(accessor: (obj: T) => R): Option<R>;
   /** Structural deep equality. */
-  equals(other: ImmutableRecord<T>): boolean;
+  equals(other: unknown): boolean;
   /** Deep mutable clone. Escape hatch for interop. */
   toMutable(): T;
   /** JSON-safe plain-object output. */
@@ -67,6 +68,8 @@ export interface RecordMethods<T> {
   readonly $raw: DeepReadonly<T>;
   /** Brand for runtime type checking via {@link isImmutable}. */
   readonly $immutable: true;
+  /** Shared {@link IMMUTABLE} protocol brand. */
+  readonly [IMMUTABLE]: true;
 }
 
 /**
@@ -168,7 +171,14 @@ const buildShapeClass = (keys: readonly string[]): (new (raw: object) => any) =>
 
   proto.produce = function (this: any, recipe: (draft: any) => void) {
     const mutations: Mutation[] = [];
-    recipe(createDraft(this._raw, mutations));
+    const draft = createDraft(this._raw, mutations);
+    // Revoke the draft after the recipe so a leaked draft throws on later use.
+    const { proxy, revoke } = Proxy.revocable(draft as object, {});
+    try {
+      recipe(proxy);
+    } finally {
+      revoke();
+    }
     return createRecord(applyMutations(this._raw, mutations));
   };
 
@@ -201,6 +211,10 @@ const buildShapeClass = (keys: readonly string[]): (new (raw: object) => any) =>
   });
 
   Object.defineProperty(proto, "$immutable", {
+    value: true,
+    enumerable: false,
+  });
+  Object.defineProperty(proto, IMMUTABLE, {
     value: true,
     enumerable: false,
   });

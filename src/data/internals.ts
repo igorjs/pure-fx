@@ -84,6 +84,32 @@ export const isWrappable = (val: unknown): val is Record<string, unknown> => {
 };
 
 /**
+ * Run `recipe` against a revocable Proxy over `target`, then revoke it so a
+ * leaked draft throws on any later use. Returns `target` (mutated in place by
+ * the recipe) for the caller to rebuild into a frozen value.
+ *
+ * This gives the mutable draft a scope-bounded lifetime — the borrow-checker-
+ * style guarantee that prevents capturing a draft and mutating it after
+ * `produce` has returned.
+ */
+export const revocableDraft = <T extends object>(target: T, recipe: (draft: T) => void): T => {
+  const { proxy, revoke } = Proxy.revocable(target, {
+    // Bind methods to the real target so built-ins that rely on internal slots
+    // (Map/Set/Date) work through the proxy; data props pass through unchanged.
+    get(t, prop) {
+      const value = Reflect.get(t, prop, t);
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(t) : value;
+    },
+  });
+  try {
+    recipe(proxy as T);
+  } finally {
+    revoke();
+  }
+  return target;
+};
+
+/**
  * Recursively freeze an object and all nested properties.
  *
  * Skips already-frozen objects to avoid redundant work.
