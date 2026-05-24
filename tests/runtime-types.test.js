@@ -18,6 +18,8 @@ import {
   Int,
   isImmutable,
   List,
+  ListOf,
+  MapOf,
   Record,
   Schema,
   Str,
@@ -225,22 +227,22 @@ describe("Struct composer", () => {
   });
 });
 
-// ── Vec -> ImmutableList ──────────────────────────────────────────────────────
+// ── Vec -> frozen array ───────────────────────────────────────────────────────
 
-describe("Vec returns ImmutableList", () => {
+describe("Vec returns a frozen array", () => {
   class Tag extends TypeDef("Tag", Schema.string) {}
 
-  it("parses an array into an immutable list", () => {
-    const Tags = Vec(Tag);
-    const r = Tags.parse(["a", "b"]);
+  it("parses into a frozen readonly array", () => {
+    const r = Vec(Tag).parse(["a", "b"]);
     expect(r.isOk).toBe(true);
     if (r.isOk) {
-      expect(typeof r.value.map).toBe("function");
+      expect(Array.isArray(r.value)).toBe(true);
+      expect(r.value[0]).toBe("a");
       expect(r.value.length).toBe(2);
-      expect(r.value.toMutable()).toEqual(["a", "b"]);
-      expect(r.value.append("c").toMutable()).toEqual(["a", "b", "c"]);
-      // original is unchanged (immutable)
-      expect(r.value.toMutable()).toEqual(["a", "b"]);
+      expect(Object.isFrozen(r.value)).toBe(true);
+      expect(() => {
+        r.value.push("c");
+      }).toThrow();
     }
   });
 
@@ -255,17 +257,64 @@ describe("Vec returns ImmutableList", () => {
     expect(Vec(Tag).parse([1]).isErr).toBe(true);
   });
 
-  it("is still cached by inner reference", () => {
+  it("is cached by inner reference", () => {
     expect(Vec(Tag)).toBe(Vec(Tag));
   });
 });
 
-// ── Dict -> ImmutableHashMap ──────────────────────────────────────────────────
+// ── Dict -> frozen object ─────────────────────────────────────────────────────
 
-describe("Dict returns ImmutableHashMap", () => {
-  it("parses a record into an immutable hash map", () => {
-    const H = Dict(Str, Str);
-    const r = H.parse({ "content-type": "application/json" });
+describe("Dict returns a frozen object", () => {
+  it("parses into a frozen record", () => {
+    const r = Dict(Str, Str).parse({ "content-type": "application/json" });
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value["content-type"]).toBe("application/json");
+      expect(Object.isFrozen(r.value)).toBe(true);
+    }
+  });
+
+  it("rejects non-objects and bad values", () => {
+    expect(Dict(Str, Str).parse(null).isErr).toBe(true);
+    expect(Dict(Str, Str).parse({ k: 1 }).isErr).toBe(true);
+  });
+
+  it("is cached by inner references", () => {
+    expect(Dict(Str, Str)).toBe(Dict(Str, Str));
+  });
+});
+
+// ── ListOf -> ImmutableList ───────────────────────────────────────────────────
+
+describe("ListOf returns ImmutableList", () => {
+  class Tag extends TypeDef("Tag", Schema.string) {}
+
+  it("parses into an ImmutableList", () => {
+    const r = ListOf(Tag).parse(["a", "b"]);
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(typeof r.value.map).toBe("function");
+      expect(r.value.toMutable()).toEqual(["a", "b"]);
+      expect(r.value.append("c").toMutable()).toEqual(["a", "b", "c"]);
+      expect(r.value.toMutable()).toEqual(["a", "b"]); // original unchanged
+    }
+  });
+
+  it("rejects non-arrays and bad elements", () => {
+    expect(ListOf(Tag).parse("nope").isErr).toBe(true);
+    expect(ListOf(Tag).parse([1]).isErr).toBe(true);
+  });
+
+  it("is cached by inner reference", () => {
+    expect(ListOf(Tag)).toBe(ListOf(Tag));
+  });
+});
+
+// ── MapOf -> ImmutableHashMap ─────────────────────────────────────────────────
+
+describe("MapOf returns ImmutableHashMap", () => {
+  it("parses into an ImmutableHashMap", () => {
+    const r = MapOf(Str, Str).parse({ "content-type": "application/json" });
     expect(r.isOk).toBe(true);
     if (r.isOk) {
       expect(r.value.size).toBe(1);
@@ -276,19 +325,13 @@ describe("Dict returns ImmutableHashMap", () => {
     }
   });
 
-  it("parses an empty object", () => {
-    const r = Dict(Str, Str).parse({});
-    expect(r.isOk).toBe(true);
-    if (r.isOk) expect(r.value.size).toBe(0);
-  });
-
   it("rejects non-objects and bad values", () => {
-    expect(Dict(Str, Str).parse(null).isErr).toBe(true);
-    expect(Dict(Str, Str).parse({ k: 1 }).isErr).toBe(true);
+    expect(MapOf(Str, Str).parse(null).isErr).toBe(true);
+    expect(MapOf(Str, Str).parse({ k: 1 }).isErr).toBe(true);
   });
 
-  it("is still cached by inner references", () => {
-    expect(Dict(Str, Str)).toBe(Dict(Str, Str));
+  it("is cached by inner references", () => {
+    expect(MapOf(Str, Str)).toBe(MapOf(Str, Str));
   });
 });
 
@@ -297,8 +340,8 @@ describe("Dict returns ImmutableHashMap", () => {
 describe("composers nest with immutable-collection composers", () => {
   class Tag extends TypeDef("Tag", Schema.string) {}
 
-  it("Struct with a Vec field parses; field is an ImmutableList", () => {
-    class Post extends Struct({ tags: Vec(Tag), title: Str }) {}
+  it("Struct with a ListOf field parses; field is an ImmutableList", () => {
+    class Post extends Struct({ tags: ListOf(Tag), title: Str }) {}
     const r = Post.parse({ tags: ["a", "b"], title: "hi" });
     expect(r.isOk).toBe(true);
     if (r.isOk) {
@@ -308,8 +351,8 @@ describe("composers nest with immutable-collection composers", () => {
     }
   });
 
-  it("Struct with a Dict field parses; field is an ImmutableHashMap", () => {
-    class Cfg extends Struct({ headers: Dict(Str, Str) }) {}
+  it("Struct with a MapOf field parses; field is an ImmutableHashMap", () => {
+    class Cfg extends Struct({ headers: MapOf(Str, Str) }) {}
     const r = Cfg.parse({ headers: { "x-id": "1" } });
     expect(r.isOk).toBe(true);
     if (r.isOk) {
@@ -336,22 +379,36 @@ describe("composers nest with immutable-collection composers", () => {
     if (r.isOk) expect(r.value.inner.name).toBe("Ada");
   });
 
-  it("Vec(Vec(Int)) supports both index and .at() access", () => {
+  it("Vec(Vec(Int)) — frozen nested arrays support index access", () => {
     const r = Vec(Vec(Int)).parse([
       [1, 2],
       [3, 4],
     ]);
     expect(r.isOk).toBe(true);
     if (r.isOk) {
-      expect(r.value[0][1]).toBe(2); // index access works (inner list returned unwrapped)
+      expect(r.value[0][1]).toBe(2);
+      expect(r.value[1][0]).toBe(3);
+      expect(Object.isFrozen(r.value)).toBe(true);
+      expect(Object.isFrozen(r.value[0])).toBe(true);
+    }
+  });
+
+  it("ListOf(ListOf(Int)) — nested immutable lists, .at() returns Option", () => {
+    const r = ListOf(ListOf(Int)).parse([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(r.isOk).toBe(true);
+    if (r.isOk) {
+      expect(r.value[0][1]).toBe(2); // inner list returned unwrapped
       const row = r.value.at(1);
       expect(row.isSome).toBe(true);
       if (row.isSome) expect(row.value.at(0).isSome && row.value.at(0).value).toBe(3);
     }
   });
 
-  it("Dict(Str, Vec(Int)) exposes inner ImmutableList values", () => {
-    const r = Dict(Str, Vec(Int)).parse({ a: [1, 2] });
+  it("MapOf(Str, ListOf(Int)) exposes inner ImmutableList values", () => {
+    const r = MapOf(Str, ListOf(Int)).parse({ a: [1, 2] });
     expect(r.isOk).toBe(true);
     if (r.isOk) {
       const a = r.value.get("a");
