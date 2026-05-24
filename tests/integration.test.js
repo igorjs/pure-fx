@@ -27,6 +27,7 @@ const {
   Lazy,
   Task,
   isImmutable,
+  Immutable,
   ErrType,
   Program,
 } = await import("../dist/index.js");
@@ -233,7 +234,7 @@ describe("Lazy with Schema + Record", () => {
     expect(evalCount).toBe(0);
 
     const record = lazy.value;
-    expect(record.$immutable).toBe(true);
+    expect(Immutable.is(record)).toBe(true);
     expect(record.name).toBe("Alice");
     expect(evalCount).toBe(1);
 
@@ -350,8 +351,8 @@ describe("Nested Schema -> Record methods", () => {
       }).unwrap(),
     );
 
-    expect(user.$immutable).toBe(true);
-    expect(user.address.$immutable).toBe(true);
+    expect(Immutable.is(user)).toBe(true);
+    expect(Immutable.is(user.address)).toBe(true);
 
     const moved = user.set(u => u.address.city, "Sydney");
     expect(moved.address.city).toBe("Sydney");
@@ -641,7 +642,7 @@ describe("Program: Order Processing Pipeline", () => {
     const order = Record(parsed.unwrap());
     expect(isImmutable(order)).toBe(true);
     expect(isImmutable(order.customer)).toBe(true);
-    expect(order.items.$immutable).toBe(true);
+    expect(Immutable.is(order.items)).toBe(true);
   });
 
   it("tryCatch integration: wraps JSON.parse errors into ValidationError", () => {

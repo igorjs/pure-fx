@@ -66,9 +66,7 @@ export interface RecordMethods<T> {
   toJSON(): unknown;
   /** The frozen raw data underlying this record. */
   readonly $raw: DeepReadonly<T>;
-  /** Brand for runtime type checking via {@link isImmutable}. */
-  readonly $immutable: true;
-  /** Shared {@link IMMUTABLE} protocol brand. */
+  /** Shared {@link IMMUTABLE} protocol brand (runtime type checking). */
   readonly [IMMUTABLE]: true;
 }
 
@@ -210,10 +208,6 @@ const buildShapeClass = (keys: readonly string[]): (new (raw: object) => any) =>
     enumerable: false,
   });
 
-  Object.defineProperty(proto, "$immutable", {
-    value: true,
-    enumerable: false,
-  });
   Object.defineProperty(proto, IMMUTABLE, {
     value: true,
     enumerable: false,

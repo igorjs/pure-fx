@@ -16,6 +16,8 @@
  *   - **Deep equality** (`deepEqual`) for `Record.equals()` / `List.equals()`
  */
 
+import { IMMUTABLE } from "./immutable.js";
+
 /** @internal JavaScript primitive types (non-object, non-function). */
 export type Primitive = string | number | boolean | bigint | symbol | undefined | null;
 
@@ -78,7 +80,7 @@ export const isWrappable = (val: unknown): val is Record<string, unknown> => {
   // typeof check. Typed arrays, Maps, Sets, and class instances fall out via
   // the prototype test below (they are neither plain objects nor arrays).
   if (val === null || typeof val !== "object") return false;
-  if ((val as { $immutable?: unknown }).$immutable === true) return false;
+  if ((val as Record<symbol, unknown>)[IMMUTABLE] === true) return false;
   const proto = Object.getPrototypeOf(val);
   return proto === Object.prototype || proto === null || Array.isArray(val);
 };
@@ -120,7 +122,7 @@ export const deepFreezeRaw = (obj: unknown): void => {
   // Pure-fx immutables (ImmutableList/ImmutableRecord proxies) manage their own
   // immutability; calling Object.freeze on them trips their write-guarding
   // traps. Treat them as opaque leaves.
-  if ((obj as { $immutable?: unknown }).$immutable === true) return;
+  if ((obj as Record<symbol, unknown>)[IMMUTABLE] === true) return;
   Object.freeze(obj);
   const keys = Object.keys(obj);
   // biome-ignore lint/style/useForOf: recursive hot-path during Record creation

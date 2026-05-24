@@ -86,9 +86,7 @@ export interface ListMethods<T> {
   produce(recipe: (draft: T[]) => void): ImmutableList<T>;
   /** The frozen raw array underlying this list. */
   readonly $raw: ReadonlyArray<DeepReadonly<T>>;
-  /** Brand for runtime type checking via {@link isImmutable}. */
-  readonly $immutable: true;
-  /** Shared {@link IMMUTABLE} protocol brand. */
+  /** Shared {@link IMMUTABLE} protocol brand (runtime type checking). */
   readonly [IMMUTABLE]: true;
 }
 
@@ -147,7 +145,6 @@ const LIST_METHOD_KEYS = new Set([
   "toJSON",
   "produce",
   "$raw",
-  "$immutable",
 ]);
 
 /** Pre-built method objects keyed by raw array. One per list instance. */
@@ -279,7 +276,6 @@ const buildListMethods = <T>(raw: readonly T[]): ListMethods<T> => ({
   get $raw() {
     return raw as ReadonlyArray<DeepReadonly<T>>;
   },
-  $immutable: true as const,
   [IMMUTABLE]: true as const,
 });
 

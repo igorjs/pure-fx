@@ -27,6 +27,7 @@ const {
   Option,
   Task,
   List,
+  Immutable,
   ErrType,
   pipe,
 } = await import("../dist/index.js");
@@ -1627,8 +1628,8 @@ describe("List.groupBy", () => {
     const list = List([1, 2, 3]);
     const groups = list.groupBy(n => (n % 2 === 0 ? "even" : "odd"));
 
-    expect(groups.odd.$immutable).toBe(true);
-    expect(groups.even.$immutable).toBe(true);
+    expect(Immutable.is(groups.odd)).toBe(true);
+    expect(Immutable.is(groups.even)).toBe(true);
   });
 });
 

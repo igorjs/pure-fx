@@ -26,6 +26,7 @@ const {
   Lazy,
   Task,
   isImmutable,
+  Immutable,
   ErrType,
   Program,
 } = await import("../dist/index.js");
@@ -53,7 +54,7 @@ describe("Record", () => {
   });
 
   it("nested objects are full Records", () => {
-    expect(user.address.$immutable).toBe(true);
+    expect(Immutable.is(user.address)).toBe(true);
     expect(typeof user.address.set).toBe("function");
     expect(typeof user.address.update).toBe("function");
     expect(typeof user.address.produce).toBe("function");
@@ -156,8 +157,8 @@ describe("Record", () => {
     expect(json.name).toBe("John Doe");
   });
 
-  it("$immutable brand", () => {
-    expect(user.$immutable).toBe(true);
+  it("IMMUTABLE brand", () => {
+    expect(Immutable.is(user)).toBe(true);
     expect(isImmutable(user)).toBe(true);
     expect(isImmutable({})).toBe(false);
   });
@@ -185,7 +186,7 @@ describe("Record", () => {
 
   it("empty Record", () => {
     const empty = Record({});
-    expect(empty.$immutable).toBe(true);
+    expect(Immutable.is(empty)).toBe(true);
     expect(empty.toJSON()).toEqual({});
     expect(empty.equals(Record({}))).toBe(true);
   });
@@ -266,7 +267,7 @@ describe("List", () => {
       { id: "u2", name: "Gislaine" },
     ]);
     expect(users[0].name).toBe("John Doe");
-    expect(users[0].$immutable).toBe(true);
+    expect(Immutable.is(users[0])).toBe(true);
   });
 
   it("empty List", () => {
