@@ -40,6 +40,10 @@ export type { ResultMatcher } from "../core/result.js";
 
 /** Algebraic data type constructor with exhaustive matching. */
 export { ADT } from "./adt.js";
+/** Shared protocol brand + helpers for immutable value types. */
+export { IMMUTABLE, Immutable } from "./immutable.js";
+/** Structural immutable-value protocol interface (supports copy-on-write `produce`). */
+export type { Producible } from "./immutable.js";
 /** Persistent immutable hash map backed by a HAMT. */
 export { HashMap } from "./hash-map.js";
 /** An immutable hash map instance with get, set, delete, and functional methods. */

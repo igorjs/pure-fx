@@ -141,6 +141,10 @@ export { Codec } from "./data/codec.js";
 export type { CodecType } from "./data/codec.js";
 /** Check whether a value is an ImmutableRecord or ImmutableList. */
 export { isImmutable } from "./data/constructors.js";
+/** Shared protocol brand + helpers for immutable value types. */
+export { IMMUTABLE, Immutable } from "./data/immutable.js";
+/** Structural immutable-value protocol interface (supports copy-on-write `produce`). */
+export type { Producible } from "./data/immutable.js";
 /** Create an immutable list from an array of items. */
 export { List } from "./data/constructors.js";
 /** Create an immutable record from a plain object. */

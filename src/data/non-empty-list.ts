@@ -21,7 +21,8 @@ import type { Eq } from "../core/eq.js";
 import type { Option } from "../core/option.js";
 import { None, Some } from "../core/option.js";
 import type { Ord } from "../core/ord.js";
-import type { DeepReadonly } from "./internals.js";
+import { IMMUTABLE } from "./immutable.js";
+import { type DeepReadonly, revocableDraft } from "./internals.js";
 import { createListProxy, type ImmutableList, type ListBase } from "./list.js";
 
 // ── NonEmptyList methods ────────────���───────────────────────────────────────
@@ -70,17 +71,24 @@ export interface NonEmptyListMethods<T> {
   /** Return a sub-range as ImmutableList (may be empty). */
   slice(start?: number, end?: number): ImmutableList<T>;
   /** Structural deep equality. */
-  equals(other: NonEmptyList<T>): boolean;
+  equals(other: unknown): boolean;
   /** Deep mutable clone. */
   toMutable(): T[];
   /** JSON-safe output. */
   toJSON(): unknown;
   /** Convert to a regular ImmutableList. */
   toList(): ImmutableList<T>;
+  /**
+   * Copy-on-write edit via a revocable array draft. Throws if the recipe leaves
+   * the list empty (the non-empty invariant must hold).
+   */
+  produce(recipe: (draft: T[]) => void): NonEmptyList<T>;
   /** The frozen raw array underlying this list. */
   readonly $raw: ReadonlyArray<DeepReadonly<T>>;
   /** Brand for runtime type checking. */
   readonly $immutable: true;
+  /** Shared {@link IMMUTABLE} protocol brand. */
+  readonly [IMMUTABLE]: true;
   /** Non-empty brand. */
   readonly $nonEmpty: true;
 }
@@ -181,7 +189,7 @@ const createNonEmptyList = <T>(raw: readonly T[]): NonEmptyList<T> => {
     slice(start?: number, end?: number): ImmutableList<T> {
       return createListProxy(raw.slice(start, end));
     },
-    equals(other: NonEmptyList<T>): boolean {
+    equals(other: unknown): boolean {
       // Why: NonEmptyList wraps ImmutableList. The inner equals() expects
       // ImmutableList, but other is NonEmptyList (a supertype via Proxy).
       return inner.equals(other as unknown as ImmutableList<T>);
@@ -195,10 +203,19 @@ const createNonEmptyList = <T>(raw: readonly T[]): NonEmptyList<T> => {
     toList(): ImmutableList<T> {
       return inner;
     },
+    produce(recipe: (draft: T[]) => void): NonEmptyList<T> {
+      const copy = raw.slice() as T[];
+      revocableDraft(copy, recipe);
+      if (copy.length === 0) {
+        throw new TypeError("NonEmptyList.produce: recipe left the list empty");
+      }
+      return createNonEmptyList(copy);
+    },
     get $raw(): ReadonlyArray<DeepReadonly<T>> {
       return raw as ReadonlyArray<DeepReadonly<T>>;
     },
     $immutable: true as const,
+    [IMMUTABLE]: true as const,
     $nonEmpty: true as const,
   };
 
