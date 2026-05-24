@@ -85,9 +85,7 @@ export interface NonEmptyListMethods<T> {
   produce(recipe: (draft: T[]) => void): NonEmptyList<T>;
   /** The frozen raw array underlying this list. */
   readonly $raw: ReadonlyArray<DeepReadonly<T>>;
-  /** Brand for runtime type checking. */
-  readonly $immutable: true;
-  /** Shared {@link IMMUTABLE} protocol brand. */
+  /** Shared {@link IMMUTABLE} protocol brand (runtime type checking). */
   readonly [IMMUTABLE]: true;
   /** Non-empty brand. */
   readonly $nonEmpty: true;
@@ -214,7 +212,6 @@ const createNonEmptyList = <T>(raw: readonly T[]): NonEmptyList<T> => {
     get $raw(): ReadonlyArray<DeepReadonly<T>> {
       return raw as ReadonlyArray<DeepReadonly<T>>;
     },
-    $immutable: true as const,
     [IMMUTABLE]: true as const,
     $nonEmpty: true as const,
   };
