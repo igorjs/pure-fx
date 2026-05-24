@@ -73,7 +73,11 @@ export const isObjectLike = (val: unknown): val is Record<string | symbol, unkno
  * re-wrapped (or, for proxy-backed immutables, throwing when frozen/redefined).
  */
 export const isWrappable = (val: unknown): val is Record<string, unknown> => {
-  if (!isObjectLike(val)) return false;
+  // Fast primitive reject inlined (not via isObjectLike) — this runs on every
+  // Record field get and List index access, so the hot path stays a single
+  // typeof check. Typed arrays, Maps, Sets, and class instances fall out via
+  // the prototype test below (they are neither plain objects nor arrays).
+  if (val === null || typeof val !== "object") return false;
   if ((val as { $immutable?: unknown }).$immutable === true) return false;
   const proto = Object.getPrototypeOf(val);
   return proto === Object.prototype || proto === null || Array.isArray(val);
