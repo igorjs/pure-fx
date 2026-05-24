@@ -14,6 +14,8 @@ export {
   Dict,
   Either,
   type EitherValue,
+  ListOf,
+  MapOf,
   Maybe,
   Pair,
   Struct,

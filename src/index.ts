@@ -489,6 +489,10 @@ export type { EitherValue } from "./types/runtime/composers.js";
 export { Maybe } from "./types/runtime/composers.js";
 /** 2-tuple composer. */
 export { Pair } from "./types/runtime/composers.js";
+/** Homogeneous-array composer returning a pure-fx `ImmutableList`. */
+export { ListOf } from "./types/runtime/composers.js";
+/** String-keyed record composer returning a pure-fx `ImmutableHashMap`. */
+export { MapOf } from "./types/runtime/composers.js";
 /** Heterogeneous object composer over named TypeDefs (returns `ImmutableRecord`). */
 export { Struct } from "./types/runtime/composers.js";
 /** Fixed-length n-tuple composer. */

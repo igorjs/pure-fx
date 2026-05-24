@@ -64,6 +64,8 @@ const pairMemo = makeMemo2<unknown>();
 const dictMemo = makeMemo2<unknown>();
 const maybeMemo = makeMemo1<unknown>();
 const eitherMemo = makeMemo2<unknown>();
+const listOfMemo = makeMemo1<unknown>();
+const mapOfMemo = makeMemo2<unknown>();
 
 // Why: TypeDef.parse runs schema.parse(input), which (for composers) returns
 // arrays/objects we want to freeze before handing back to the caller. The
@@ -76,20 +78,21 @@ const deepFreezeT = <T>(value: T): T => {
 // ── Vec(T) ────────────────────────────────────────────────────────────────────
 
 /**
- * Build a {@link TypeDef} class that validates a homogeneous array and returns
- * an immutable {@link ImmutableList}.
+ * Build a {@link TypeDef} class that validates a homogeneous array, returning a
+ * deep-frozen `readonly T[]` snapshot.
  *
- * Element brand survives: a parsed `Vec(Email)` yields an
- * `ImmutableList<Type<'Email', string>>`. The list is immutable — `append`,
- * `map`, etc. return new lists.
+ * Pushing, splicing, or mutating elements raises a `TypeError`. Element brand
+ * survives: indexing into a parsed `Vec(Email)` yields `Type<'Email', string>`.
+ * For a pure-fx {@link ImmutableList} with a functional API + copy-on-write
+ * `produce`, use {@link ListOf} instead.
  *
  * @example
  * ```ts
  * class UserIds extends Vec(UserId) {}
  * const r = UserIds.parse(['u_001', 'u_002']);
  * if (r.isOk) {
- *   r.value.toArray()       // [Type<'UserId', string>, ...]
- *   r.value.append('u_003') // new ImmutableList
+ *   r.value[0]              // Type<'UserId', string>
+ *   r.value.push('u_003');  // throws (frozen)
  * }
  * ```
  *
@@ -99,12 +102,11 @@ export const Vec = <Tag extends string, T>(inner: TypeDefStatic<Tag, T>) =>
   vecMemo(inner as unknown as object, () =>
     TypeDef(
       `Vec<${inner.tag}>` as const,
-      // Why: Schema.array(inner.schema) yields readonly T[] structurally; the
-      // brand is a phantom only, so the runtime value is the underlying array,
-      // wrapped in an ImmutableList for an immutable, functional surface.
-      Schema.array(inner.schema).transform(arr => List(arr as readonly Type<Tag, T>[])),
+      // Why: Schema.array yields readonly T[] structurally; the brand is a
+      // phantom only, so the runtime value is a deep-frozen array snapshot.
+      Schema.array(inner.schema).transform(arr => deepFreezeT(arr as readonly Type<Tag, T>[])),
     ),
-  ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, ImmutableList<Type<Tag, T>>>>;
+  ) as ReturnType<typeof TypeDef<`Vec<${Tag}>`, readonly Type<Tag, T>[]>>;
 
 // ── Pair(A, B) ────────────────────────────────────────────────────────────────
 
@@ -179,8 +181,11 @@ export const Tuple = <Items extends readonly TypeDefStatic<string, unknown>[]>(.
  * ```ts
  * class Headers extends Dict(Str, Str) {}
  * const r = Headers.parse({ 'content-type': 'application/json' });
- * if (r.isOk) r.value.get('content-type'); // Option<Type<'Str', string>>
+ * if (r.isOk) r.value['content-type']; // Type<'Str', string>
  * ```
+ *
+ * For a pure-fx {@link ImmutableHashMap} (functional API + `produce`), use
+ * {@link MapOf} instead.
  */
 export const Dict = <KTag extends string, K extends string, VTag extends string, V>(
   key: TypeDefStatic<KTag, K>,
@@ -189,15 +194,66 @@ export const Dict = <KTag extends string, K extends string, VTag extends string,
   dictMemo(key as unknown as object, value as unknown as object, () =>
     TypeDef(
       `Dict<${key.tag},${value.tag}>` as const,
-      // Why: Schema.record yields a plain record structurally; wrap it in an
-      // ImmutableHashMap for an immutable, functional surface. Keys are
-      // string-coerced at runtime; the key brand is phantom-only.
+      // Why: Schema.record yields a plain record structurally; deep-freeze it
+      // into a snapshot. Keys are string-coerced; the key brand is phantom-only.
+      Schema.record(value.schema).transform(obj =>
+        deepFreezeT(obj as Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>),
+      ),
+    ),
+  ) as ReturnType<
+    typeof TypeDef<`Dict<${KTag},${VTag}>`, Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>>
+  >;
+
+// ── ListOf(T) ───────────────────────────────────────────────────────────────
+
+/**
+ * Like {@link Vec}, but returns a pure-fx {@link ImmutableList} (functional API
+ * + copy-on-write `produce`) instead of a frozen array.
+ *
+ * @example
+ * ```ts
+ * class UserIds extends ListOf(UserId) {}
+ * const r = UserIds.parse(['u_001']);
+ * if (r.isOk) r.value.append('u_002'); // new ImmutableList
+ * ```
+ */
+export const ListOf = <Tag extends string, T>(inner: TypeDefStatic<Tag, T>) =>
+  listOfMemo(inner as unknown as object, () =>
+    TypeDef(
+      `ListOf<${inner.tag}>` as const,
+      Schema.array(inner.schema).transform(arr => List(arr as readonly Type<Tag, T>[])),
+    ),
+  ) as ReturnType<typeof TypeDef<`ListOf<${Tag}>`, ImmutableList<Type<Tag, T>>>>;
+
+// ── MapOf(K, V) ───────────────────────────────────────────────────────────────
+
+/**
+ * Like {@link Dict}, but returns a pure-fx {@link ImmutableHashMap} (functional
+ * API + copy-on-write `produce`) instead of a frozen object.
+ *
+ * @example
+ * ```ts
+ * class Headers extends MapOf(Str, Str) {}
+ * const r = Headers.parse({ 'content-type': 'application/json' });
+ * if (r.isOk) r.value.get('content-type'); // Option<Type<'Str', string>>
+ * ```
+ */
+export const MapOf = <KTag extends string, K extends string, VTag extends string, V>(
+  key: TypeDefStatic<KTag, K>,
+  value: TypeDefStatic<VTag, V>,
+) =>
+  mapOfMemo(key as unknown as object, value as unknown as object, () =>
+    TypeDef(
+      `MapOf<${key.tag},${value.tag}>` as const,
       Schema.record(value.schema).transform(obj =>
         HashMap.fromObject(obj as Readonly<Record<string, Type<VTag, V>>>),
       ),
     ),
   ) as ReturnType<
-    typeof TypeDef<`Dict<${KTag},${VTag}>`, ImmutableHashMap<Type<KTag, K> & string, Type<VTag, V>>>
+    typeof TypeDef<
+      `MapOf<${KTag},${VTag}>`,
+      ImmutableHashMap<Type<KTag, K> & string, Type<VTag, V>>
+    >
   >;
 
 // ── Maybe(T) ──────────────────────────────────────────────────────────────────
