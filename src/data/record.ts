@@ -212,10 +212,6 @@ const buildShapeClass = (keys: readonly string[]): (new (raw: object) => any) =>
     value: true,
     enumerable: false,
   });
-  Object.defineProperty(proto, IMMUTABLE, {
-    value: true,
-    enumerable: false,
-  });
 
   // ── Data getters + throwing setters on prototype ──
   // Getters on prototype → V8 creates one hidden class for the shape,
