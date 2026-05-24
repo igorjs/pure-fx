@@ -16,7 +16,9 @@
 import type { Eq } from "../../core/eq.js";
 import { None, type Option, Some } from "../../core/option.js";
 import type { Ord } from "../../core/ord.js";
+import { IMMUTABLE, type Immutable } from "../../data/immutable.js";
 import { Schema, type SchemaType } from "../../data/schema.js";
+import { Duration } from "../duration.js";
 import type { Type } from "../nominal.js";
 import { TypeDef } from "../type-def.js";
 
@@ -50,12 +52,16 @@ const isZoned = (t: TemporalInstant | TemporalZonedLike): t is TemporalZonedLike
  * `Date`-based conversions are millisecond-precision; full nanosecond fidelity
  * is preserved in {@link epochNanos} and via {@link toTemporal}.
  */
-export class DateTimeValue {
+export class DateTimeValue implements Immutable<Date> {
   /** Nanoseconds since the Unix epoch (UTC). */
   readonly epochNanos: bigint;
 
+  /** Shared {@link IMMUTABLE} protocol brand (defined in the constructor). */
+  declare readonly [IMMUTABLE]: true;
+
   private constructor(epochNanos: bigint) {
     this.epochNanos = epochNanos;
+    Object.defineProperty(this, IMMUTABLE, { value: true, enumerable: false });
     Object.freeze(this);
   }
 
@@ -105,6 +111,16 @@ export class DateTimeValue {
     return this.toDate().toISOString();
   }
 
+  /** JSON-safe output: the ISO-8601 string. */
+  toJSON(): string {
+    return this.toISO();
+  }
+
+  /** A fresh mutable `Date` (millisecond precision). Mutating it never affects this value. */
+  toMutable(): Date {
+    return this.toDate();
+  }
+
   /**
    * A `Temporal.Instant` (full nanosecond precision) when `globalThis.Temporal`
    * is available, else `None`. Never throws.
@@ -114,9 +130,35 @@ export class DateTimeValue {
     return T ? Some(T.Instant.fromEpochNanoseconds(this.epochNanos)) : None;
   }
 
-  /** Instant equality. */
-  equals(other: DateTimeValue): boolean {
-    return this.epochNanos === other.epochNanos;
+  // ── Copy-on-write modifiers (always return a new value) ──────────────────────
+
+  /** A new value advanced by `d`. */
+  plus(d: Duration): DateTimeValue {
+    return DateTimeValue.fromEpochNanos(
+      this.epochNanos + BigInt(Duration.toMilliseconds(d)) * NS_PER_MS,
+    );
+  }
+
+  /** A new value moved back by `d`. */
+  minus(d: Duration): DateTimeValue {
+    return DateTimeValue.fromEpochNanos(
+      this.epochNanos - BigInt(Duration.toMilliseconds(d)) * NS_PER_MS,
+    );
+  }
+
+  /** A new value at the given epoch milliseconds. */
+  withEpochMillis(ms: number): DateTimeValue {
+    return DateTimeValue.fromEpochMillis(ms);
+  }
+
+  /** A new value at the given epoch nanoseconds. */
+  withEpochNanos(ns: bigint): DateTimeValue {
+    return DateTimeValue.fromEpochNanos(ns);
+  }
+
+  /** Instant equality. Non-DateTimeValue operands return false. */
+  equals(other: unknown): boolean {
+    return other instanceof DateTimeValue && this.epochNanos === other.epochNanos;
   }
 
   /** Compare by instant: -1, 0, or 1. */

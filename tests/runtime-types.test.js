@@ -14,7 +14,9 @@ import {
   DateTime,
   DateTimeValue,
   Dict,
+  Duration,
   HashMap,
+  Immutable,
   Int,
   isImmutable,
   List,
@@ -467,4 +469,35 @@ it("isImmutable recognises both ImmutableList and ImmutableRecord", () => {
   expect(isImmutable([1, 2])).toBe(false);
   expect(isImmutable({ a: 1 })).toBe(false);
   expect(isImmutable(null)).toBe(false);
+});
+
+// ── DateTimeValue: Immutable protocol + copy-on-write modifiers ───────────────
+
+describe("DateTimeValue is an Immutable value with modifiers", () => {
+  const t = DateTimeValue.fromEpochMillis(1_700_000_000_000);
+
+  it("carries the brand, toJSON, and a fresh-Date toMutable", () => {
+    expect(Immutable.is(t)).toBe(true);
+    expect(t.toJSON()).toBe("2023-11-14T22:13:20.000Z");
+    const d = t.toMutable();
+    expect(d instanceof Date).toBe(true);
+    d.setFullYear(2000); // mutate the copy
+    expect(t.toEpochMillis()).toBe(1_700_000_000_000); // source unchanged
+    expect(t.toMutable()).not.toBe(t.toMutable()); // fresh each call
+  });
+
+  it("plus/minus/withEpoch* return new values, original unchanged", () => {
+    const t2 = t.plus(Duration.hours(1));
+    expect(t2.toEpochMillis()).toBe(1_700_000_000_000 + 3_600_000);
+    expect(t.toEpochMillis()).toBe(1_700_000_000_000);
+    expect(t.minus(Duration.hours(1)).toEpochMillis()).toBe(1_700_000_000_000 - 3_600_000);
+    expect(t.withEpochMillis(0).toEpochMillis()).toBe(0);
+    expect(t.withEpochNanos(5n).epochNanos).toBe(5n);
+  });
+
+  it("equals returns false for non-DateTimeValue operands", () => {
+    expect(t.equals(t)).toBe(true);
+    expect(t.equals(123)).toBe(false);
+    expect(t.equals(null)).toBe(false);
+  });
 });
