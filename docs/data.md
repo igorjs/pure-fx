@@ -2,6 +2,38 @@
 
 Immutable data structures, validation, and algebraic data types.
 
+## Immutable protocol
+
+`Record`, `List`, `HashMap`, `NonEmptyList`, and `DateTimeValue` share one
+protocol. Every such value is runtime-frozen and carries a non-enumerable
+`Symbol` brand (`IMMUTABLE`); the only way to derive a changed value is `produce`
+or a functional method that returns a **new** frozen value.
+
+```ts
+import { Immutable, List, Record } from '@igorjs/pure-fx'
+
+Immutable.is(List([1, 2]));   // true
+Immutable.is({});             // false
+Immutable.equals(a, b);       // brand-aware: a.equals(b) for immutables, else Object.is
+
+// Copy-on-write via a revocable draft:
+const r2 = Record({ a: 1 }).produce(d => { d.a = 9; });   // new ImmutableRecord
+const l2 = List([1, 2]).produce(d => { d.push(3); });      // new ImmutableList
+```
+
+- **`Immutable<TMut>`** — the base contract: the `IMMUTABLE` brand, `equals(other)`,
+  `toJSON()`, and `toMutable()` (a fresh deeply-mutable copy: `Record`→object,
+  `List`→array, `HashMap`→`Map`, `DateTimeValue`→`Date`).
+- **`Producible<TMut>`** — extends it with `produce(recipe)`. The recipe receives a
+  mutable draft; it is **revoked when the recipe returns**, so capturing the draft
+  and using it afterward throws. `Record`/`List`/`HashMap`/`NonEmptyList` are
+  `Producible`; `DateTimeValue` is `Immutable` only (use its `plus`/`minus`/`with*`
+  modifiers).
+- **`Immutable` namespace** — `Immutable.is`, `Immutable.equals`, `Immutable.produce`.
+
+`Vec`/`Dict` (from [types](types.md)) return frozen native snapshots and are *not*
+protocol members; their collection counterparts `ListOf`/`MapOf` are.
+
 ## Record
 
 Deeply frozen immutable objects with typed updates.
