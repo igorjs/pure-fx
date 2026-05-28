@@ -276,31 +276,29 @@ const commits = rawLog
 const sections = [];
 const uncategorized = [];
 
+const hasPrefix = (msg, prefix) =>
+  msg.startsWith(`${prefix}:`) ||
+  msg.startsWith(`${prefix}(`) ||
+  msg.startsWith(`${prefix}!`);
+
 for (const cat of CATEGORIES) {
-  const matching = commits.filter((c) => {
-    const msg = c.slice(c.indexOf(" ") + 1);
-    return msg.startsWith(`${cat.prefix}:`) || msg.startsWith(`${cat.prefix}(`);
-  });
+  const matching = commits.filter((c) => hasPrefix(c.slice(c.indexOf(" ") + 1), cat.prefix));
   if (matching.length > 0) {
     sections.push({
       label: cat.label,
       items: matching.map((c) => {
         const hash = c.slice(0, c.indexOf(" "));
         const msg = c.slice(c.indexOf(" ") + 1);
-        // Strip the type prefix for cleaner display
-        const clean = msg.replace(/^\w+(\([^)]*\))?:\s*/, "");
+        const clean = msg.replace(/^\w+(\([^)]*\))?!?:\s*/, "");
         return `- ${clean} (${hash})`;
       }),
     });
   }
 }
 
-// Commits that don't match any conventional prefix
 for (const c of commits) {
   const msg = c.slice(c.indexOf(" ") + 1);
-  const matched = CATEGORIES.some(
-    (cat) => msg.startsWith(`${cat.prefix}:`) || msg.startsWith(`${cat.prefix}(`),
-  );
+  const matched = CATEGORIES.some((cat) => hasPrefix(msg, cat.prefix));
   if (!matched) {
     const hash = c.slice(0, c.indexOf(" "));
     uncategorized.push(`- ${msg} (${hash})`);
@@ -337,12 +335,12 @@ const keepSections = [];
 for (const cat of CHANGELOG_CATEGORIES) {
   const matching = commits.filter((c) => {
     const msg = c.slice(c.indexOf(" ") + 1);
-    return cat.prefixes.some((p) => msg.startsWith(`${p}:`) || msg.startsWith(`${p}(`));
+    return cat.prefixes.some((p) => hasPrefix(msg, p));
   });
   if (matching.length === 0) continue;
   const entries = matching.map((c) => {
     const msg = c.slice(c.indexOf(" ") + 1);
-    const clean = msg.replace(/^\w+(\([^)]*\))?:\s*/, "");
+    const clean = msg.replace(/^\w+(\([^)]*\))?!?:\s*/, "");
     return `- ${clean.charAt(0).toUpperCase()}${clean.slice(1)}`;
   });
   keepSections.push(`### ${cat.label}\n${entries.join("\n")}`);
