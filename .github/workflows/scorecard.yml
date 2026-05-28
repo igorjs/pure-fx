@@ -32,6 +32,21 @@ jobs:
     steps:
       - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
+          # Kept on audit (not block) — scorecard's egress includes
+          # regional GitHub Actions backend endpoints that rotate per
+          # runner placement: `run-actions-<N>-azure-<region>.actions
+          # .githubusercontent.com` and `productionresultssa<N>.blob
+          # .core.windows.net`. harden-runner's allowed-endpoints has
+          # no wildcard support, so a strict block-mode allowlist would
+          # break scorecard runs that land on a different region than
+          # the one we sampled. Audit mode still enforces the global
+          # blocklist of known-compromised C2/exfil endpoints (the
+          # primary supply-chain protection); block-mode would add
+          # protection against exfil to legitimate-but-unexpected
+          # endpoints, but the regional rotation risk outweighs the
+          # marginal benefit for this workflow. Reassess if step-
+          # security adds wildcard support or publishes a stable
+          # scorecard-action allowlist.
           egress-policy: audit
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
