@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner: cross-language vulnerability scan against the GitHub
+# Advisory Database. Auto-detects package manifests at the repo root
+# (Cargo.lock, package-lock.json, requirements.txt, go.sum, etc.) and
+# flags any known CVEs in transitive dependencies.
+#
+# For repos with no traditional package manifest (Terraform, bash, raw
+# Markdown), the scanner produces an empty report; harmless to keep
+# enabled.
+
+name: osv-scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * 1"  # weekly Monday 04:00 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: osv-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # upload SARIF
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: google/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+        with:
+          scan-args: |-
+            --recursive
+            --skip-git
+            ./
