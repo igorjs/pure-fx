@@ -42,6 +42,7 @@ jobs:
 
             const missing = [];
             for (const c of commits.data) {
+              if (c.author?.type === 'Bot') continue;
               const msg = c.commit.message || '';
               if (!msg.includes('Signed-off-by:')) {
                 missing.push(c.sha.substring(0, 7));
