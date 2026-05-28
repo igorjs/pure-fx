@@ -34,7 +34,25 @@ jobs:
     steps:
       - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          egress-policy: audit
+          # Block-mode allowlist derived from audit telemetry on a
+          # known-good pure-fx run (run 26576056664). The set is small
+          # and stable: checkout source, OSV-Scanner API, optional SARIF
+          # upload, harden-runner control plane + telemetry, GitHub
+          # Actions result receiver. ghcr.io is required because
+          # google/osv-scanner-action is a Docker action; the image pull
+          # itself happens before harden-runner activates, but cached
+          # pulls and downstream calls still go through the policy.
+          egress-policy: block
+          allowed-endpoints: >
+            agent.api.stepsecurity.io:443
+            api.github.com:443
+            api.osv.dev:443
+            codeload.github.com:443
+            ghcr.io:443
+            github.com:443
+            pkg-containers.githubusercontent.com:443
+            prod.app-api.stepsecurity.io:443
+            results-receiver.actions.githubusercontent.com:443
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -42,4 +60,5 @@ jobs:
         with:
           scan-args: |-
             --recursive
+            --skip-git
             ./
