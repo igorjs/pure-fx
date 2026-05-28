@@ -23,6 +23,9 @@ jobs:
       (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
        contains(github.event.comment.body, 'I hereby sign the CLA'))
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: main
@@ -42,7 +45,16 @@ jobs:
 
             const missing = [];
             for (const c of commits.data) {
-              if (c.author?.type === 'Bot') continue;
+              // Skip bot-authored commits. auto-update-pr.yml,
+              // dependabot, and the igorjs App create merge / sync
+              // commits via the GitHub API that can't carry a
+              // Signed-off-by trailer; gating on them would block
+              // every PR the auto-updater touches. Mirrors Probot
+              // DCO behaviour. Check both author and committer
+              // because merge commits have a separate committer.
+              if (c.author?.type === 'Bot' || c.committer?.type === 'Bot') {
+                continue;
+              }
               const msg = c.commit.message || '';
               if (!msg.includes('Signed-off-by:')) {
                 missing.push(c.sha.substring(0, 7));
