@@ -16,6 +16,8 @@
  *   - **Deep equality** (`deepEqual`) for `Record.equals()` / `List.equals()`
  */
 
+import { IMMUTABLE } from "./immutable.js";
+
 /** @internal JavaScript primitive types (non-object, non-function). */
 export type Primitive = string | number | boolean | bigint | symbol | undefined | null;
 
@@ -61,6 +63,55 @@ export const isObjectLike = (val: unknown): val is Record<string | symbol, unkno
   val !== null && typeof val === "object" && !ArrayBuffer.isView(val);
 
 /**
+ * Check whether `val` is a nested value that should be lazily wrapped as a child
+ * `ImmutableRecord` on access: a plain object (prototype `Object.prototype` or
+ * `null`) or a plain array.
+ *
+ * Excludes pure-fx immutables (`ImmutableList`/`ImmutableRecord`, detected via
+ * the `$immutable` marker) and other class instances (`ImmutableHashMap`,
+ * `DateTimeValue`, `Map`, `Set`, ...), which are returned as-is. This lets
+ * collections compose — e.g. a `Record`/`Struct` field holding a `List`,
+ * `HashMap`, or `DateTimeValue` is passed through untouched rather than being
+ * re-wrapped (or, for proxy-backed immutables, throwing when frozen/redefined).
+ */
+export const isWrappable = (val: unknown): val is Record<string, unknown> => {
+  // Fast primitive reject inlined (not via isObjectLike) — this runs on every
+  // Record field get and List index access, so the hot path stays a single
+  // typeof check. Typed arrays, Maps, Sets, and class instances fall out via
+  // the prototype test below (they are neither plain objects nor arrays).
+  if (val === null || typeof val !== "object") return false;
+  if ((val as Record<symbol, unknown>)[IMMUTABLE] === true) return false;
+  const proto = Object.getPrototypeOf(val);
+  return proto === Object.prototype || proto === null || Array.isArray(val);
+};
+
+/**
+ * Run `recipe` against a revocable Proxy over `target`, then revoke it so a
+ * leaked draft throws on any later use. Returns `target` (mutated in place by
+ * the recipe) for the caller to rebuild into a frozen value.
+ *
+ * This gives the mutable draft a scope-bounded lifetime — the borrow-checker-
+ * style guarantee that prevents capturing a draft and mutating it after
+ * `produce` has returned.
+ */
+export const revocableDraft = <T extends object>(target: T, recipe: (draft: T) => void): T => {
+  const { proxy, revoke } = Proxy.revocable(target, {
+    // Bind methods to the real target so built-ins that rely on internal slots
+    // (Map/Set/Date) work through the proxy; data props pass through unchanged.
+    get(t, prop) {
+      const value = Reflect.get(t, prop, t);
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(t) : value;
+    },
+  });
+  try {
+    recipe(proxy as T);
+  } finally {
+    revoke();
+  }
+  return target;
+};
+
+/**
  * Recursively freeze an object and all nested properties.
  *
  * Skips already-frozen objects to avoid redundant work.
@@ -68,6 +119,10 @@ export const isObjectLike = (val: unknown): val is Record<string | symbol, unkno
  */
 export const deepFreezeRaw = (obj: unknown): void => {
   if (!isObjectLike(obj) || Object.isFrozen(obj)) return;
+  // Pure-fx immutables (ImmutableList/ImmutableRecord proxies) manage their own
+  // immutability; calling Object.freeze on them trips their write-guarding
+  // traps. Treat them as opaque leaves.
+  if ((obj as Record<symbol, unknown>)[IMMUTABLE] === true) return;
   Object.freeze(obj);
   const keys = Object.keys(obj);
   // biome-ignore lint/style/useForOf: recursive hot-path during Record creation

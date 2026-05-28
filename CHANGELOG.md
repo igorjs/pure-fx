@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-05-25
+
+### Added
+- **`Immutable` protocol** for value types: a global-registry `Symbol` brand (`IMMUTABLE`), the `Immutable<TMut>` and `Producible<TMut>` interfaces, and an `Immutable` helper namespace (`Immutable.is` / `Immutable.equals` / `Immutable.produce`). `ImmutableRecord`, `ImmutableList`, `ImmutableHashMap`, `NonEmptyList`, and `DateTimeValue` all implement it.
+- **Copy-on-write `produce`** on `ImmutableList`, `ImmutableHashMap`, and `NonEmptyList` (Record already had it). Drafts are revocable: a draft captured out of the recipe throws on later use. `NonEmptyList.produce` throws if the recipe empties the list.
+- `ImmutableHashMap` gains `toMutable()` (fresh `Map`).
+- `DateTime` runtime type: a Temporal-aware instant backed by `DateTimeValue` (epoch nanoseconds), accepting an ISO string, epoch millis, a `Date`, a `Temporal.Instant`/`ZonedDateTime`, or an existing `DateTimeValue`; with `toDate`/`toISO`/`toEpochMillis`/`toTemporal(): Option`, `equals`/`compare`, `eq`/`ord`, and copy-on-write modifiers `plus`/`minus`/`withEpochMillis`/`withEpochNanos`. Zero-dependency: Temporal is feature-detected, no polyfill.
+- `Struct({ ... })` composer: heterogeneous object validation over named TypeDefs → `ImmutableRecord`.
+- `ListOf(T)` → `ImmutableList` and `MapOf(K, V)` → `ImmutableHashMap` composers (the immutable-collection counterparts of `Vec`/`Dict`).
+
+### Changed
+- **BREAKING:** the `$immutable` string marker is removed from all immutable types. Use `Immutable.is(value)` (or `isImmutable(value)`).
+- **BREAKING:** `.equals(other)` on `Record`/`List`/`HashMap`/`NonEmptyList`/`DateTimeValue` is widened to accept `unknown` (non-immutable / different-kind operands return `false`).
+
+### Fixed
+- `Record`/`List`/`Struct` now compose with nested pure-fx immutables (e.g. `Struct({ tags: ListOf(Tag) })`); the deep-freeze and lazy-wrap paths treat existing immutables and class instances as opaque leaves. `isImmutable` now correctly recognises `ImmutableList`.
+
 ## [0.1.0] - 2026-03-15
 
 ### Added

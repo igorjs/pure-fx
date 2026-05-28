@@ -75,7 +75,7 @@ export { Str } from "./runtime/scalars.js";
 /** Branded non-negative integer primitive. */
 export { UInt } from "./runtime/scalars.js";
 
-/** String-keyed object-record composer. */
+/** String-keyed object-record composer (returns `ImmutableHashMap`). */
 export { Dict } from "./runtime/composers.js";
 /** Tagged sum-type composer (`Left | Right`). */
 export { Either } from "./runtime/composers.js";
@@ -85,7 +85,20 @@ export type { EitherValue } from "./runtime/composers.js";
 export { Maybe } from "./runtime/composers.js";
 /** 2-tuple composer. */
 export { Pair } from "./runtime/composers.js";
+/** Homogeneous-array composer returning a pure-fx `ImmutableList`. */
+export { ListOf } from "./runtime/composers.js";
+/** String-keyed record composer returning a pure-fx `ImmutableHashMap`. */
+export { MapOf } from "./runtime/composers.js";
+/** Heterogeneous object composer over named TypeDefs (returns `ImmutableRecord`). */
+export { Struct } from "./runtime/composers.js";
 /** Fixed-length n-tuple composer. */
 export { Tuple } from "./runtime/composers.js";
-/** Homogeneous-array composer. */
+/** Homogeneous-array composer (returns `ImmutableList`). */
 export { Vec } from "./runtime/composers.js";
+
+/** Temporal-aware instant TypeDef (extend to create domain instants). */
+export { DateTime } from "./runtime/date-time.js";
+/** Immutable instant value (epoch nanoseconds) produced by parsing {@link DateTime}. */
+export { DateTimeValue } from "./runtime/date-time.js";
+/** Minimal structural `Temporal.Instant` shape returned by `DateTimeValue.toTemporal`. */
+export type { TemporalInstant } from "./runtime/date-time.js";

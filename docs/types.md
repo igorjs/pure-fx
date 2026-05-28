@@ -118,18 +118,46 @@ Score.parse(42);
 
 ### Composers
 
-Six generic factories build new branded types from existing ones. Outputs
-are deep-frozen at runtime; composers are cached per inner reference so
-`Vec(X) === Vec(X)` holds.
+Nine generic factories build new branded types from existing ones. `Vec`,
+`Dict`, `Pair`, `Tuple`, `Either` return **deep-frozen native snapshots**;
+`Struct`, `ListOf`, `MapOf` return **pure-fx [Immutable](data.md#immutable-protocol)
+collections** (functional API + copy-on-write `produce`). Reference-keyed
+composers are cached so `Vec(X) === Vec(X)` holds (`Tuple`/`Struct` take
+unbounded shapes and are not cached — hold them in a `const`/`class`).
 
 | Composer | Validates | Returns |
 |----------|-----------|---------|
-| `Vec(T)` | `T[]` | `readonly T[]` branded |
-| `Pair(A, B)` | `[A, B]` | `readonly [A, B]` branded |
-| `Tuple(...T)` | n-tuple | `readonly [...T]` branded |
-| `Dict(K, V)` | string-keyed record | `Readonly<Record<K, V>>` branded |
+| `Vec(T)` | `T[]` | frozen `readonly T[]` branded |
+| `Pair(A, B)` | `[A, B]` | frozen `readonly [A, B]` branded |
+| `Tuple(...T)` | n-tuple | frozen `readonly [...T]` branded |
+| `Dict(K, V)` | string-keyed record | frozen `Readonly<Record<K, V>>` branded |
+| `ListOf(T)` | `T[]` | `ImmutableList<T>` branded |
+| `MapOf(K, V)` | string-keyed record | `ImmutableHashMap<K, V>` branded |
+| `Struct({...})` | named heterogeneous object | `ImmutableRecord<{...}>` branded |
 | `Maybe(T)` | `{tag:'Some',value:T} \| {tag:'None'} \| null \| undefined` | `Option<T>` branded |
 | `Either(L, R)` | `{tag:'Left',value:L} \| {tag:'Right',value:R}` | tagged sum branded |
+
+`Vec`/`Dict` are lightweight **snapshots** (a branded frozen array/object) — use
+plain indexing/property access. `ListOf`/`MapOf` are the **collection** variants:
+access their parsed values through the collection API (`.at(i)`, `.get(key)`,
+`.size`, `.produce(...)`). `Struct` is the heterogeneous counterpart to `Dict`/
+`MapOf`: each field has its own TypeDef.
+
+```ts
+import { TypeDef, Schema, Struct } from '@igorjs/pure-fx'
+
+class UserId extends TypeDef('UserId', Schema.uuid) {}
+class Email  extends TypeDef('Email',  Schema.email) {}
+
+class User extends Struct({ id: UserId, email: Email }) {}
+
+const r = User.parse({ id: '550e8400-e29b-41d4-a716-446655440000', email: 'a@b.com' });
+if (r.isOk) {
+  r.value.id;     // Type<'UserId', string>
+  r.value.email;  // Type<'Email', string>
+  // r.value is an ImmutableRecord — assignment throws
+}
+```
 
 ```ts
 import { TypeDef, Schema, Vec, Pair, Dict, Maybe, Either } from '@igorjs/pure-fx'
@@ -173,6 +201,69 @@ Then compose freely:
 class Wallet extends Dict(Str, Money) {}
 class Failure extends Either(HttpError, NetworkError) {}
 ```
+
+## DateTime
+
+A Temporal-aware instant primitive. `DateTime` is a `TypeDef` you can extend;
+parsing yields a `DateTimeValue` — an immutable instant stored as epoch
+nanoseconds (`bigint`).
+
+```ts
+import { DateTime, DateTimeValue } from '@igorjs/pure-fx'
+
+class CreatedAt extends DateTime {}
+
+// Parse accepts an ISO string, epoch millis, a Date, a Temporal.Instant /
+// ZonedDateTime, or an existing DateTimeValue:
+const r = CreatedAt.parse('2026-05-22T10:00:00.000Z');
+// Result<Type<'DateTime', DateTimeValue>, SchemaError>
+
+if (r.isOk) {
+  r.value.epochNanos;     // bigint (full nanosecond precision)
+  r.value.toDate();        // Date (millisecond precision)
+  r.value.toISO();         // '2026-05-22T10:00:00.000Z'
+  r.value.toEpochMillis(); // 1747908000000
+  r.value.toTemporal();    // Option<Temporal.Instant> (Some when available)
+}
+
+// Convenience constructors return branded values directly:
+DateTime.now();
+DateTime.fromEpochMillis(1_700_000_000_000);
+DateTime.fromDate(new Date());
+```
+
+`DateTimeValue` is comparable: `equals(other)`, `compare(other)` (`-1 | 0 | 1`),
+and the typeclass instances `DateTimeValue.eq` / `DateTimeValue.ord` (ordered by
+instant).
+
+**Zero-dependency Temporal interop.** pure-fx bundles no polyfill and declares no
+dependency. `globalThis.Temporal` is feature-detected at runtime: when present,
+`toTemporal()` returns `Some(Temporal.Instant)` with full nanosecond precision;
+when absent (older runtimes), it returns `None` and everything else continues to
+work via `Date`/`bigint`. `Date`-based conversions (`toDate`, `toISO`,
+`fromISO`, `fromDate`, `fromEpochMillis`) are millisecond-precision; full
+nanosecond fidelity is preserved in `epochNanos` and through Temporal values.
+
+`DateTimeValue` implements the [Immutable protocol](data.md#immutable-protocol)
+(`Immutable.is(dt) === true`). Modifiers are copy-on-write — they always return a
+**new** value, never mutating in place:
+
+```ts
+const later = dt.plus(Duration.hours(1));    // new DateTimeValue
+const reset = dt.withEpochMillis(0);          // new DateTimeValue
+dt.toMutable();                                // a fresh Date (interop)
+```
+
+**Static constructors:** `now`, `fromEpochMillis`, `fromEpochNanos`, `fromDate`,
+`fromISO`, `fromTemporal`
+
+**Instance:** `epochNanos`, `toEpochMillis`, `toDate`, `toISO`, `toJSON`,
+`toMutable`, `toTemporal`, `equals`, `compare`
+
+**Copy-on-write modifiers:** `plus(Duration)`, `minus(Duration)`,
+`withEpochMillis`, `withEpochNanos`
+
+**Typeclass instances:** `eq`, `ord`
 
 ## Duration
 

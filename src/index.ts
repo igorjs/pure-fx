@@ -141,6 +141,10 @@ export { Codec } from "./data/codec.js";
 export type { CodecType } from "./data/codec.js";
 /** Check whether a value is an ImmutableRecord or ImmutableList. */
 export { isImmutable } from "./data/constructors.js";
+/** Shared protocol brand + helpers for immutable value types. */
+export { IMMUTABLE, Immutable } from "./data/immutable.js";
+/** Structural immutable-value protocol interface (supports copy-on-write `produce`). */
+export type { Producible } from "./data/immutable.js";
 /** Create an immutable list from an array of items. */
 export { List } from "./data/constructors.js";
 /** Create an immutable record from a plain object. */
@@ -479,7 +483,7 @@ export { Str } from "./types/runtime/scalars.js";
 /** Branded non-negative integer primitive. */
 export { UInt } from "./types/runtime/scalars.js";
 
-/** String-keyed object-record composer. */
+/** String-keyed object-record composer (returns `ImmutableHashMap`). */
 export { Dict } from "./types/runtime/composers.js";
 /** Tagged sum-type composer (`Left | Right`). */
 export { Either } from "./types/runtime/composers.js";
@@ -489,10 +493,23 @@ export type { EitherValue } from "./types/runtime/composers.js";
 export { Maybe } from "./types/runtime/composers.js";
 /** 2-tuple composer. */
 export { Pair } from "./types/runtime/composers.js";
+/** Homogeneous-array composer returning a pure-fx `ImmutableList`. */
+export { ListOf } from "./types/runtime/composers.js";
+/** String-keyed record composer returning a pure-fx `ImmutableHashMap`. */
+export { MapOf } from "./types/runtime/composers.js";
+/** Heterogeneous object composer over named TypeDefs (returns `ImmutableRecord`). */
+export { Struct } from "./types/runtime/composers.js";
 /** Fixed-length n-tuple composer. */
 export { Tuple } from "./types/runtime/composers.js";
-/** Homogeneous-array composer. */
+/** Homogeneous-array composer (returns `ImmutableList`). */
 export { Vec } from "./types/runtime/composers.js";
+
+/** Temporal-aware instant TypeDef (extend to create domain instants). */
+export { DateTime } from "./types/runtime/date-time.js";
+/** Immutable instant value (epoch nanoseconds) produced by parsing {@link DateTime}. */
+export { DateTimeValue } from "./types/runtime/date-time.js";
+/** Minimal structural `Temporal.Instant` shape returned by `DateTimeValue.toTemporal`. */
+export type { TemporalInstant } from "./types/runtime/date-time.js";
 
 // ── WebSocket ───────────────────────────────────────────────────────────────
 

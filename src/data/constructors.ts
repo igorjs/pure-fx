@@ -13,6 +13,7 @@
  * lets the public API stay stable even if internals change.
  */
 
+import { IMMUTABLE } from "./immutable.js";
 import { createListProxy, type ImmutableList } from "./list.js";
 import { createRecord, type ImmutableRecord } from "./record.js";
 
@@ -88,7 +89,7 @@ List.clone = <T>(items: readonly T[]): ImmutableList<T> =>
 export const isImmutable = (
   val: unknown,
 ): val is ImmutableRecord<object> | ImmutableList<unknown> =>
-  val !== null &&
-  typeof val === "object" &&
-  "$immutable" in val &&
-  (val as Record<string, unknown>)["$immutable"] === true;
+  // Why: read the IMMUTABLE symbol directly. ImmutableList is a Proxy that
+  // exposes the brand through its `get` trap (it has no `has` trap), so an `in`
+  // check would miss it; property access returns true.
+  val !== null && typeof val === "object" && (val as Record<symbol, unknown>)[IMMUTABLE] === true;

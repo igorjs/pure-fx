@@ -35,6 +35,8 @@
 
 import type { Option } from "../core/option.js";
 import { None, Some } from "../core/option.js";
+import { IMMUTABLE } from "./immutable.js";
+import { revocableDraft } from "./internals.js";
 
 // ── Hashing ──────────────────────────────────────────────────────────────────
 
@@ -339,20 +341,29 @@ export interface ImmutableHashMap<K, V> extends Iterable<[K, V]> {
   entries(): IterableIterator<[K, V]>;
 
   /** Structural equality (keys compared by ===, values compared by ===). */
-  equals(other: ImmutableHashMap<K, V>): boolean;
+  equals(other: unknown): boolean;
   /** Convert to a mutable Map. */
   toMap(): Map<K, V>;
+  /** A fresh mutable Map copy (protocol alias of {@link toMap}). */
+  toMutable(): Map<K, V>;
   /** Convert to an array of [key, value] pairs. */
   toArray(): [K, V][];
   /** JSON-safe output as array of [key, value] pairs. */
   toJSON(): [K, V][];
+  /** Copy-on-write edit: mutate a revocable Map draft, get a new frozen map. */
+  produce(recipe: (draft: Map<K, V>) => void): ImmutableHashMap<K, V>;
   /** Human-readable string. */
   toString(): string;
+  /** Shared {@link IMMUTABLE} protocol brand. */
+  readonly [IMMUTABLE]: true;
 }
 
 // ── Implementation ───────────────────────────────────────────────────────────
 
 class HashMapImpl<K, V> implements ImmutableHashMap<K, V> {
+  /** Shared protocol brand. */
+  readonly [IMMUTABLE] = true as const;
+
   constructor(
     private readonly root: Node<K, V> | undefined,
     readonly size: number,
@@ -465,11 +476,11 @@ class HashMapImpl<K, V> implements ImmutableHashMap<K, V> {
     return this.entries();
   }
 
-  equals(other: ImmutableHashMap<K, V>): boolean {
+  equals(other: unknown): boolean {
     if (this === other) return true;
-    if (this.size !== other.size) return false;
+    if (!(other instanceof HashMapImpl) || this.size !== other.size) return false;
     for (const entry of trieEntries(this.root)) {
-      const otherVal = other.get(entry.key);
+      const otherVal = (other as ImmutableHashMap<K, V>).get(entry.key);
       if (otherVal.isNone || otherVal.value !== entry.value) return false;
     }
     return true;
@@ -481,6 +492,16 @@ class HashMapImpl<K, V> implements ImmutableHashMap<K, V> {
       m.set(entry.key, entry.value);
     }
     return m;
+  }
+
+  toMutable(): Map<K, V> {
+    return this.toMap();
+  }
+
+  produce(recipe: (draft: Map<K, V>) => void): ImmutableHashMap<K, V> {
+    const copy = this.toMap();
+    revocableDraft(copy, recipe);
+    return HashMap.fromMap(copy);
   }
 
   toArray(): [K, V][] {

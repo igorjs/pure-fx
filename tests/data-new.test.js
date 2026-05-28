@@ -15,6 +15,7 @@ import { describe, expect, it } from "@igorjs/pure-test";
 const {
   ADT,
   NonEmptyList,
+  Immutable,
   Codec,
   Schema,
   Duration,
@@ -82,7 +83,7 @@ describe("NonEmptyList", () => {
     // NonEmptyList wraps via Proxy. The is() check uses `in` which requires
     // a `has` trap. Verify the brand is accessible via property access.
     expect(nel.$nonEmpty).toBe(true);
-    expect(nel.$immutable).toBe(true);
+    expect(Immutable.is(nel)).toBe(true);
   });
 
   it("is: type guard returns false for non-NEL values", () => {
@@ -257,7 +258,7 @@ describe("NonEmptyList", () => {
     const nel = NonEmptyList([1, 2, 3]);
     const list = nel.toList();
     expect(list.length).toBe(3);
-    expect(list.$immutable).toBe(true);
+    expect(Immutable.is(list)).toBe(true);
   });
 
   it("toMutable: returns mutable array", () => {

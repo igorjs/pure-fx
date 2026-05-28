@@ -357,14 +357,10 @@ describe("Vec", () => {
   it("deep-freezes the parsed output", () => {
     const r = Vec(Int).parse([1, 2, 3]);
     expect(r.isOk).toBe(true);
-    let threw = false;
-    try {
-      r.value.push(4);
-    } catch (_) {
-      threw = true;
-    }
-    expect(threw).toBe(true);
     expect(Object.isFrozen(r.value)).toBe(true);
+    expect(() => {
+      r.value.push(4);
+    }).toThrow();
   });
 
   it("caches per inner TypeDef (referential equality)", () => {
