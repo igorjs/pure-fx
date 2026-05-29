@@ -1,47 +1,254 @@
-name: Release
+# SPDX-License-Identifier: Apache-2.0
+#
+# Templated by repo-config/modules/hardened-repo/main.tf (variable
+# manage_workflow_release). Direct edits in the consuming repo are
+# overwritten on the next `terraform apply` against repo-config.
+#
+# SLSA L3 build + attest pipeline for npm-shaped JavaScript packages.
+# Triggered on `v*` tag push (the convention `scripts/release.mjs`
+# follows). Produces:
+#
+#   1. An `npm pack` tarball (the artifact npm publish would receive).
+#   2. A per-file in-toto attestation from actions/attest-build-provenance,
+#      signed by Sigstore (Fulcio + Rekor).
+#   3. A combined SLSA v1 provenance attestation from
+#      slsa-framework/slsa-github-generator, run in an isolated workflow
+#      context the caller cannot inject into — this is the L2 -> L3 gap
+#      closer; the build environment the attestation describes is the
+#      reusable workflow's own runner, not this one.
+#   4. A GitHub Release with all three attached (tarball, .sha256
+#      sidecar, .intoto.jsonl provenance).
+#
+# When the publish event for the release fires, publish.javascript.yml
+# verifies the provenance against the tarball before pushing to npm
+# and/or JSR (whichever the package targets via file presence).
+#
+# Co-existence with scripts/release.mjs:
+#   - The local script may run `gh release create` to publish notes
+#     before this workflow attaches artifacts. softprops/action-gh-release
+#     below matches by tag_name and updates the existing release in place
+#     rather than colliding. If the script is later migrated to create a
+#     draft release (recommended in the follow-up), this workflow will
+#     flip it to published, which is what triggers publish.yml.
+
+name: release
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
-      version:
-        description: "patch | minor | major | x.y.z. Leave blank to release the version currently in package.json (it must not already be tagged)."
+      tag:
+        description: "Synthesised dev tag for testing without cutting a real release."
         required: false
         type: string
         default: ""
-      dry_run:
-        description: "Dry-run: preview the release without writing files, creating commits/tags, or publishing."
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  # ── Resolve tag + version once ─────────────────────────────────────
+  resolve:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.r.outputs.tag }}
+      version: ${{ steps.r.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
-          fetch-depth: 0
-          persist-credentials: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            codeload.github.com:443
 
-      - run: corepack enable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: actions/setup-node@v6
+      - id: r
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${GITHUB_REF##refs/tags/}"
+            VERSION="${TAG#v}"
+          elif [[ -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+            VERSION="${TAG#v}"
+          else
+            SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+            TAG="dev-${SHORT_SHA}"
+            VERSION="0.0.0-${SHORT_SHA}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Resolved tag=${TAG} version=${VERSION}"
+
+  # ── Build the npm tarball + attest provenance ──────────────────────
+  build:
+    needs: [resolve]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.hash.outputs.digest }}
+      filename: ${{ steps.pack.outputs.filename }}
+    steps:
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
-          node-version: 24
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
+          egress-policy: block
+          # Allowlist: GitHub API + git transport, npm registry (pnpm
+          # install), Node.js binaries (setup-node), Sigstore endpoints
+          # (fulcio for cert issuance, rekor for transparency log,
+          # tuf-repo-cdn for trust roots). registry.yarnpkg.com kept
+          # because pnpm fetches some packages from the Yarn mirror.
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            nodejs.org:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+
+      - name: Enable corepack
+        run: corepack enable
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Build
+        run: pnpm run build
 
-      - name: Release
-        run: node scripts/release.mjs ${{ inputs.version }} --yes --skip-test-ci ${{ inputs.dry_run && '--dry-run' || '' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: pack
+        name: Pack tarball
+        run: |
+          set -euo pipefail
+          mkdir -p dist-pack
+          npm pack --pack-destination=./dist-pack
+          FILENAME=$(ls dist-pack/*.tgz | head -1)
+          echo "filename=${FILENAME}" >> "$GITHUB_OUTPUT"
+          # Cross-platform sha256 (sha256sum on Linux; this job is
+          # ubuntu-latest so GNU coreutils are present).
+          sha256sum "${FILENAME}" > "${FILENAME}.sha256"
+          echo "::group::Tarball + sha256"
+          ls -la dist-pack/
+          cat "${FILENAME}.sha256"
+          echo "::endgroup::"
+
+      - id: hash
+        name: Compute base64-encoded digest for SLSA generator
+        run: |
+          set -euo pipefail
+          DIGEST=$(cd dist-pack && sha256sum ./*.tgz \
+            | awk '{print $1"  "$NF}' | base64 -w0)
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest per-file build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist-pack/*.tgz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: package
+          path: |
+            dist-pack/*.tgz
+            dist-pack/*.tgz.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── SLSA L3 provenance via the framework's reusable workflow ───────
+  # Runs in an isolated job context the caller workflow cannot inject
+  # into; this is the property that closes the L2 -> L3 gap. The build
+  # environment the attestation describes is the reusable workflow's
+  # own runner, not ours. End users verify with either:
+  #   gh attestation verify <file> --owner <owner>
+  #   slsa-verifier verify-artifact --provenance-path <intoto>
+  #     --source-uri github.com/<owner>/<repo> <file>
+  slsa_provenance:
+    needs: [resolve, build]
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@f7dd8c54c2067bafc12ca7a55595d5ee9b75204a
+    with:
+      base64-subjects: ${{ needs.build.outputs.digest }}
+      upload-assets: true
+      upload-tag-name: ${{ needs.resolve.outputs.tag }}
+      provenance-name: provenance-${{ needs.resolve.outputs.version }}.intoto.jsonl
+
+  # ── Attach tarball + sha256 + provenance to the GH release ─────────
+  # Uses softprops/action-gh-release with tag_name matching: if
+  # scripts/release.mjs has already created the release (with the
+  # generated changelog as notes), this UPDATES that release in place
+  # rather than colliding. If no release exists yet (workflow_dispatch
+  # or a hand-pushed tag), it creates one.
+  publish-gh:
+    needs: [resolve, build, slsa_provenance]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            uploads.github.com:443
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: package
+          path: dist-release
+
+      - name: Summarise release contents
+        run: |
+          {
+            echo "## Release ${{ needs.resolve.outputs.tag }}"
+            echo ""
+            echo "**Tarball + checksum + provenance attached.** Verify with:"
+            echo ""
+            echo '```bash'
+            echo "gh attestation verify dist-release/*.tgz --owner ${{ github.repository_owner }}"
+            echo "slsa-verifier verify-artifact dist-release/*.tgz \\"
+            echo "  --provenance-path *.intoto.jsonl \\"
+            echo "  --source-uri github.com/${{ github.repository }} \\"
+            echo "  --source-tag ${{ needs.resolve.outputs.tag }}"
+            echo '```'
+            echo ""
+            echo '```'
+            cat dist-release/*.sha256 | sort
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach assets to GitHub release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
+          files: |
+            dist-release/*.tgz
+            dist-release/*.tgz.sha256
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(needs.resolve.outputs.tag, 'dev-') || contains(needs.resolve.outputs.tag, '-alpha') || contains(needs.resolve.outputs.tag, '-beta') || contains(needs.resolve.outputs.tag, '-rc') }}
