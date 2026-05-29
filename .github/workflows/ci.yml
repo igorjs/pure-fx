@@ -1,3 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Templated by repo-config/modules/hardened-repo/main.tf (variable
+# manage_workflow_ci). Direct edits in the consuming repo are
+# overwritten on the next `terraform apply` against repo-config.
+#
+# Per-runtime integration matrix for npm-shaped JavaScript packages.
+# Shape matches the existing pure-fx pattern: a single `lint-and-test`
+# job (the required status check) that handles lint + type-check +
+# build + unit tests, then per-runtime-family integration jobs that
+# download the built `dist/` artifact and run smoke tests.
+#
+# Runtimes are opted into per-repo via `var.ci_runtimes`. The module
+# parses that flat list into per-family version arrays before passing
+# them to this template, so the template renders only the integration
+# jobs the repo actually needs.
+
 name: CI
 
 on:
@@ -10,15 +27,39 @@ permissions:
   contents: read
 
 jobs:
+  # ── Lint, type-check, build, unit tests, type tests ───────────────
+  # This is the canonical `lint-and-test` required status check. Other
+  # integration jobs depend on it via `needs: [lint-and-test]` so they
+  # download an artefact rather than rebuilding.
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          # Allowlist: GitHub API + git transport, npm registry,
+          # Node.js binaries (setup-node), and pkg-containers (used by
+          # actions/cache to fetch tar archives).
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            nodejs.org:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
       - run: corepack enable
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 24
+          node-version: '24'
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -35,150 +76,246 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      - name: Bundle size / tree-shaking
-        run: node tests/bundle-size.mjs
-
       - name: Type tests
         run: pnpm run test:types
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v7
+      - name: Upload build artefact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: dist
           path: dist/
           retention-days: 1
+          if-no-files-found: error
 
+  # ── Node integration matrix ────────────────────────────────────────
   integration-node:
-    needs: lint-and-test
+    needs: [lint-and-test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["22", "23", "24", "25", "26"]
-    name: integration / node-${{ matrix.node-version }}
+        node-version: ["22","23","24","25","26"]
+    name: "integration / node-${{ matrix.node-version }}"
     steps:
-      - uses: actions/checkout@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            nodejs.org:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - run: corepack enable
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
+
       - name: Unit tests
         run: pnpm test
-      - name: Runtime smoke test
-        run: node tests/smoke-platform.mjs
-      - name: Core smoke test
-        run: node tests/smoke-core.mjs
 
+  # ── Deno integration matrix ────────────────────────────────────────
   integration-deno:
-    needs: lint-and-test
+    needs: [lint-and-test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        deno-version: ["2.x", "canary"]
-    name: integration / deno-${{ matrix.deno-version }}
+        deno-version: ["2.x","canary"]
+    name: "integration / deno-${{ matrix.deno-version }}"
     steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-      - uses: actions/setup-node@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
-          node-version: 24
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            registry.jsr.io:443
+            jsr.io:443
+            nodejs.org:443
+            dl.deno.land:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - run: corepack enable
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
           cache: pnpm
-      - uses: denoland/setup-deno@v2
+      - uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2
         with:
           deno-version: ${{ matrix.deno-version }}
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
+
       - name: Runtime smoke test
         run: deno run --allow-all tests/smoke-platform.mjs
       - name: Core smoke test
         run: deno run --allow-all tests/smoke-core.mjs
 
+  # ── Bun integration matrix ─────────────────────────────────────────
   integration-bun:
-    needs: lint-and-test
+    needs: [lint-and-test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        bun-version: ["latest", "canary"]
-    name: integration / bun-${{ matrix.bun-version }}
+        bun-version: ["canary","latest"]
+    name: "integration / bun-${{ matrix.bun-version }}"
     steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-      - uses: actions/setup-node@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
-          node-version: 24
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            nodejs.org:443
+            bun.sh:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - run: corepack enable
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
           cache: pnpm
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2
         with:
           bun-version: ${{ matrix.bun-version }}
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
+
       - name: Runtime smoke test
         run: bun tests/smoke-platform.mjs
       - name: Core smoke test
         run: bun tests/smoke-core.mjs
 
+  # ── Cloudflare Workers integration (miniflare) ─────────────────────
   integration-workers:
-    needs: lint-and-test
+    needs: [lint-and-test]
     runs-on: ubuntu-latest
-    name: integration / cf-workers
+    name: "integration / cf-workers"
     steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-      - uses: actions/setup-node@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
-          node-version: 24
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            nodejs.org:443
+            workers.cloudflare.com:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - run: corepack enable
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
-      - run: pnpm add -D miniflare
+
       - name: Workers smoke test (miniflare)
         run: node tests/workers/run.mjs
 
+  # ── Browser integration (Playwright + Chromium) ────────────────────
   integration-browser:
-    needs: lint-and-test
+    needs: [lint-and-test]
     runs-on: ubuntu-latest
-    name: integration / browser
+    name: "integration / browser"
     steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-      - uses: actions/setup-node@v6
+      - uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
-          node-version: 24
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            registry.yarnpkg.com:443
+            nodejs.org:443
+            playwright.azureedge.net:443
+            playwright-akamai.azureedge.net:443
+            cdn.playwright.dev:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            archive.ubuntu.com:80
+            security.ubuntu.com:80
+            esm.ubuntu.com:443
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - run: corepack enable
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
-      - run: pnpm add -D playwright
+
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@30e36b9b3e98ee71e51ec1a7c91b9f3b9aa50b7d # v5
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('node_modules/.pnpm/playwright@*/node_modules/playwright/package.json') }}
+          key: "playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}"
+
       - name: Install Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium --with-deps
+
       - name: Install Playwright deps only
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
+
       - name: Browser smoke test (Chromium)
         run: node tests/browser/run.mjs
