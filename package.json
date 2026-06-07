@@ -121,11 +121,11 @@
     "url": "https://github.com/sponsors/igorjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.14",
-    "@igorjs/pure-test": "^0.1.0",
+    "@biomejs/biome": "2.4.16",
+    "@igorjs/pure-test": "^0.4.2",
     "@typescript/native-preview": "latest",
-    "miniflare": "^4.20260430.0",
-    "playwright": "^1.59.1"
+    "miniflare": "^4.20260603.0",
+    "playwright": "^1.60.0"
   },
   "peerDependencies": {
     "typescript": ">=5.7.0"
