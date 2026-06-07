@@ -125,8 +125,7 @@
     "@igorjs/pure-test": "^0.1.0",
     "@typescript/native-preview": "latest",
     "miniflare": "^4.20260430.0",
-    "playwright": "^1.59.1",
-    "tsc-alias": "^1.8.17"
+    "playwright": "^1.59.1"
   },
   "peerDependencies": {
     "typescript": ">=5.7.0"
