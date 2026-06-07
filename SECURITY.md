@@ -1,21 +1,16 @@
 # Security Policy
 
-## Supported Versions
-
-| Version | Supported |
-|---------|-----------|
-| 0.1.x (latest) | Yes |
-| < 0.1 | No |
-
-Only the latest minor version receives security patches. Upgrade to the latest version before reporting.
-
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-To report a vulnerability, email: **oss@mail.igorjs.io**
+To report a vulnerability, use one of:
+
+- **GitHub Security Advisories**: [Report a vulnerability](https://github.com/igorjs/pure-fx/security/advisories/new)
+- **Email**: **oss@mail.igorjs.io**
 
 Include:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Affected versions
@@ -32,25 +27,41 @@ If the report is accepted, you will be credited in the release notes (unless you
 
 If the report is declined (not a vulnerability, or out of scope), you will receive an explanation and may open a public issue.
 
-### Scope
+## Supported Versions
 
-The following are in scope:
-- Code execution vulnerabilities in any module
-- Cryptographic weaknesses in the `Crypto` module
-- Path traversal or injection in `File`, `Command`, `Url` modules
-- FFI safety issues (arbitrary code execution via type confusion)
-- Denial of service via crafted input (e.g., hash collision attacks on `HashMap`)
+| Version | Supported |
+|---------|-----------|
+| `v0.1.0` (latest) | Yes |
+| earlier | No |
 
-The following are out of scope:
-- Vulnerabilities in dependencies (there are none)
-- Issues requiring physical access to the machine
+Only the latest released version (`v0.1.0`) receives security patches. Upgrade to the latest version before reporting.
+
+## Scope
+
+### In scope
+
+Vulnerabilities in this repository's code, including but not limited to:
+
+- Code execution, injection, or memory safety issues
+- Cryptographic weaknesses
+- Authentication or authorisation bypasses
+- Denial of service via crafted input
+- Bypass of any documented security guarantees (sandbox, isolation, etc.)
+- Compromise of the build, release, or signing pipeline (where applicable)
+
+### Out of scope
+
+- Vulnerabilities in third-party dependencies (report to the upstream maintainer)
+- Issues that require an attacker to already have admin or write access to this repository
+- Theoretical issues without a practical exploit path
 - Social engineering attacks
-- Issues in test files or development tooling
+- Issues requiring physical access to the user's machine
+- Bugs in development-only tooling not shipped to end users
 
-## Security Design Principles
+## Hardening posture
 
-- **Zero dependencies** eliminates supply chain risk
-- **All errors are values** (Result/Option) prevents unhandled exceptions
-- **No eval, no dynamic require** in production code (FFI uses `Function()` constructor for runtime detection only)
-- **Timing-safe comparison** (`Crypto.timingSafeEqual`) for constant-time byte comparison
-- **Input validation** via `Schema` before processing untrusted data
+This repository is part of the `igorjs` repo set and follows a common
+hardening posture: ruleset-managed branch and tag protection, signed
+commits, SHA-pinned third-party actions, and an App-based bot identity
+with narrow per-repo scope. For the cross-repo configuration as code,
+see the [`repo-config`](https://github.com/igorjs/repo-config) repo.

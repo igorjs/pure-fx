@@ -6,9 +6,11 @@ on:
   issue_comment:
     types: [created]
 
-permissions:
-  pull-requests: write
-  contents: write
+# Minimal top-level grant: job-level permissions override below.
+# SAFETY: pull_request_target runs with base-branch write context.
+# This workflow must NEVER check out or exec code from the PR head.
+# The actions/checkout step always uses `ref: main` for this reason.
+permissions: {}
 
 concurrency:
   group: cla-signature
@@ -17,20 +19,31 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
     if: >
       (github.event_name == 'pull_request_target' &&
        github.event.pull_request.user.login != 'dependabot[bot]') ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
        contains(github.event.comment.body, 'I hereby sign the CLA'))
     steps:
-      - uses: actions/checkout@v6
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            codeload.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: main
 
       - name: Check DCO (Signed-off-by on all commits)
         if: github.event_name == 'pull_request_target'
         id: dco
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const commits = await github.rest.pulls.listCommits({
@@ -42,6 +55,16 @@ jobs:
 
             const missing = [];
             for (const c of commits.data) {
+              // Skip bot-authored commits. auto-update-pr.yml,
+              // dependabot, and the igorjs App create merge / sync
+              // commits via the GitHub API that can't carry a
+              // Signed-off-by trailer; gating on them would block
+              // every PR the auto-updater touches. Mirrors Probot
+              // DCO behaviour. Check both author and committer
+              // because merge commits have a separate committer.
+              if (c.author?.type === 'Bot' || c.committer?.type === 'Bot') {
+                continue;
+              }
               const msg = c.commit.message || '';
               if (!msg.includes('Signed-off-by:')) {
                 missing.push(c.sha.substring(0, 7));
@@ -57,7 +80,7 @@ jobs:
 
       - name: Check CLA signature
         id: cla
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');
@@ -82,7 +105,7 @@ jobs:
           github.event_name == 'issue_comment' &&
           steps.cla.outputs.cla_pass == 'false' &&
           contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA')
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -94,7 +117,6 @@ jobs:
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                // Fetch current file via API (gets latest SHA)
                 const { data: file } = await github.rest.repos.getContent({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -104,19 +126,16 @@ jobs:
 
                 const content = Buffer.from(file.content, 'base64').toString('utf-8');
 
-                // Already signed (another workflow beat us)
                 if (content.toLowerCase().includes(`@${author.toLowerCase()}`)) {
                   core.info(`@${author} already signed (detected on attempt ${attempt}).`);
                   break;
                 }
 
-                // Insert new row before the CLA-BOT:END marker
                 const updated = content.replace(
                   '<!-- CLA-BOT:END',
                   `${newRow}\n<!-- CLA-BOT:END`,
                 );
 
-                // Atomic update via API (fails with 409 if SHA changed)
                 await github.rest.repos.createOrUpdateFileContents({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -154,7 +173,7 @@ jobs:
 
       - name: Post status comment
         if: github.event_name == 'pull_request_target'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -163,7 +182,6 @@ jobs:
             const author = '${{ steps.cla.outputs.author }}';
             const prNumber = context.payload.pull_request.number;
 
-            // Apply CLA/DCO labels
             const addLabel = (name) => github.rest.issues.addLabels({
               owner: context.repo.owner, repo: context.repo.repo,
               issue_number: prNumber, labels: [name],

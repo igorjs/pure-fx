@@ -15,7 +15,10 @@
  *   node scripts/release.mjs --dry-run    # preview without changing any state
  *
  * Pre-flight checks abort the release if the resulting tag already exists
- * locally, on origin, or as a published GitHub release.
+ * locally, on origin, or as a published GitHub release. A real run also
+ * verifies the latest CI on main succeeded and that `npm publish --dry-run`
+ * and `npx jsr publish --dry-run` both pass, so a release is only cut when the
+ * published npm tarball and JSR module graph are sound.
  *
  * Dry-run (-n / --dry-run): every file write, git mutation, and gh release
  * call is short-circuited and printed as `[dry-run] WOULD ...`. The working
@@ -44,8 +47,9 @@ const die = (msg) => {
 const args = process.argv.slice(2);
 const yesFlag = args.includes("--yes") || args.includes("-y");
 const dryRun = args.includes("--dry-run") || args.includes("-n");
-// In dry-run we skip the test:ci and publish dry-run too — they're slow and
-// not useful for the "what would happen?" reporting.
+// --dry-run is a fast preview: it forces the heavy test matrix to be skipped
+// (via skipTestCi) and also skips the publish dry runs further down, since no
+// tag/release is cut in preview mode.
 const skipTestCi = args.includes("--skip-test-ci") || dryRun;
 const bump = args.find((a) => !a.startsWith("-") && a.length > 0);
 // bump is undefined when no positional arg is passed → release the version
@@ -111,7 +115,7 @@ if (ciRun.conclusion !== "success") {
 }
 
 if (skipTestCi) {
-  log("Skipping test:ci and publish dry run (--skip-test-ci).");
+  log("Skipping full test matrix (--skip-test-ci); CI on main was verified above.");
 } else {
   log("Running full test matrix (native + Docker)...");
   try {
@@ -119,16 +123,37 @@ if (skipTestCi) {
   } catch {
     die("Test matrix failed. Fix all failures before releasing.");
   }
+}
+
+// Publish dry runs gate every real release — local AND the Release workflow —
+// independent of --skip-test-ci. ci.yml builds and tests but never packs the
+// published artifacts, so this is the only check that the npm tarball and the
+// JSR module graph (including slow types) are sound before a tag/release is cut.
+// Skipped in --dry-run preview, where no tag/release is created anyway.
+if (dryRun) {
+  log("Skipping publish dry runs (preview mode — no release will be cut).");
+} else {
+  // npm packs dist/; build it now since the matrix (which also builds) may have
+  // been skipped via --skip-test-ci. JSR packs src/, which is always present.
+  log("Building dist for an accurate npm pack...");
+  run("pnpm run build", { stdio: "inherit" });
 
   log("Verifying npm publish (dry run)...");
   try {
-    // Strip pnpm-injected npm_config_ env vars that npm doesn't recognise
+    // Strip pnpm-injected npm_config_ env vars that npm doesn't recognise.
     const cleanEnv = Object.fromEntries(
       Object.entries(process.env).filter(([k]) => !k.startsWith("npm_")),
     );
     execSync("npm publish --dry-run --ignore-scripts", { stdio: "inherit", env: cleanEnv });
   } catch {
     die("npm publish dry run failed. Fix packaging issues before releasing.");
+  }
+
+  log("Verifying JSR publish (dry run)...");
+  try {
+    execSync("npx jsr publish --dry-run", { stdio: "inherit" });
+  } catch {
+    die("JSR publish dry run failed. Fix JSR packaging or slow-types issues before releasing.");
   }
 }
 

@@ -1,156 +1,255 @@
-name: Publish
+# SPDX-License-Identifier: Apache-2.0
+#
+# Templated by repo-config/modules/hardened-repo/main.tf (variable
+# manage_workflow_publish). Direct edits in the consuming repo are
+# overwritten on the next `terraform apply` against repo-config.
+#
+# SLSA L3 publish pipeline for npm and JSR. Triggered when a GitHub
+# Release is published (which the templated release.yml does after it
+# uploads the SLSA L3 provenance attestation). Publish runs in two
+# stages:
+#
+#   1. detect       Read package.json / jsr.json / deno.json from the
+#                   checked-out source at the release tag. Decide which
+#                   registries the package targets (`publish_npm`,
+#                   `publish_jsr`) and emit the deployment-environment
+#                   URLs that the GitHub UI shows on the release page.
+#                   No Terraform-side `publish_targets` flag — file
+#                   presence is the source of truth.
+#
+#   2. publish-*    One job per registry, each gated by the detect
+#                   output. Both jobs run with `id-token: write` to mint
+#                   the OIDC token Trusted Publishers expect, both
+#                   verify the SLSA provenance attached to the GH
+#                   release before pushing the package, both run inside
+#                   step-security/harden-runner with `egress-policy:
+#                   block` so a compromised step can't exfiltrate.
+#
+# Trusted Publishers on npm/JSR must be configured per-package via the
+# registry web UI; see modules/hardened-repo/docs/setup-trusted-publishers.md.
+
+name: publish
 
 on:
   release:
     types: [published]
 
-permissions:
-  contents: write
-  packages: write
-  id-token: write
+permissions: {}
 
 jobs:
-  verify:
+  # ── Detect publish targets from source ─────────────────────────────
+  detect:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Validate tag format
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
-            echo "::error::Tag must be semver: v1.2.3 (got $GITHUB_REF_NAME)"
-            exit 1
-          fi
-
-      - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Lint & format
-        run: pnpm run lint
-
-      - name: Type-check
-        run: pnpm run check
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Runtime tests
-        run: pnpm test
-
-      - name: Type tests
-        run: pnpm run test:types
-
-  publish-npm:
-    needs: verify
-    runs-on: ubuntu-latest
-    environment: npm
     permissions:
       contents: read
-      id-token: write
+    outputs:
+      publish_npm: ${{ steps.d.outputs.publish_npm }}
+      publish_jsr: ${{ steps.d.outputs.publish_jsr }}
+      package_name: ${{ steps.d.outputs.package_name }}
+      npm_url: ${{ steps.d.outputs.npm_url }}
+      jsr_url: ${{ steps.d.outputs.jsr_url }}
     steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-
-      - uses: actions/setup-node@v6
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          node-version: 24
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            codeload.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - id: d
+        name: Detect publish targets
+        run: |
+          set -euo pipefail
+
+          # npm — publish when package.json is present and not marked private
+          if [[ -f package.json ]] && ! jq -e '.private == true' package.json > /dev/null 2>&1; then
+            PKG_NPM=$(jq -r '.name' package.json)
+            echo "publish_npm=true" >> "$GITHUB_OUTPUT"
+            echo "package_name=${PKG_NPM}" >> "$GITHUB_OUTPUT"
+            echo "npm_url=https://www.npmjs.com/package/${PKG_NPM}" >> "$GITHUB_OUTPUT"
+            echo "::notice::Detected npm target: ${PKG_NPM}"
+          else
+            echo "publish_npm=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No npm target (package.json missing or private=true)"
+          fi
+
+          # JSR — publish when jsr.json or deno.json (with .name) is present
+          JSR_FILE=""
+          if [[ -f jsr.json ]]; then
+            JSR_FILE=jsr.json
+          elif [[ -f deno.json ]] && jq -e '.name' deno.json > /dev/null 2>&1; then
+            JSR_FILE=deno.json
+          fi
+          if [[ -n "$JSR_FILE" ]]; then
+            PKG_JSR=$(jq -r '.name' "$JSR_FILE")
+            echo "publish_jsr=true" >> "$GITHUB_OUTPUT"
+            echo "jsr_url=https://jsr.io/${PKG_JSR}" >> "$GITHUB_OUTPUT"
+            echo "::notice::Detected JSR target: ${PKG_JSR}"
+          else
+            echo "publish_jsr=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No JSR target (jsr.json/deno.json absent)"
+          fi
+
+      - name: Validate package.json#repository matches this repo
+        if: steps.d.outputs.publish_npm == 'true'
+        run: |
+          set -euo pipefail
+          EXPECTED="github.com/${{ github.repository }}"
+          REPO_URL=$(jq -r '.repository.url // .repository // ""' package.json)
+          # Normalise git+https://github.com/x/y.git -> github.com/x/y
+          NORMALISED=$(echo "$REPO_URL" \
+            | sed -e 's|^git+||' -e 's|\.git$||' -e 's|^https://||' -e 's|^git@github\.com:|github.com/|')
+          if [[ "$NORMALISED" != "$EXPECTED" ]]; then
+            echo "::error::package.json#repository (${NORMALISED}) does not match GitHub repo (${EXPECTED})."
+            echo "::error::npm --provenance will reject the publish. Fix package.json's repository field."
+            exit 1
+          fi
+          echo "package.json#repository matches: ${EXPECTED}"
+
+  # ── Publish to npm with provenance verification ────────────────────
+  publish-npm:
+    needs: [detect]
+    if: needs.detect.outputs.publish_npm == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: npm-publish
+      url: ${{ needs.detect.outputs.npm_url }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          # Allowlist: GitHub API + git transport (for action checkouts),
+          # npm registry, Go module proxy (to install slsa-verifier from
+          # source), Sigstore endpoints (fulcio for cert issuance, rekor
+          # for the transparency log, tuf-repo-cdn for trust roots),
+          # GHCR (slsa-verifier mirror).
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.npmjs.org:443
+            nodejs.org:443
+            raw.githubusercontent.com:443
+            proxy.golang.org:443
+            sum.golang.org:443
+            go.dev:443
+            storage.googleapis.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist-release
+          # Download every asset attached to this release (tarball,
+          # .sha256 sidecar, .intoto.jsonl provenance file).
+          gh release download "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --dir dist-release
+          echo "::group::Release assets"
+          ls -la dist-release/
+          echo "::endgroup::"
+
+      - name: Install slsa-verifier
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: '1.22'
+      - run: go install github.com/slsa-framework/slsa-verifier/v2/cli/slsa-verifier@v2.7.0
+
+      - name: Verify SLSA L3 provenance against the published tarball
+        run: |
+          set -euo pipefail
+          TARBALL=$(ls dist-release/*.tgz | head -1)
+          PROVENANCE=$(ls dist-release/*.intoto.jsonl | head -1)
+          if [[ -z "$TARBALL" || -z "$PROVENANCE" ]]; then
+            echo "::error::Missing tarball or provenance in release assets."
+            echo "::error::Found: $(ls dist-release/)"
+            exit 1
+          fi
+          slsa-verifier verify-artifact \
+            --provenance-path "$PROVENANCE" \
+            --source-uri "github.com/${{ github.repository }}" \
+            --source-tag "${{ github.event.release.tag_name }}" \
+            "$TARBALL"
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
           registry-url: https://registry.npmjs.org
 
-      - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-
-      - name: Publish to npm
+      - name: Publish tarball to npm with provenance
         run: |
+          set -euo pipefail
+          TARBALL=$(ls dist-release/*.tgz | head -1)
           for i in 1 2 3; do
-            npm publish --provenance --access public --ignore-scripts && exit 0
+            npm publish "$TARBALL" --provenance --access public --ignore-scripts && exit 0
             echo "::warning::npm publish attempt $i failed, retrying in 15s..."
             sleep 15
           done
           exit 1
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  publish-gpr:
-    # Gated on publish-npm: npm is canonical; do not advertise the version on GPR if npm failed.
-    needs: publish-npm
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - run: corepack enable
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: https://npm.pkg.github.com
-          scope: '@igorjs'
-
-      - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-
-      - name: Publish to GitHub Packages
-        run: |
-          for i in 1 2 3; do
-            pnpm publish --no-git-checks --ignore-scripts && exit 0
-            echo "::warning::GPR publish attempt $i failed, retrying in 15s..."
-            sleep 15
-          done
-          exit 1
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+  # ── Publish to JSR with attestation ────────────────────────────────
   publish-jsr:
-    # Gated on publish-npm: same rationale as publish-gpr.
-    needs: publish-npm
+    needs: [detect]
+    if: needs.detect.outputs.publish_jsr == 'true'
     runs-on: ubuntu-latest
+    environment:
+      name: jsr-publish
+      url: ${{ needs.detect.outputs.jsr_url }}
+    permissions:
+      id-token: write
+      contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            codeload.github.com:443
+            registry.jsr.io:443
+            jsr.io:443
+            nodejs.org:443
+            raw.githubusercontent.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
 
-      - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+
+      - name: Enable corepack and install deps
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
       - name: Publish to JSR
-        run: |
-          for i in 1 2 3; do
-            npx jsr publish && exit 0
-            echo "::warning::JSR publish attempt $i failed, retrying in 30s..."
-            sleep 30
-          done
-          exit 1
-
-  sync-version:
-    needs: [publish-npm, publish-gpr, publish-jsr]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: main
-          persist-credentials: true
-
-      - name: Bump version in package.json
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
-
-      - name: Commit and push
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json jsr.json
-          git diff --staged --quiet && echo "Already at v${VERSION}" && exit 0
-          git commit -m "chore: bump version to ${VERSION} [skip ci]"
-          git push origin main
+        run: npx jsr publish
