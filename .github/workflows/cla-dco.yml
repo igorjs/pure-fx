@@ -6,9 +6,11 @@ on:
   issue_comment:
     types: [created]
 
-permissions:
-  pull-requests: write
-  contents: write
+# Minimal top-level grant: job-level permissions override below.
+# SAFETY: pull_request_target runs with base-branch write context.
+# This workflow must NEVER check out or exec code from the PR head.
+# The actions/checkout step always uses `ref: main` for this reason.
+permissions: {}
 
 concurrency:
   group: cla-signature
@@ -17,6 +19,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
     if: >
       (github.event_name == 'pull_request_target' &&
        github.event.pull_request.user.login != 'dependabot[bot]') ||
@@ -25,8 +30,13 @@ jobs:
     steps:
       - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          egress-policy: audit
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            codeload.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: main
 

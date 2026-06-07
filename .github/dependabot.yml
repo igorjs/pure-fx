@@ -1,23 +1,35 @@
-version: 2
-updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "monthly"
-    labels:
-      - "dependencies"
-      - "chore"
-    commit-message:
-      prefix: "chore(deps):"
-    open-pull-requests-limit: 5
+# Managed by repo-config. Direct edits are overwritten on the next `terraform apply`.
+#
+# Dependabot version-update schedule. `monthly` runs in the first week of the
+# month (GitHub does not support pinning to a specific day number). Patch and
+# minor PRs are auto-merged by .github/workflows/dependabot-auto-merge.yml;
+# major-version bumps require manual review. PRs are grouped to minimise noise.
 
+version: 2
+
+updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
-    labels:
-      - "dependencies"
-      - "ci"
+    groups:
+      all-github-actions:
+        patterns: ["*"]
     commit-message:
-      prefix: "ci(deps):"
+      prefix: "chore(deps)"
     open-pull-requests-limit: 5
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        patterns: ["*"]
+      development-dependencies:
+        dependency-type: "development"
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
