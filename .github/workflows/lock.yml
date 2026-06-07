@@ -15,12 +15,11 @@ jobs:
     steps:
       - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          # Audit mode: lock-threads only hits api.github.com, so a
-          # strict block-mode allowlist would also work, but audit
-          # is consistent with the other low-risk utility workflows
-          # (scorecard, stale, etc.) that ward consumes from this
-          # module.
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
       - uses: dessant/lock-threads@89ae32b08ed1a541efecbab17912962a5e38981c # v6.0.2
         with:
           issue-inactive-days: 90
