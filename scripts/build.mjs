@@ -22,14 +22,6 @@ import { join } from "node:path";
 await rm("./dist", { recursive: true, force: true });
 execSync("tsgo", { stdio: "inherit" });
 
-// -- Rewrite @/* aliases in the emitted JS + d.ts -----------------------------
-// tsgo/tsc does not resolve `paths` in emitted output. tsc-alias post-processes
-// dist/ so the published package has plain relative imports; consumers never
-// see "@/" specifiers. --resolve-full-paths adds the .js extension Node strict
-// ESM requires (and that `rewriteRelativeImportExtensions` only adds for
-// already-relative imports, not for resolved alias paths).
-execSync("tsc-alias --resolve-full-paths", { stdio: "inherit" });
-
 // -- Strip comments from .js output -------------------------------------------
 
 const DIST = "./dist";
