@@ -68,6 +68,17 @@ jobs:
       - name: Dependency audit
         run: pnpm audit --audit-level=high
 
+      - name: Verify SPDX licence headers
+        run: |
+          missing=$(git ls-files '*.ts' '*.mts' '*.js' '*.mjs' \
+            | grep -v '\.d\.\(ts\|mts\)$$' \
+            | xargs grep -L "SPDX-License-Identifier" 2>/dev/null || true)
+          if [ -n "$$missing" ]; then
+            echo "Files missing SPDX-License-Identifier header:"
+            printf '%s\n' "$$missing"
+            exit 1
+          fi
+
       - name: Lint & format
         run: pnpm run lint
 
