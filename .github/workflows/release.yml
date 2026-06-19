@@ -216,6 +216,7 @@ jobs:
   publish-gh:
     needs: [resolve, build, slsa_provenance]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     steps:
