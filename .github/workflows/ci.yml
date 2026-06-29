@@ -79,6 +79,33 @@ jobs:
             exit 1
           fi
 
+      - name: Verify dependency versions are pinned
+        run: |
+          node -e '
+            const { execSync } = require("child_process");
+            const fs = require("fs");
+            const files = execSync("git ls-files", { encoding: "utf8" })
+              .split("\n")
+              .filter(f => (f === "package.json" || f.endsWith("/package.json")) && !f.includes("node_modules"));
+            const bad = [];
+            for (const f of files) {
+              const pkg = JSON.parse(fs.readFileSync(f, "utf8"));
+              for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
+                for (const [name, range] of Object.entries(pkg[field] || {})) {
+                  if (typeof range === "string" && /^[\^~]/.test(range)) {
+                    bad.push(f + ": " + field + "." + name + " = " + range);
+                  }
+                }
+              }
+            }
+            if (bad.length) {
+              console.error("Unpinned caret/tilde ranges (pin exact versions; Dependabot bumps them):");
+              console.error(bad.join("\n"));
+              process.exit(1);
+            }
+            console.log("All dependency versions are pinned.");
+          '
+
       - name: Lint & format
         run: pnpm run lint
 
