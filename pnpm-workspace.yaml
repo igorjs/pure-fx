@@ -1,6 +1,17 @@
-allowBuilds:
-  sharp: true
-  workerd: true
-
-overrides:
-  ws: ^8.20.1
+# Managed by repo-config. Direct edits are overwritten on next terraform apply.
+# Hardened pnpm settings live here; pnpm v10+ ignores them in .npmrc.
+# Repo-specific keys (packages, allowBuilds, overrides) come from
+# var.pnpm_workspace_settings and win over the hardening defaults on conflict.
+"allowBuilds":
+  "sharp": true
+  "workerd": true
+"autoInstallPeers": false
+"lockfileIncludeTarballUrl": true
+"overrides":
+  "ws": "^8.20.1"
+"preferFrozenLockfile": true
+"resolutionMode": "highest"
+"saveExact": true
+"shamefullyHoist": false
+"strictPeerDependencies": true
+"verifyStoreIntegrity": true
