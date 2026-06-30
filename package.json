@@ -122,10 +122,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",
-    "@igorjs/pure-test": "^0.4.2",
+    "@igorjs/pure-test": "0.4.2",
     "@typescript/native-preview": "latest",
-    "miniflare": "^4.20260603.0",
-    "playwright": "^1.60.0"
+    "miniflare": "4.20260603.0",
+    "playwright": "1.60.0"
   },
   "peerDependencies": {
     "typescript": ">=5.7.0"
