@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * remaining.test.js - Tests for the 7 previously untested modules:
  * Dns, Net, nodeAdapter, bunAdapter, denoAdapter, lambdaAdapter, nominal Type.

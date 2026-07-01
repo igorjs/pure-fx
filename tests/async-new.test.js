@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * async-new.test.js - Tests for new async modules: Stream, Retry, CircuitBreaker,
  * Semaphore, Mutex, RateLimiter, Cache, Channel, Env, EventEmitter.

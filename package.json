@@ -68,6 +68,7 @@
     "format": "biome format --write",
     "build": "node scripts/build.mjs",
     "test": "pure-test tests/",
+    "coverage": "c8 --config .c8rc.node.json pure-test tests/",
     "test:types": "tsgo -p tsconfig.test.json",
     "test:ci": "node scripts/test-ci.mjs",
     "release": "node scripts/release.mjs",
@@ -122,10 +123,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.16",
-    "@igorjs/pure-test": "^0.4.2",
+    "@igorjs/pure-test": "0.4.2",
     "@typescript/native-preview": "latest",
-    "miniflare": "^4.20260603.0",
-    "playwright": "^1.60.0"
+    "c8": "11.0.0",
+    "miniflare": "4.20260603.0",
+    "playwright": "1.60.0"
   },
   "peerDependencies": {
     "typescript": ">=5.7.0"

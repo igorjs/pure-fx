@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 import { Logger, Program, Task } from "../../dist/index.js";
 
 const log = Logger.create({ name: "custom", sink: Logger.json });

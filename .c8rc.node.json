@@ -1,0 +1,5 @@
+{
+  "$comment": "Coverage config when measuring under Node. Node 26 compatible.",
+  "include": ["dist/**/*.js"],
+  "reporter": ["text", "json-summary"]
+}

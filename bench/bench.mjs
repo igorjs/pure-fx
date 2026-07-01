@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * bench.mjs - Throughput (ops/sec) + memory footprint for hot paths.
  *

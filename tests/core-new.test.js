@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * core-new.test.js - Tests for Eq, Ord, Match, State, Lens, optics,
  * Result/Option traverse/sequence, Task traverse/sequence/ap,
