@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * server.test.js - Server module runtime correctness tests.
  *

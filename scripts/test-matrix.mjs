@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * test-matrix.mjs - Run full test suite across all available runtimes.
  * Used inside Docker containers and natively on macOS.
