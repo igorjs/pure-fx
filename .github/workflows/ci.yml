@@ -338,6 +338,7 @@ jobs:
             raw.githubusercontent.com:443
             ghcr.io:443
             pkg-containers.githubusercontent.com:443
+            azure.archive.ubuntu.com:80
             archive.ubuntu.com:80
             security.ubuntu.com:80
             esm.ubuntu.com:443
