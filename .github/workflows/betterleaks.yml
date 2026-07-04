@@ -25,7 +25,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  scan:
+  # Job key is deliberately NOT `scan`: osv-scan.yml uses that key, and
+  # two check runs with the same name make a ruleset's required `scan`
+  # context ambiguous (either one satisfies it). Keep this key unique.
+  betterleaks:
     runs-on: ubuntu-latest
     permissions:
       contents: read
