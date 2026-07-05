@@ -265,3 +265,25 @@ jobs:
             dist-release/sbom.cdx.json
           fail_on_unmatched_files: true
           prerelease: ${{ contains(needs.resolve.outputs.tag, 'dev-') || contains(needs.resolve.outputs.tag, '-alpha') || contains(needs.resolve.outputs.tag, '-beta') || contains(needs.resolve.outputs.tag, '-rc') }}
+
+  # ── Fail loud: central pipeline-failure issue ─────────────────────
+  # A failed tag-push release notifies nobody by default. Reports into
+  # the central alerts repo via the shared notify-failure action.
+  notify:
+    needs: [resolve, build, slsa_provenance, publish-gh]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/notify-failure
+        with:
+          bot-app-client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
+          bot-app-private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
