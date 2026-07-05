@@ -19,7 +19,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  check:
+  # Unique job key on purpose: clanker-filter.yml used to share `check`,
+  # and duplicate check-run names make any ruleset context named `check`
+  # ambiguous. Keep this key unique across the workflow set.
+  cla-dco:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
