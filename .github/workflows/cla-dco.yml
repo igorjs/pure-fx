@@ -9,11 +9,9 @@ on:
     types: [created]
 
 # Minimal top-level grant: job-level permissions override below.
-# SAFETY: pull_request_target AND issue_comment both run with base-branch write
-# context. This workflow must NEVER check out or exec code from the PR head, and
-# must NEVER interpolate untrusted event data (comment.body, PR title/body) into
-# a run: step. The actions/checkout step always uses `ref: main`, and event data
-# is read via the API / github-script context, never shell interpolation.
+# SAFETY: pull_request_target runs with base-branch write context.
+# This workflow must NEVER check out or exec code from the PR head.
+# The actions/checkout step always uses `ref: main` for this reason.
 permissions: {}
 
 concurrency:
