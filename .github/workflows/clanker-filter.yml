@@ -39,7 +39,10 @@ on:
 permissions: {}
 
 jobs:
-  check:
+  # Unique job key on purpose: cla-dco.yml used to share `check`, and
+  # duplicate check-run names make any ruleset context named `check`
+  # ambiguous. Keep this key unique across the workflow set.
+  clanker-filter:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
