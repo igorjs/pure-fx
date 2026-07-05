@@ -126,4 +126,4 @@ jobs:
             exit 1
           fi
           allow=$(grep -vE '^[[:space:]]*(#|$)' .license-checker.allow | paste -sd';' -)
-          npx --yes license-checker --production --onlyAllow "$allow"
+          npx --yes license-checker@25.0.1 --production --onlyAllow "$allow"
