@@ -19,7 +19,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  check:
+  # Unique job key on purpose: clanker-filter.yml used to share `check`,
+  # and duplicate check-run names make any ruleset context named `check`
+  # ambiguous. Keep this key unique across the workflow set.
+  cla-dco:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -65,6 +68,14 @@ jobs:
               // DCO behaviour. Check both author and committer
               // because merge commits have a separate committer.
               if (c.author?.type === 'Bot' || c.committer?.type === 'Bot') {
+                continue;
+              }
+              // Skip merge commits. A merge made through the GitHub UI
+              // (or `git merge` locally) cannot carry a Signed-off-by
+              // trailer, and it only combines commits that were already
+              // signed off on their own PRs, so gating on it would block
+              // any PR that merges the base branch back in.
+              if ((c.parents?.length || 0) >= 2) {
                 continue;
               }
               const msg = c.commit.message || '';
