@@ -4,9 +4,15 @@ name: Dependabot Auto-Merge
 
 on: pull_request
 
+# GITHUB_TOKEN stays read-only: the App token minted below does the
+# approve + auto-merge writes. GITHUB_TOKEN approvals additionally
+# require the repo-level "Allow GitHub Actions to create and approve
+# pull requests" setting (off by default, not managed by Terraform),
+# which silently broke this workflow everywhere. An igorjs[bot]
+# approval avoids the setting entirely, satisfies required-review
+# rules, and leaves a clearer audit trail than github-actions[bot].
 permissions:
-  contents: write
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   auto-merge:
@@ -26,16 +32,23 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Mint App installation token
+        id: app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Auto-approve patch and minor updates
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
 
       - name: Enable auto-merge for patch and minor updates
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
