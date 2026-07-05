@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: Apache-2.0
+# Managed by github.com/igorjs-iac/repo-config
+#
+# Files (or updates) a pipeline-failure issue in the central alerts
+# repo when an unattended workflow fails. Central rather than per-repo
+# because some repos have issues disabled and a fleet wants one pane;
+# App-token rather than GITHUB_TOKEN because issue creation happens
+# cross-repo.
+#
+# Prereq: the App needs `Issues: Read and write` (Repository
+# permissions section) granted AND accepted on the installation that
+# owns the alerts repo. Missing permission surfaces in this step's log
+# as 403 "Resource not accessible by integration".
+name: notify-failure
+description: File or update a pipeline-failure issue in the central alerts repo
+
+inputs:
+  bot-app-client-id:
+    description: OAuth client ID of the bot App (secrets.BOT_APP_CLIENT_ID)
+    required: true
+  bot-app-private-key:
+    description: PEM private key of the bot App (secrets.BOT_APP_PRIVATE_KEY)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - id: app_token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ inputs.bot-app-client-id }}
+        private-key: ${{ inputs.bot-app-private-key }}
+        owner: igorjs-iac
+        repositories: repo-config
+
+    - name: Open or update the pipeline-failure issue
+      shell: bash
+      env:
+        GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        ALERTS_REPO: igorjs-iac/repo-config
+        SOURCE: ${{ github.repository }}
+        WORKFLOW: ${{ github.workflow }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        gh label create pipeline-failure --repo "$ALERTS_REPO" \
+          --color B60205 --description "Automation pipeline needs attention" \
+          2>/dev/null || true
+        title="[$SOURCE] pipeline failure"
+        existing="$(gh issue list --repo "$ALERTS_REPO" --label pipeline-failure \
+          --state open --search "$SOURCE in:title" --json number --jq '.[0].number // empty')"
+        body="Workflow \`$WORKFLOW\` in $SOURCE failed: $RUN_URL"
+        if [[ -n "$existing" ]]; then
+          gh issue comment "$existing" --repo "$ALERTS_REPO" --body "$body"
+        else
+          gh issue create --repo "$ALERTS_REPO" --title "$title" \
+            --label pipeline-failure --body "$body"
+        fi
