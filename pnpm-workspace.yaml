@@ -8,7 +8,9 @@
 "autoInstallPeers": false
 "lockfileIncludeTarballUrl": true
 "overrides":
-  "ws": "^8.20.1"
+  "ws": "^8.21.0"
+  "undici": "^7.28.0"
+  "brace-expansion": "^5.0.6"
 "preferFrozenLockfile": true
 "resolutionMode": "highest"
 "saveExact": true

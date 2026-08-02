@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * type-def.test.js - Tests for TypeDef factory + v0 catalogue.
  *

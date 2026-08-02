@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * Run the web smoke test inside miniflare (Cloudflare Workers runtime).
  *

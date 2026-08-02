@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 // license-headers.mjs - Verify and optionally fix SPDX license headers.
 //
 // Usage:

@@ -1,3 +1,5 @@
+// Copyright 2026 igorjs. SPDX-License-Identifier: Apache-2.0
+
 /**
  * io-tier1.test.js - Comprehensive tests for Tier 1 IO modules:
  * Crypto, Url, Encoding, Clone, Compression, Timer.

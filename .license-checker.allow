@@ -1,0 +1,15 @@
+# SPDX license ids allowed for production dependencies (one per line).
+# Consumed by license-checker --onlyAllow in .github/workflows/license.yml.
+# Blank lines and # comments are ignored. Add ids as new prod deps appear.
+MIT
+ISC
+Apache-2.0
+BSD-2-Clause
+BSD-3-Clause
+0BSD
+Unlicense
+CC0-1.0
+CC-BY-4.0
+BlueOak-1.0.0
+MIT-0
+Python-2.0
