@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    // ── Target ───────────────────────────────────────────────────────────
+    // -- Target -------------------------------------------------------------------
     // ES2024: Node 22+ (V8 12.4+). Includes Array.groupBy, Promise.withResolvers,
     // ArrayBuffer.resize, Atomics.waitAsync, well-formed Unicode strings,
     // plus all ES2022 features (top-level await, Error.cause, Array.at).
@@ -10,7 +10,7 @@
     "moduleResolution": "bundler",
     "lib": ["es2024"],
 
-    // ── Strict - Maximum Safety ──────────────────────────────────────────
+    // -- Strict - Maximum Safety --------------------------------------------------
     // TS7 enables --strict by default. We go further.
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -19,25 +19,39 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
 
-    // ── Unused Code ──────────────────────────────────────────────────────
+    // -- Unused Code --------------------------------------------------------------
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
-    // ── Module Interop ───────────────────────────────────────────────────
+    // -- Module Interop -----------------------------------------------------------
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "isolatedModules": true,
 
-    // ── Output ───────────────────────────────────────────────────────────
+    // -- Output -------------------------------------------------------------------
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
 
-    // ── Interop ──────────────────────────────────────────────────────────
+    // -- Interop ------------------------------------------------------------------
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+
+    // -- Path aliases -------------------------------------------------------------
+    // Internal imports use @/<subpath> instead of ../../<subpath>. The TS
+    // compiler resolves them via these paths; tsx resolves them at dev/test
+    // runtime; tsc-alias rewrites them in the published dist so consumers
+    // see plain relative paths. Bun reads tsconfig paths natively; Deno
+    // reads its own deno.json import map.
+    //
+    // Note: modern TS (5.4+, including tsgo) treats `paths` values as
+    // relative to this tsconfig - no baseUrl needed, and entries must start
+    // with "./".
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests", "**/*.test.ts"]

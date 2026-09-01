@@ -159,6 +159,7 @@ if (r.isOk) {
 }
 ```
 
+
 ```ts
 import { TypeDef, Schema, Vec, Pair, Dict, Maybe, Either } from '@igorjs/pure-fx'
 
@@ -264,6 +265,7 @@ dt.toMutable();                                // a fresh Date (interop)
 `withEpochMillis`, `withEpochNanos`
 
 **Typeclass instances:** `eq`, `ord`
+
 
 ## Duration
 
