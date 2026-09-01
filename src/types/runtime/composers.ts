@@ -256,58 +256,6 @@ export const MapOf = <KTag extends string, K extends string, VTag extends string
     >
   >;
 
-// ── ListOf(T) ───────────────────────────────────────────────────────────────
-
-/**
- * Like {@link Vec}, but returns a pure-fx {@link ImmutableList} (functional API
- * + copy-on-write `produce`) instead of a frozen array.
- *
- * @example
- * ```ts
- * class UserIds extends ListOf(UserId) {}
- * const r = UserIds.parse(['u_001']);
- * if (r.isOk) r.value.append('u_002'); // new ImmutableList
- * ```
- */
-export const ListOf = <Tag extends string, T>(inner: TypeDefStatic<Tag, T>) =>
-  listOfMemo(inner as unknown as object, () =>
-    TypeDef(
-      `ListOf<${inner.tag}>` as const,
-      Schema.array(inner.schema).transform(arr => List(arr as readonly Type<Tag, T>[])),
-    ),
-  ) as ReturnType<typeof TypeDef<`ListOf<${Tag}>`, ImmutableList<Type<Tag, T>>>>;
-
-// ── MapOf(K, V) ───────────────────────────────────────────────────────────────
-
-/**
- * Like {@link Dict}, but returns a pure-fx {@link ImmutableHashMap} (functional
- * API + copy-on-write `produce`) instead of a frozen object.
- *
- * @example
- * ```ts
- * class Headers extends MapOf(Str, Str) {}
- * const r = Headers.parse({ 'content-type': 'application/json' });
- * if (r.isOk) r.value.get('content-type'); // Option<Type<'Str', string>>
- * ```
- */
-export const MapOf = <KTag extends string, K extends string, VTag extends string, V>(
-  key: TypeDefStatic<KTag, K>,
-  value: TypeDefStatic<VTag, V>,
-) =>
-  mapOfMemo(key as unknown as object, value as unknown as object, () =>
-    TypeDef(
-      `MapOf<${key.tag},${value.tag}>` as const,
-      Schema.record(value.schema).transform(obj =>
-        HashMap.fromObject(obj as Readonly<Record<string, Type<VTag, V>>>),
-      ),
-    ),
-  ) as ReturnType<
-    typeof TypeDef<
-      `MapOf<${KTag},${VTag}>`,
-      ImmutableHashMap<Type<KTag, K> & string, Type<VTag, V>>
-    >
-  >;
-
 // ── Maybe(T) ──────────────────────────────────────────────────────────────────
 
 /**
