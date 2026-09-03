@@ -31,10 +31,10 @@ If the report is declined (not a vulnerability, or out of scope), you will recei
 
 | Version | Supported |
 |---------|-----------|
-| `v0.1.0` (latest) | Yes |
+| `v0.3.0` (latest) | Yes |
 | earlier | No |
 
-Only the latest released version (`v0.1.0`) receives security patches. Upgrade to the latest version before reporting.
+Only the latest released version (`v0.3.0`) receives security patches. Upgrade to the latest version before reporting.
 
 ## Scope
 

@@ -10,10 +10,10 @@ services:
     build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: bullseye-slim } }
   node-24-alpine:
     build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "24", VARIANT: alpine } }
-  node-25-bookworm-slim:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25", VARIANT: bookworm-slim } }
-  node-25-alpine:
-    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "25", VARIANT: alpine } }
+  node-26-bookworm-slim:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "26", VARIANT: bookworm-slim } }
+  node-26-alpine:
+    build: { context: ., dockerfile: docker/node.Dockerfile, args: { NODE_VERSION: "26", VARIANT: alpine } }
 
   # ── Distroless Node (production runtime) ────────────────────────────────
   node-distroless:
