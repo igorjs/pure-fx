@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * websocket.test.js - Tests for the WebSocket router module.
  *

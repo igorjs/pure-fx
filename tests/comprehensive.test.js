@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * comprehensive.test.js - Exhaustive tests for Result, Option, Task, Schema,
  * Record, List, and namespace methods. Fills coverage gaps.
