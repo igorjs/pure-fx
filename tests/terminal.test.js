@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * terminal.test.js - Tests for the Terminal module.
  *

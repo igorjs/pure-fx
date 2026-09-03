@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * program.test.js - Black-box tests for Program.run() process lifecycle.
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * integration.test.js - Cross-module integration & full program simulation.
  *

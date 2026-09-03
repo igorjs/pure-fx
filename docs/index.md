@@ -46,7 +46,7 @@ CI-tested on 8 environments:
 |---------|-----------|-------------------|
 | Node.js 22 | 1462 | 337 (runtime + web) |
 | Node.js 24 | - | 337 |
-| Node.js 25 | - | 337 (with `--allow-ffi`) |
+| Node.js 26 | - | 337 (with `--allow-ffi`) |
 | Deno 2+ | - | 337 |
 | Bun | - | 337 |
 | CF Workers (miniflare) | - | 249 (web) |
