@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * adapters.test.js - Tests for the runtime adapter layer.
  *

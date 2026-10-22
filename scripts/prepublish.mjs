@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * prepublish.mjs - Pre-publish gate.
  *

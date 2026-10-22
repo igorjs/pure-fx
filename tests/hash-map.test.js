@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * hash-map.test.js - Tests for immutable HashMap (HAMT-backed).
  *

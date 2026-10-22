@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * Worker wrapper for running smoke-core tests inside miniflare.
  *

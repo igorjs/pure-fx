@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * bundle-size.mjs - Verify tree-shaking works by comparing bundle sizes.
  *

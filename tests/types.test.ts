@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * types.test.ts - Compile-time type safety suite.
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * crypto.test.js - Tests for expanded Crypto module (full Web Crypto API).
  *

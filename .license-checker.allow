@@ -1,0 +1,5 @@
+# SPDX license identifiers allowed for production dependencies.
+# Checked by dependency-review.yml (license-checker --production --onlyAllow).
+# This package ships zero runtime dependencies, so only the project's own
+# license needs to be listed.
+Apache-2.0

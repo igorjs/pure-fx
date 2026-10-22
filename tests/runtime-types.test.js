@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * runtime-types.test.js - Tests for the v0.2 runtime-types additions.
  *

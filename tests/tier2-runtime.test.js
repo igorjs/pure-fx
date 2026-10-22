@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * tier2-runtime.test.js - Tests for Tier 2 runtime modules.
  *

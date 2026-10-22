@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { Err, ErrType, Program, Task } from "../../dist/index.js";
 
 const NotFound = ErrType("NotFound", "NOT_FOUND");

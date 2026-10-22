@@ -40,7 +40,7 @@ body:
       options:
         - Node.js 22
         - Node.js 24
-        - Node.js 25
+        - Node.js 26
         - Deno
         - Bun
         - Cloudflare Workers

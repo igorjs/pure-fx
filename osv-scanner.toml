@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner ignore list. This package ships zero runtime dependencies
+# (see package.json), so every advisory below is a transitive devDependency
+# of miniflare (undici, sharp) used only by the Cloudflare Workers
+# integration test job. None of it reaches the published npm/JSR package.
+#
+# Tracked fix: upgrade miniflare past its current 4.x line once a stable
+# (non-alpha) 5.x release resolves the undici/sharp advisories. Re-run
+# `osv-scanner scan source --recursive ./` after that upgrade and prune
+# whichever entries below it clears.
+#
+# Mirrors the same --prod scoping decision already made for the
+# `pnpm audit` CI gate (.github/workflows/ci.yml).
+
+[[IgnoredVulns]]
+id = "GHSA-f88m-g3jw-g9cj"
+reason = "sharp, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-35p6-xmwp-9g52"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-4cwx-7wf7-3272"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-8xcm-r25x-g524"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-g8m3-5g58-fq7m"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-hm92-r4w5-c3mj"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-jr45-8vmc-qm54"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-m8rv-5g2x-5cg5"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-p88m-4jfj-68fv"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-pr7r-676h-xcf6"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-v3r7-h72x-cjcm"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-vmh5-mc38-953g"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"
+
+[[IgnoredVulns]]
+id = "GHSA-vxpw-j846-p89q"
+reason = "undici, transitive devDependency of miniflare only; not shipped in the published package"

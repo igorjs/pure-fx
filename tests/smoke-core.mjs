@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /**
  * smoke-core.mjs - Cross-runtime smoke test for all pure and
  * web-standard modules (no runtime-specific APIs).
