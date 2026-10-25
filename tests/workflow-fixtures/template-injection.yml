@@ -1,0 +1,10 @@
+name: Template injection fixture
+on:
+  issues:
+    types: [opened]
+permissions: {}
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.event.issue.title }}
