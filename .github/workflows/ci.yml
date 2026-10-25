@@ -1,20 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-# Managed by github.com/igorjs-iac/repo-config
-#
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_ci). Direct edits in the consuming repo are
-# overwritten on the next `terraform apply` against repo-config.
 #
 # Per-runtime integration matrix for npm-shaped JavaScript packages.
 # Shape matches the existing pure-fx pattern: a single `lint-and-test`
 # job (the required status check) that handles lint + type-check +
 # build + unit tests, then per-runtime-family integration jobs that
 # download the built `dist/` artifact and run smoke tests.
-#
-# Runtimes are opted into per-repo via `var.ci_runtimes`. The module
-# parses that flat list into per-family version arrays before passing
-# them to this template, so the template renders only the integration
-# jobs the repo actually needs.
 
 name: CI
 

@@ -1,13 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-# Managed by github.com/igorjs-iac/repo-config
-#
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_publish). Direct edits in the consuming repo are
-# overwritten on the next `terraform apply` against repo-config.
 #
 # SLSA L3 publish pipeline for npm and JSR. Triggered when a GitHub
-# Release is published (which the templated release.yml does after it
-# uploads the SLSA L3 provenance attestation). Publish runs in two
+# Release is published (which release.yml does after it uploads the
+# SLSA L3 provenance attestation). Publish runs in two
 # stages:
 #
 #   1. detect       Read package.json / jsr.json / deno.json from the
@@ -15,8 +10,7 @@
 #                   registries the package targets (`publish_npm`,
 #                   `publish_jsr`) and emit the deployment-environment
 #                   URLs that the GitHub UI shows on the release page.
-#                   No Terraform-side `publish_targets` flag — file
-#                   presence is the source of truth.
+#                   File presence is the source of truth.
 #
 #   2. publish-*    One job per registry, each gated by the detect
 #                   output. Both jobs run with `id-token: write` to mint
@@ -27,7 +21,7 @@
 #                   block` so a compromised step can't exfiltrate.
 #
 # Trusted Publishers on npm/JSR must be configured per-package via the
-# registry web UI; see modules/hardened-repo/docs/setup-trusted-publishers.md.
+# registry web UI; see docs/repo-setup.md.
 
 name: publish
 

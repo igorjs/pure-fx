@@ -1,4 +1,3 @@
-# Managed by repo-config. Direct edits may be overwritten on next `terraform apply`.
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default: every file requires maintainer review.

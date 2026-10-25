@@ -1,9 +1,4 @@
 # SPDX-License-Identifier: Apache-2.0
-# Managed by github.com/igorjs-iac/repo-config
-#
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_release). Direct edits in the consuming repo are
-# overwritten on the next `terraform apply` against repo-config.
 #
 # SLSA L3 build + attest pipeline for npm-shaped JavaScript packages.
 # Triggered on `v*` tag push (the convention `scripts/release.mjs`
