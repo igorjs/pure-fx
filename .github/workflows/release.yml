@@ -71,14 +71,14 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [[ "$$EVENT_NAME" == "push" ]]; then
+          if [[ "${EVENT_NAME}" == "push" ]]; then
             TAG="${GITHUB_REF##refs/tags/}"
             VERSION="${TAG#v}"
-          elif [[ -n "$$INPUT_TAG" ]]; then
-            TAG="$$INPUT_TAG"
+          elif [[ -n "${INPUT_TAG}" ]]; then
+            TAG="${INPUT_TAG}"
             VERSION="${TAG#v}"
           else
-            SHORT_SHA="$(echo "$$HEAD_SHA" | cut -c1-7)"
+            SHORT_SHA="$(echo "${HEAD_SHA}" | cut -c1-7)"
             TAG="dev-${SHORT_SHA}"
             VERSION="0.0.0-${SHORT_SHA}"
           fi

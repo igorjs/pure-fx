@@ -309,30 +309,11 @@ jobs:
     needs: [lint-and-test]
     runs-on: ubuntu-latest
     name: "integration / browser"
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
+    # harden-runner needs sudo on the runner VM and does not support
+    # container jobs. This job runs without it.
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-        with:
-          egress-policy: block
-          allowed-endpoints: >
-            api.github.com:443
-            github.com:443
-            objects.githubusercontent.com:443
-            release-assets.githubusercontent.com:443
-            codeload.github.com:443
-            registry.npmjs.org:443
-            registry.yarnpkg.com:443
-            nodejs.org:443
-            playwright.azureedge.net:443
-            playwright-akamai.azureedge.net:443
-            cdn.playwright.dev:443
-            raw.githubusercontent.com:443
-            ghcr.io:443
-            pkg-containers.githubusercontent.com:443
-            azure.archive.ubuntu.com:80
-            archive.ubuntu.com:80
-            security.ubuntu.com:80
-            esm.ubuntu.com:443
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: corepack enable
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -344,21 +325,6 @@ jobs:
         with:
           name: dist
           path: dist/
-
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: "playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}"
-
-      - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium --with-deps
-
-      - name: Install Playwright deps only
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
 
       - name: Browser smoke test (Chromium)
         run: node tests/browser/run.mjs

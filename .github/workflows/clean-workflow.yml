@@ -30,7 +30,7 @@ jobs:
             github.com:443
             objects.githubusercontent.com:443
 
-      - uses: igorjs/gh-actions-clean-workflow@8de2bf6a685b49cbece3bdb16ca5cdb827684161 # v7
+      - uses: igorjs/gh-actions-clean-workflow@5fa2e3a4fdd40e3e7098645a0b8df08624352e5e # v7.0.1
         with:
           runs_older_than: 7
           runs_to_keep: 10

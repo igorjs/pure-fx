@@ -45,6 +45,7 @@ jobs:
           egress-policy: block
           allowed-endpoints: >
             agent.api.stepsecurity.io:443
+            api.deps.dev:443
             api.github.com:443
             api.osv.dev:443
             codeload.github.com:443
