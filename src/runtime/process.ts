@@ -6,14 +6,13 @@
  * Cross-runtime process information and argument parsing.
  *
  * **Why wrap process globals?**
- * Each runtime exposes process info differently: Node/Bun use `process`,
- * Deno uses `Deno`. This module uses the ProcessInfo adapter from
- * runtime/adapters which normalises both behind a single interface,
+ * Each runtime exposes process info differently. This module uses the
+ * ProcessInfo adapter from runtime/adapters which normalises them behind
+ * a single interface,
  * returning Result/Option instead of throwing.
  *
  * **Troubleshooting:**
  * - `uid()`/`gid()` return `None` on Windows (POSIX-only APIs).
- * - `env('KEY')` returns `None` on Deno without `--allow-env`.
  * - `memoryUsage()` returns `None` if the runtime doesn't expose heap stats.
  * - `ppid` returns `None` on some restricted runtimes.
  * - All methods return `Option` or `Result`, never throw.
@@ -105,8 +104,7 @@ export const Process: {
    * With a key, returns Option<string> for that variable.
    * Without arguments, returns all env vars as a record.
    *
-   * Cross-runtime: Node/Bun use `process.env`, Deno uses `Deno.env`.
-   * Deno requires `--allow-env` permission; returns None / empty record if denied.
+   * Cross-runtime: Node/Bun use `process.env`.
    */
   readonly env: {
     (): Record<string, string>;
@@ -128,7 +126,7 @@ export const Process: {
   readonly uid: () => Option<number>;
   /** Get the group ID of the process (POSIX only). */
   readonly gid: () => Option<number>;
-  /** Get the path to the runtime executable (node, deno, bun). */
+  /** Get the path to the runtime executable (node, bun). */
   readonly execPath: () => Option<string>;
   /** Exit the process with the given code. */
   readonly exit: (code?: number) => never;

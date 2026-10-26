@@ -11,7 +11,7 @@
  * management (generate, import, export, wrap, unwrap), and random generation.
  *
  * All async operations return TaskLike. All fallible sync operations return
- * Result. Uses only web standard APIs available in Node 22+, Deno, and Bun.
+ * Result. Uses only web standard APIs available in Node 22+ and Bun.
  */
 
 import { makeTask, type TaskLike } from "../async/task-like.js";
@@ -162,8 +162,8 @@ const cryptoTask = <T>(fn: () => Promise<T>): TaskLike<T, ErrType<"CryptoError">
 /**
  * Batteries-included cryptographic operations using the Web Crypto API.
  *
- * All methods use `globalThis.crypto` which is available in Node 22+,
- * Deno, and Bun without any imports.
+ * All methods use `globalThis.crypto` which is available in Node 22+
+ * and Bun without any imports.
  *
  * @example
  * ```ts

@@ -3,10 +3,10 @@
 /**
  * @module runtime/adapters/subprocess
  *
- * Subprocess adapter implementations for Deno, Bun, and Node.
+ * Subprocess adapter implementations for Bun and Node.
  */
 
-import { getDeno, importNode } from "./detect.js";
+import { importNode } from "./detect.js";
 import type { Subprocess, SubprocessOptions, SubprocessResult } from "./types.js";
 
 // ── Bun structural types ────────────────────────────────────────────────────
@@ -99,122 +99,6 @@ const raceTimeout = <T>(
       },
     );
   });
-};
-
-// ── Deno adapter ────────────────────────────────────────────────────────────
-
-const createDenoSubprocess = (): Subprocess | undefined => {
-  const deno = getDeno();
-  const DenoCommand = (deno as unknown as { Command?: unknown })?.Command;
-  if (DenoCommand === undefined) return undefined;
-
-  // biome-ignore lint/complexity/noBannedTypes: Deno.Command constructor stored dynamically
-  const Cmd = DenoCommand as Function;
-
-  return {
-    exec: async (cmd, args, options) => {
-      const spawnOpts = buildOpts(options);
-      const decoder = new TextDecoder();
-
-      if (options.stdin !== undefined) {
-        const proc = new (
-          Cmd as new (
-            ...a: unknown[]
-          ) => {
-            spawn(): {
-              stdin: WritableStream<Uint8Array>;
-              output(): Promise<{ code: number; stdout: Uint8Array; stderr: Uint8Array }>;
-            };
-            kill(): void;
-          }
-        )(cmd, { args, stdin: "piped", stdout: "piped", stderr: "piped", ...spawnOpts });
-        const child = proc.spawn();
-        const writer = child.stdin.getWriter();
-        await writer.write(new TextEncoder().encode(options.stdin));
-        await writer.close();
-        const output = await raceTimeout(child.output(), options.timeout, () => {
-          try {
-            proc.kill();
-          } catch {
-            /* */
-          }
-        });
-        return {
-          exitCode: output.code,
-          stdout: decoder.decode(output.stdout),
-          stderr: decoder.decode(output.stderr),
-        };
-      }
-
-      const proc = new (
-        Cmd as new (
-          ...a: unknown[]
-        ) => {
-          output(): Promise<{ code: number; stdout: Uint8Array; stderr: Uint8Array }>;
-          spawn(): {
-            output(): Promise<{ code: number; stdout: Uint8Array; stderr: Uint8Array }>;
-            kill(): void;
-          };
-        }
-      )(cmd, { args, stdout: "piped", stderr: "piped", ...spawnOpts });
-
-      if (options.timeout !== undefined) {
-        const child = proc.spawn();
-        const output = await raceTimeout(child.output(), options.timeout, () => {
-          try {
-            child.kill();
-          } catch {
-            /* */
-          }
-        });
-        return {
-          exitCode: output.code,
-          stdout: decoder.decode(output.stdout),
-          stderr: decoder.decode(output.stderr),
-        };
-      }
-
-      const output = await proc.output();
-      return {
-        exitCode: output.code,
-        stdout: decoder.decode(output.stdout),
-        stderr: decoder.decode(output.stderr),
-      };
-    },
-
-    spawn: async (cmd, args, options) => {
-      const spawnOpts = buildOpts(options);
-      const pipeOpts = options.capture === true ? { stdout: "piped", stderr: "piped" } : {};
-      const proc = new (
-        Cmd as new (
-          ...a: unknown[]
-        ) => {
-          spawn(): {
-            readonly pid: number;
-            output(): Promise<{ code: number; stdout: Uint8Array; stderr: Uint8Array }>;
-            kill(signal?: string): void;
-            unref(): void;
-          };
-        }
-      )(cmd, { args, ...pipeOpts, ...spawnOpts });
-      const child = proc.spawn();
-      const decoder = new TextDecoder();
-
-      return {
-        pid: child.pid,
-        kill: (signal?) => child.kill(signal),
-        unref: () => child.unref(),
-        wait: async () => {
-          const output = await child.output();
-          return {
-            exitCode: output.code,
-            stdout: decoder.decode(output.stdout),
-            stderr: decoder.decode(output.stderr),
-          };
-        },
-      };
-    },
-  };
 };
 
 // ── Bun adapter ─────────────────────────────────────────────────────────────
@@ -396,5 +280,4 @@ const createNodeSubprocess = (): Subprocess => ({
 // ── Resolve ─────────────────────────────────────────────────────────────────
 
 /** Resolve the subprocess adapter for the current runtime. */
-export const resolveSubprocess = (): Subprocess =>
-  createDenoSubprocess() ?? createBunSubprocess() ?? createNodeSubprocess();
+export const resolveSubprocess = (): Subprocess => createBunSubprocess() ?? createNodeSubprocess();

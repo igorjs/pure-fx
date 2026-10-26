@@ -6,7 +6,7 @@
  * Unified adapter interfaces for cross-runtime capabilities.
  *
  * Each interface defines a normalised contract that hides runtime
- * differences (Node vs Deno vs Bun). Implementations live in the
+ * differences (Node vs Bun). Implementations live in the
  * per-capability adapter files alongside their resolve functions.
  *
  * These types are internal. Public modules (File, Terminal, Command,

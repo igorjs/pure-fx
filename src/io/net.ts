@@ -8,7 +8,7 @@
  * **Why wrap TCP?**
  * Raw TCP sockets are runtime-specific with no web standard equivalent.
  * This module uses the TcpClient adapter from runtime/adapters which
- * normalises Deno and Node/Bun TCP APIs behind a single interface.
+ * normalises Node/Bun TCP APIs behind a single interface.
  */
 
 import { makeTask, type TaskLike } from "../async/task-like.js";

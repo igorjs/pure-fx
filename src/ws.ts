@@ -12,7 +12,7 @@
  * alongside Server's `.fetch` handler.
  *
  * This module provides the type-safe handler interface. Actual WebSocket
- * upgrade depends on the runtime (Bun, Deno, Node), so the runtime adapter
+ * upgrade depends on the runtime (Bun, Node), so the runtime adapter
  * must wire it in.
  */
 
@@ -122,8 +122,7 @@ const createRouter = (routes: readonly WebSocketRoute[]): WebSocketRouter =>
  * WebSocket routing and handler definitions.
  *
  * The router holds type-safe handler definitions. Actual WebSocket
- * upgrade is runtime-specific: Bun uses `server.upgrade()`, Deno uses
- * `Deno.upgradeWebSocket()`, Node uses a ws library. The runtime adapter
+ * upgrade is runtime-specific: Bun uses `server.upgrade()`, Node uses a ws library. The runtime adapter
  * reads the router's routes and wires them into the server.
  *
  * @example

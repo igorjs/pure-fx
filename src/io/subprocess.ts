@@ -5,10 +5,10 @@
  *
  * Cross-runtime subprocess execution returning Task instead of throwing.
  *
- * **Why wrap child_process / Deno.Command / Bun.spawn?**
+ * **Why wrap child_process / Bun.spawn?**
  * Each runtime has its own subprocess API with different shapes, error
  * semantics, and output types. This module uses the Subprocess adapter
- * from runtime/adapters which normalises all three behind a single
+ * from runtime/adapters which normalises both behind a single
  * interface, returning a unified CommandResult wrapped in TaskLike.
  *
  * Non-zero exit codes are not errors: only spawn failures (command not

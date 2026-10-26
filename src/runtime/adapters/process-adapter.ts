@@ -3,86 +3,11 @@
 /**
  * @module runtime/adapters/process-adapter
  *
- * Process information adapter implementations for Deno and Node/Bun.
+ * Process information adapter implementations for Node/Bun.
  */
 
-import { getDeno, getNodeProcess } from "./detect.js";
+import { getNodeProcess } from "./detect.js";
 import type { ProcessInfo, ProcessMemory } from "./types.js";
-
-// ── Deno adapter ────────────────────────────────────────────────────────────
-
-const createDenoProcessInfo = (): ProcessInfo | undefined => {
-  const deno = getDeno();
-  if (deno === undefined) return undefined;
-
-  return {
-    cwd: () => deno.cwd(),
-    pid: deno.pid,
-    ...(deno.ppid !== undefined ? { ppid: deno.ppid } : {}),
-    argv: deno.args,
-    env: ((key?: string) => {
-      try {
-        if (key === undefined) return deno.env?.toObject?.() ?? {};
-        return deno.env?.get?.(key);
-      } catch {
-        return key === undefined ? {} : undefined;
-      }
-    }) as ProcessInfo["env"],
-    exit: (code?) => deno.exit(code),
-    ...(deno.osUptime
-      ? {
-          uptime: (): number => {
-            try {
-              return deno.osUptime!();
-            } catch {
-              return 0;
-            }
-          },
-        }
-      : {}),
-    ...(deno.memoryUsage
-      ? {
-          memoryUsage: (): ProcessMemory => {
-            const mem = deno.memoryUsage!();
-            return { heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss };
-          },
-        }
-      : {}),
-    ...(deno.uid
-      ? {
-          uid: (): number | undefined => {
-            try {
-              return deno.uid!();
-            } catch {
-              return undefined;
-            }
-          },
-        }
-      : {}),
-    ...(deno.gid
-      ? {
-          gid: (): number | undefined => {
-            try {
-              return deno.gid!();
-            } catch {
-              return undefined;
-            }
-          },
-        }
-      : {}),
-    ...(deno.execPath
-      ? {
-          execPath: (): string => {
-            try {
-              return deno.execPath!();
-            } catch {
-              return "deno";
-            }
-          },
-        }
-      : {}),
-  };
-};
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 
@@ -127,5 +52,4 @@ const createNodeProcessInfo = (): ProcessInfo | undefined => {
 // ── Resolve ─────────────────────────────────────────────────────────────────
 
 /** Resolve the process info adapter for the current runtime. */
-export const resolveProcessInfo = (): ProcessInfo | undefined =>
-  createDenoProcessInfo() ?? createNodeProcessInfo();
+export const resolveProcessInfo = (): ProcessInfo | undefined => createNodeProcessInfo();

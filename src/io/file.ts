@@ -10,7 +10,7 @@
  * invalid paths. Wrapping in Task makes failures values, not exceptions.
  *
  * **Multi-runtime strategy:**
- * Uses the Fs adapter from runtime/adapters which normalises Deno, Node,
+ * Uses the Fs adapter from runtime/adapters which normalises Node
  * and Bun file system APIs behind a single interface.
  */
 
@@ -74,7 +74,7 @@ const withFs = <T>(
 /**
  * Type-safe file system operations that return Task instead of throwing.
  *
- * Multi-runtime: detects Deno (native API), then Node/Bun (node:fs/promises).
+ * Multi-runtime: uses Node/Bun (node:fs/promises).
  * Gracefully returns Err in runtimes without filesystem (Workers, browsers).
  *
  * @example

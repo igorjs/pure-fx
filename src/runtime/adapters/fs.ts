@@ -3,10 +3,10 @@
 /**
  * @module runtime/adapters/fs
  *
- * File system adapter implementations for Deno and Node/Bun.
+ * File system adapter implementations for Node/Bun.
  */
 
-import { getDeno, importNode } from "./detect.js";
+import { importNode } from "./detect.js";
 import type { Fs, FsStat } from "./types.js";
 
 // ── Node structural types ───────────────────────────────────────────────────
@@ -47,75 +47,6 @@ interface NodeFs {
 }
 
 const getNodeFs = importNode<NodeFs>("node:fs/promises");
-
-// ── Deno adapter ────────────────────────────────────────────────────────────
-
-const createDenoFs = (): Fs | undefined => {
-  const deno = getDeno();
-  if (deno?.readTextFile === undefined) return undefined;
-
-  return {
-    readFile: path => deno.readTextFile!(path),
-    writeFile: (path, content) => deno.writeTextFile!(path, content),
-    appendFile: (path, content) => deno.writeTextFile!(path, content, { append: true }),
-    mkdir: path => deno.mkdir!(path, { recursive: true }).then(() => undefined),
-    stat: async (path): Promise<FsStat> => {
-      const s = await deno.stat!(path);
-      return {
-        isFile: s.isFile,
-        isDirectory: s.isDirectory,
-        size: s.size,
-        mtime: s.mtime ?? undefined,
-      };
-    },
-    remove: path => deno.remove!(path),
-    removeDir: path => deno.remove!(path, { recursive: true }),
-    readDir: async path => {
-      const entries: string[] = [];
-      for await (const entry of deno.readDir!(path)) entries.push(entry.name);
-      return entries;
-    },
-    copyFile: (src, dest) => deno.copyFile!(src, dest),
-    rename: (oldPath, newPath) => deno.rename!(oldPath, newPath),
-    makeTempDir: prefix => {
-      const opts: { prefix?: string } = {};
-      if (prefix !== undefined) opts.prefix = prefix;
-      return deno.makeTempDir!(opts);
-    },
-    ...(deno.readFile ? { readBytes: (path: string) => deno.readFile!(path) } : {}),
-    ...(deno.writeFile
-      ? { writeBytes: (path: string, data: Uint8Array) => deno.writeFile!(path, data) }
-      : {}),
-    ...(deno.symlink
-      ? { symlink: (target: string, path: string) => deno.symlink!(target, path) }
-      : {}),
-    ...(deno.link
-      ? { link: (existingPath: string, newPath: string) => deno.link!(existingPath, newPath) }
-      : {}),
-    ...(deno.chmod ? { chmod: (path: string, mode: number) => deno.chmod!(path, mode) } : {}),
-    ...(deno.chown
-      ? { chown: (path: string, uid: number, gid: number) => deno.chown!(path, uid, gid) }
-      : {}),
-    ...(deno.truncate
-      ? { truncate: (path: string, len?: number) => deno.truncate!(path, len) }
-      : {}),
-    ...(deno.realPath ? { realPath: (path: string) => deno.realPath!(path) } : {}),
-    ...(deno.readLink ? { readLink: (path: string) => deno.readLink!(path) } : {}),
-    ...(deno.lstat
-      ? {
-          lstat: async (path: string): Promise<FsStat> => {
-            const s = await deno.lstat!(path);
-            return {
-              isFile: s.isFile,
-              isDirectory: s.isDirectory,
-              size: s.size,
-              mtime: s.mtime ?? undefined,
-            };
-          },
-        }
-      : {}),
-  };
-};
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 
@@ -158,7 +89,5 @@ const createNodeFs = async (): Promise<Fs | null> => {
 
 /** Resolve the file system adapter for the current runtime. */
 export const resolveFs = async (): Promise<Fs | null> => {
-  const deno = createDenoFs();
-  if (deno !== undefined) return deno;
   return createNodeFs();
 };

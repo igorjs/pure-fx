@@ -7,7 +7,7 @@
 declare function structuredClone<T>(value: T): T;
 
 /**
- * V8's Error.captureStackTrace (Node 22+, Deno 2+, Chromium).
+ * V8's Error.captureStackTrace (Node 22+, Chromium).
  * Not part of ECMAScript but universally available in V8 environments.
  */
 interface ErrorConstructor {
@@ -30,7 +30,7 @@ declare class AbortSignal {
 }
 
 /**
- * Minimal `process` declarations for Node 22+ / Bun / Deno.
+ * Minimal `process` declarations for Node 22+ / Bun.
  * Only the subset used by Program (signals + exit).
  */
 declare const process: {
@@ -40,7 +40,7 @@ declare const process: {
 };
 
 /**
- * WHATWG Timer API. Available in all JS runtimes (Node, Deno, Bun, browsers).
+ * WHATWG Timer API. Available in all JS runtimes (Node, Bun, browsers).
  * Not part of ECMAScript but universally available.
  */
 declare function setTimeout(callback: () => void, ms?: number): number;
@@ -60,7 +60,7 @@ declare const console: {
 /**
  * Explicit Resource Management (ECMAScript 2024).
  * Enables `using` / `await using` declarations for deterministic cleanup.
- * Available in Node 22+, Deno 2+, and modern browsers.
+ * Available in Node 22+ and modern browsers.
  */
 interface SymbolConstructor {
   readonly dispose: unique symbol;
@@ -75,7 +75,7 @@ interface AsyncDisposable {
   [Symbol.asyncDispose](): PromiseLike<void>;
 }
 
-// ── WHATWG URL API (Node 10+, Deno 1.0+, Bun, browsers) ────────────────────
+// ── WHATWG URL API (Node 10+, Bun, browsers) ────────────────────
 
 declare class URL {
   constructor(url: string, base?: string);
@@ -107,7 +107,7 @@ declare class URLSearchParams {
   toString(): string;
 }
 
-// ── WHATWG Fetch API (Node 18+, Deno 1.0+, Bun, browsers) ──────────────────
+// ── WHATWG Fetch API (Node 18+, Bun, browsers) ──────────────────
 
 type HeadersInit = Headers | Record<string, string> | readonly [string, string][];
 
@@ -166,7 +166,7 @@ declare class Response {
   clone(): Response;
 }
 
-// ── WHATWG Streams API (Node 18+, Deno 1.0+, Bun, browsers) ────────────────
+// ── WHATWG Streams API (Node 18+, Bun, browsers) ────────────────
 
 interface ReadableStreamDefaultController<R> {
   enqueue(chunk: R): void;
@@ -201,7 +201,7 @@ declare class WritableStream<W = Uint8Array> {
   readonly locked: boolean;
 }
 
-// ── WHATWG Encoding API (Node 11+, Deno 1.0+, Bun, browsers) ───────────────
+// ── WHATWG Encoding API (Node 11+, Bun, browsers) ───────────────
 
 declare class TextEncoder {
   encode(input?: string): Uint8Array;

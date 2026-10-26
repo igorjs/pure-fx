@@ -8,21 +8,19 @@
  *
  * Provides a unified API across:
  * - **Node 25+**: `node:ffi` (experimental, requires `--allow-ffi`)
- * - **Deno**: `Deno.dlopen()` (requires `--allow-ffi`)
  * - **Bun**: `bun:ffi`
  *
  * All operations return Result, making failure paths explicit.
  *
  * **Troubleshooting:**
  * - `Err("FFI not available...")`: You're on Node <25. Upgrade to Node 25+
- *   and run with `--allow-ffi`, or use Deno/Bun.
+ *   and run with `--allow-ffi`, or use Bun.
  * - `Err("...library not found...")`: The shared library path is wrong.
  *   Use `FFI.systemLib('name')` for system libraries, or provide an
  *   absolute path. Check `FFI.suffix` for the correct file extension.
  * - `Err("...symbol not found...")`: The function name doesn't match what
  *   the library exports. Check with `nm -D libfoo.so` (Linux) or
  *   `nm -gU libfoo.dylib` (macOS).
- * - Deno requires `--allow-ffi` permission flag.
  * - Use `FFI.isAvailable()` to check before attempting to load.
  *
  * @example
@@ -55,7 +53,7 @@ export const FFIError: ErrTypeConstructor<"FFIError", string> = ErrType("FFIErro
 /**
  * Supported FFI scalar types.
  *
- * Common across all runtimes (Deno, Bun, Node 25+):
+ * Common across all runtimes (Bun, Node 25+):
  * - Integers: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`
  * - Floats: `f32`, `f64`
  * - Other: `void`, `bool`, `pointer`, `buffer`
@@ -96,22 +94,6 @@ export interface FfiLibrary<S extends FfiSymbols> {
 }
 
 // ── Runtime detection ───────────────────────────────────────────────────────
-
-interface DenoGlobal {
-  dlopen(
-    path: string,
-    symbols: Record<string, FfiSymbolDefinition>,
-  ): {
-    symbols: Record<string, (...args: readonly unknown[]) => unknown>;
-    close(): void;
-  };
-  build: { os: string };
-}
-
-const getDeno = (): DenoGlobal | undefined =>
-  typeof globalThis !== "undefined" && "Deno" in globalThis
-    ? (globalThis as unknown as { Deno: DenoGlobal }).Deno
-    : undefined;
 
 const isBun = (): boolean => typeof globalThis !== "undefined" && "Bun" in globalThis;
 
@@ -154,10 +136,6 @@ const toNodeDefinitions = (
 // ── Platform suffix ─────────────────────────────────────────────────────────
 
 const detectSuffix = (): string => {
-  const deno = getDeno();
-  if (deno) {
-    return deno.build.os === "windows" ? "dll" : deno.build.os === "darwin" ? "dylib" : "so";
-  }
   if (typeof globalThis !== "undefined" && "process" in globalThis) {
     const proc = (globalThis as unknown as { process: { platform: string } }).process;
     return proc.platform === "win32" ? "dll" : proc.platform === "darwin" ? "dylib" : "so";
@@ -166,22 +144,6 @@ const detectSuffix = (): string => {
 };
 
 // ── Implementation ──────────────────────────────────────────────────────────
-
-const openDeno = <S extends FfiSymbols>(
-  path: string,
-  symbols: S,
-): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
-  try {
-    const deno = getDeno()!;
-    const lib = deno.dlopen(path, symbols);
-    return Ok({
-      symbols: lib.symbols as FfiLibrary<S>["symbols"],
-      close: () => lib.close(),
-    });
-  } catch (e) {
-    return Err(FFIError(e instanceof Error ? e.message : String(e)));
-  }
-};
 
 const openBun = <S extends FfiSymbols>(
   path: string,
@@ -230,9 +192,7 @@ const openNode = <S extends FfiSymbols>(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("No such built-in module")) {
-      return Err(
-        FFIError("FFI not available. Node 25+ with --allow-ffi required, or use Deno/Bun."),
-      );
+      return Err(FFIError("FFI not available. Node 25+ with --allow-ffi required, or use Bun."));
     }
     return Err(FFIError(msg));
   }
@@ -244,7 +204,7 @@ const openNode = <S extends FfiSymbols>(
  * Cross-runtime Foreign Function Interface.
  *
  * Load native shared libraries and call their exported functions from
- * JavaScript. Works on Deno, Bun, and Node 25+.
+ * JavaScript. Works on Bun and Node 25+.
  *
  * @example
  * ```ts
@@ -319,7 +279,6 @@ export const FFI: {
     path: string,
     symbols: S,
   ): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
-    if (getDeno()) return openDeno(path, symbols);
     if (isBun()) return openBun(path, symbols);
     return openNode(path, symbols);
   },
@@ -356,7 +315,7 @@ export const FFI: {
   }),
 
   isAvailable: (): boolean => {
-    if (getDeno() || isBun()) return true;
+    if (isBun()) return true;
     try {
       Function('return require("node:ffi")')();
       return true;

@@ -6,7 +6,6 @@
  * Tests the compiled dist/ output (black-box).
  *
  * These tests run in Node.js, so they validate the Node/Bun adapters.
- * Deno adapter paths return undefined when Deno is not available.
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -16,7 +15,7 @@ import { describe, expect, it } from "@igorjs/pure-test";
 
 // ── Import adapter resolve functions ────────────────────────────────────────
 
-const { getDeno, getNodeProcess, importNode, requireNode } = await import(
+const { getNodeProcess, importNode, requireNode } = await import(
   "../dist/runtime/adapters/detect.js"
 );
 const { resolveStdin, resolveStdout, resolveStderr } = await import(
@@ -34,10 +33,6 @@ const { resolveProcessInfo } = await import("../dist/runtime/adapters/process-ad
 // =============================================================================
 
 describe("detect", () => {
-  it("getDeno returns undefined in Node", () => {
-    expect(getDeno()).toBe(undefined);
-  });
-
   it("getNodeProcess returns the process global", () => {
     const proc = getNodeProcess();
     expect(proc).not.toBe(undefined);

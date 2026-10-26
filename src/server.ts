@@ -1021,7 +1021,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
  * returns a new immutable builder (no mutation).
  *
  * Call `.listen()` to get a {@link Program} that manages graceful shutdown,
- * or use `.fetch` directly as a Bun/Deno/Cloudflare Workers handler.
+ * or use `.fetch` directly as a Bun/Cloudflare Workers handler.
  *
  * @example
  * ```ts
