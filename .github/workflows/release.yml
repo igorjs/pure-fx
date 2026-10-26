@@ -40,8 +40,7 @@ on:
         type: string
         default: ""
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   # ── Resolve tag + version once ─────────────────────────────────────
@@ -63,6 +62,8 @@ jobs:
             codeload.github.com:443
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - id: r
         env:
@@ -124,11 +125,13 @@ jobs:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: ${{ needs.resolve.outputs.tag }}
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '26'
+          package-manager-cache: false
 
       - name: Enable corepack
         run: corepack enable
@@ -144,7 +147,9 @@ jobs:
           set -euo pipefail
           mkdir -p dist-pack
           npm pack --pack-destination=./dist-pack
-          FILENAME=$(ls dist-pack/*.tgz | head -1)
+          tarballs=(dist-pack/*.tgz)
+          FILENAME="${tarballs[0]}"
+          [[ -e "$FILENAME" ]] || { echo "::error::npm pack produced no tarball."; exit 1; }
           echo "filename=${FILENAME}" >> "$GITHUB_OUTPUT"
           # Cross-platform sha256 (sha256sum on Linux; this job is
           # ubuntu-latest so GNU coreutils are present).
@@ -201,7 +206,7 @@ jobs:
       id-token: write
       contents: write
       actions: read
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0  # zizmor: ignore[unpinned-uses] SLSA verification requires the tag reference
     with:
       base64-subjects: ${{ needs.build.outputs.digest }}
       upload-assets: true
@@ -237,9 +242,11 @@ jobs:
           path: dist-release
 
       - name: Summarise release contents
+        env:
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           {
-            echo "## Release ${{ needs.resolve.outputs.tag }}"
+            echo "## Release ${RELEASE_TAG}"
             echo ""
             echo "**Tarball + checksum + provenance attached.** Verify with:"
             echo ""
@@ -248,7 +255,7 @@ jobs:
             echo "slsa-verifier verify-artifact dist-release/*.tgz \\"
             echo "  --provenance-path *.intoto.jsonl \\"
             echo "  --source-uri github.com/${{ github.repository }} \\"
-            echo "  --source-tag ${{ needs.resolve.outputs.tag }}"
+            echo "  --source-tag ${RELEASE_TAG}"
             echo '```'
             echo ""
             echo '```'
@@ -257,7 +264,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Attach assets to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1  # zizmor: ignore[superfluous-actions] step is reworked separately
         with:
           tag_name: ${{ needs.resolve.outputs.tag }}
           files: |

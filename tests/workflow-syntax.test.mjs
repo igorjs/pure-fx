@@ -10,6 +10,11 @@
  * docs/repo-setup.md under "Actions secrets", or a BOT_APP_* secret is not
  * documented under "Dependabot secrets".
  *
+ * Also fails when a job does not set its own job-level `permissions`.
+ *
+ * Also fails when an action is not pinned to a 40-character commit SHA,
+ * except the SLSA generator reusable workflow, which must be referenced by tag.
+ *
  * Run: pnpm test
  */
 
@@ -29,6 +34,16 @@ const SETUP_DOC = "docs/repo-setup.md";
 const ACTIONS_HEADING = "## Actions secrets";
 const DEPENDABOT_HEADING = "## Dependabot secrets";
 const BOT_SECRET_PREFIX = "BOT_APP_";
+
+const SHA_PIN = /^[0-9a-f]{40}$/;
+const USES_LINE = /^\s*(?:-\s+)?uses:\s*([^\s#]+)/;
+const JOB_START = /^ {2}([A-Za-z0-9_-]+):\s*$/;
+const JOB_PERMISSIONS = /^ {4}permissions:/;
+const TOP_LEVEL_KEY = /^\S/;
+// SLSA verification requires this reusable workflow to be referenced by tag.
+const PIN_ALLOWLIST = [
+  "slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml",
+];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +84,41 @@ function sectionOf(markdown, heading) {
 
 function missingBacktickedNames(section, names) {
   return names.filter(name => !section.includes(`\`${name}\``));
+}
+
+function jobsWithoutPermissions(text) {
+  const jobs = [];
+  let inJobs = false;
+  for (const line of text.split("\n")) {
+    if (line === "jobs:") {
+      inJobs = true;
+      continue;
+    }
+    if (!inJobs) continue;
+    const start = JOB_START.exec(line);
+    if (start) {
+      jobs.push({ id: start[1], hasPermissions: false });
+    } else if (TOP_LEVEL_KEY.test(line) && !line.startsWith("#")) {
+      inJobs = false;
+    } else if (JOB_PERMISSIONS.test(line) && jobs.length > 0) {
+      jobs[jobs.length - 1].hasPermissions = true;
+    }
+  }
+  return jobs.filter(job => !job.hasPermissions).map(job => job.id);
+}
+
+function unpinnedUses(text) {
+  const hits = [];
+  for (const line of text.split("\n")) {
+    const match = USES_LINE.exec(line);
+    if (!match) continue;
+    const target = match[1];
+    if (target.startsWith("./") || target.startsWith("docker://")) continue;
+    const [name, ref = ""] = target.split("@");
+    if (PIN_ALLOWLIST.includes(name)) continue;
+    if (!SHA_PIN.test(ref)) hits.push(`${name}: ${ref}`);
+  }
+  return hits;
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -164,5 +214,68 @@ describe("workflow syntax", () => {
 
     // Assert
     expect(missing).toEqual([]);
+  });
+
+  it("a job without a permissions key is reported", () => {
+    // Arrange
+    const text = [
+      "name: x",
+      "jobs:",
+      "  with-perms:",
+      "    runs-on: ubuntu-latest",
+      "    permissions:",
+      "      contents: read",
+      "  without-perms:",
+      "    runs-on: ubuntu-latest",
+      "",
+    ].join("\n");
+
+    // Act
+    const missing = jobsWithoutPermissions(text);
+
+    // Assert
+    expect(missing).toEqual(["without-perms"]);
+  });
+
+  it("a tag-pinned action is reported and the SLSA generator is allowed", () => {
+    // Arrange
+    const text = [
+      "      - uses: actions/checkout@v6",
+      "      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0",
+      "    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0",
+    ].join("\n");
+
+    // Act
+    const hits = unpinnedUses(text);
+
+    // Assert
+    expect(hits.length).toBe(1);
+    expect(hits[0]).toBe("actions/checkout: v6");
+  });
+
+  it("every job in every workflow sets job-level permissions", () => {
+    // Arrange
+    const workflows = readWorkflows();
+
+    // Act
+    const missing = workflows.flatMap(({ path, text }) =>
+      jobsWithoutPermissions(text).map(job => `${path}: ${job}`),
+    );
+
+    // Assert
+    expect(missing).toEqual([]);
+  });
+
+  it("every action is pinned to a commit SHA", () => {
+    // Arrange
+    const workflows = readWorkflows();
+
+    // Act
+    const hits = workflows.flatMap(({ path, text }) =>
+      unpinnedUses(text).map(hit => `${path}: ${hit}`),
+    );
+
+    // Assert
+    expect(hits).toEqual([]);
   });
 });

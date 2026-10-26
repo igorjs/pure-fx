@@ -42,6 +42,7 @@ jobs:
             objects.githubusercontent.com:443
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          persist-credentials: false
           ref: main
 
       - name: Check DCO (Signed-off-by on all commits)
@@ -186,12 +187,17 @@ jobs:
       - name: Post status comment
         if: github.event_name == 'pull_request_target'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DCO_PASS: ${{ steps.dco.outputs.dco_pass }}
+          DCO_MISSING: ${{ steps.dco.outputs.dco_missing }}
+          CLA_PASS: ${{ steps.cla.outputs.cla_pass }}
+          CLA_AUTHOR: ${{ steps.cla.outputs.author }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const dcoPass = '${{ steps.dco.outputs.dco_pass }}' === 'true';
-            const claPass = '${{ steps.cla.outputs.cla_pass }}' === 'true';
-            const author = '${{ steps.cla.outputs.author }}';
+            const dcoPass = process.env.DCO_PASS === 'true';
+            const claPass = process.env.CLA_PASS === 'true';
+            const author = process.env.CLA_AUTHOR;
             const prNumber = context.payload.pull_request.number;
 
             const addLabel = (name) => github.rest.issues.addLabels({
@@ -215,7 +221,7 @@ jobs:
             let body = '## Contributor Checks\n\n';
 
             if (!dcoPass) {
-              const missing = '${{ steps.dco.outputs.dco_missing }}';
+              const missing = process.env.DCO_MISSING;
               body += '### :x: DCO Check Failed\n\n';
               body += `The following commits are missing a \`Signed-off-by\` trailer: ${missing}\n\n`;
               body += 'Please amend your commits with `git commit --amend --signoff` and force-push.\n\n';
@@ -261,9 +267,10 @@ jobs:
 
       - name: Fail if checks don't pass
         if: github.event_name == 'pull_request_target'
+        env:
+          DCO: ${{ steps.dco.outputs.dco_pass }}
+          CLA: ${{ steps.cla.outputs.cla_pass }}
         run: |
-          DCO="${{ steps.dco.outputs.dco_pass }}"
-          CLA="${{ steps.cla.outputs.cla_pass }}"
           if [ "$DCO" != "true" ] || [ "$CLA" != "true" ]; then
             echo "DCO: $DCO, CLA: $CLA"
             exit 1
