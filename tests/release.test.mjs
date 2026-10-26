@@ -20,6 +20,7 @@ import {
   latestSemverTag,
   parseCommit,
   readCommitsSince,
+  tagCommandFor,
 } from "../scripts/release-lib.mjs";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -557,5 +558,28 @@ describe("createGitHubApi", () => {
     expect(seen[0].init.method).toBe("PATCH");
     expect(seen[0].init.headers.Authorization).toBe("Bearer tok");
     expect(JSON.parse(seen[0].init.body).force).toBe(false);
+  });
+});
+
+// ── tagCommandFor ───────────────────────────────────────────────────────────
+
+describe("tagCommandFor", () => {
+  it("returns the signed tag arguments when a signing key is set", () => {
+    // Arrange
+    const key = "ABCDEF0123456789";
+
+    // Act
+    const args = tagCommandFor("v1.2.3", key);
+
+    // Assert
+    expect(args).toEqual(["tag", "-s", "v1.2.3", "-m", "v1.2.3"]);
+  });
+
+  it("throws instead of falling back to an unsigned tag when the key is empty", () => {
+    // Arrange
+    const act = () => tagCommandFor("v1.2.3", "");
+
+    // Act and Assert
+    expect(act).toThrow();
   });
 });

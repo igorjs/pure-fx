@@ -47,6 +47,14 @@ const CHANGELOG_HEADINGS = new Map([
   ["Performance", "Changed"],
 ]);
 
+/** Arguments for `git tag`; refuses to build an unsigned tag. */
+export function tagCommandFor(tag, signingKey) {
+  if (!signingKey) {
+    throw new Error("No git signing key is configured (user.signingkey); releases need a signed tag.");
+  }
+  return ["tag", "-s", tag, "-m", tag];
+}
+
 /** The only files a release commit may change. */
 export const ALLOWED_RELEASE_FILES = ["package.json", "jsr.json", "CHANGELOG.md"];
 

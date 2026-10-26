@@ -191,6 +191,26 @@ function validationPrecedesRelease(text) {
   return validate !== -1 && release !== -1 && validate < release;
 }
 
+// ── Release workflow helpers ────────────────────────────────────────────────
+
+const readWorkflow = name => readFileSync(join(workflowsDir, name), "utf8");
+
+/** Lines of one job's block, from its `  id:` line to the next job. */
+function jobBlock(text, id) {
+  const lines = text.split("\n");
+  const start = lines.indexOf(`  ${id}:`);
+  if (start === -1) return "";
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex(line => JOB_START.test(line));
+  return (end === -1 ? rest : rest.slice(0, end)).join("\n");
+}
+
+/** The `- ` step of a block containing `marker`, up to the next step. */
+function stepContaining(block, marker) {
+  const steps = block.split(/^ {6}- /m);
+  return steps.find(step => step.includes(marker)) ?? "";
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("workflow syntax", () => {
@@ -465,5 +485,63 @@ describe("workflow syntax", () => {
 
     // Assert
     expect(hits).toEqual([]);
+  });
+
+  it("release verifies the tag only on a tag push", () => {
+    // Arrange
+    const resolve = jobBlock(readWorkflow("release.yml"), "resolve");
+
+    // Act
+    const step = stepContaining(resolve, "verify-release-tag.mjs");
+
+    // Assert
+    expect(step).toContain("if: github.event_name == 'push'");
+  });
+
+  it("release resolve checks out full history", () => {
+    // Arrange
+    const resolve = jobBlock(readWorkflow("release.yml"), "resolve");
+
+    // Act
+    const step = stepContaining(resolve, "actions/checkout");
+
+    // Assert
+    expect(step).toContain("fetch-depth: 0");
+  });
+
+  it("release provenance job creates a draft release", () => {
+    // Arrange
+    const job = jobBlock(readWorkflow("release.yml"), "slsa_provenance");
+
+    // Act and Assert
+    expect(job).toContain("draft-release: true");
+  });
+
+  it("release publishes the draft with an App token, not the workflow token", () => {
+    // Arrange
+    const job = jobBlock(readWorkflow("release.yml"), "publish-gh");
+
+    // Act
+    const tokenStep = stepContaining(job, "actions/create-github-app-token");
+    const releaseStep = stepContaining(job, "softprops/action-gh-release");
+    const id = /^\s*id:\s*(\S+)/m.exec(tokenStep)?.[1] ?? "";
+
+    // Assert
+    expect(id).not.toBe("");
+    expect(releaseStep).toContain(`token: ${expr(`steps.${id}.outputs.token`)}`);
+    expect(releaseStep).toContain("draft: false");
+  });
+
+  it("publish skips prerelease events for both registries", () => {
+    // Arrange
+    const text = readWorkflow("publish.yml");
+
+    // Act
+    const npm = jobBlock(text, "publish-npm");
+    const jsr = jobBlock(text, "publish-jsr");
+
+    // Assert
+    expect(/^ {4}if:.*!github\.event\.release\.prerelease/m.test(npm)).toBe(true);
+    expect(/^ {4}if:.*!github\.event\.release\.prerelease/m.test(jsr)).toBe(true);
   });
 });

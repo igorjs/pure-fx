@@ -54,6 +54,7 @@ export function createGitHubApi({ token, repository, fetch }) {
   };
   return {
     getRef: (ref) => request("GET", `/git/ref/${ref}`),
+    getTag: (sha) => request("GET", `/git/tags/${sha}`),
     getCommit: (sha) => request("GET", `/git/commits/${sha}`),
     createBlob: (content) => request("POST", "/git/blobs", { content, encoding: "utf-8" }),
     createTree: (body) => request("POST", "/git/trees", body),
