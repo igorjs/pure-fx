@@ -96,22 +96,26 @@ describe("Record", () => {
     expect(user.address.city).toBe("New York");
   });
 
-  it("produce() blocks mutating array methods", () => {
-    const rec = Record({ items: [1, 2, 3] });
-    const methods = [
-      "push",
-      "pop",
-      "shift",
-      "unshift",
-      "splice",
-      "sort",
-      "reverse",
-      "fill",
-      "copyWithin",
+  it("produce() applies mutating array methods to the produced value only", () => {
+    const rec = Record({ items: [3, 1, 2] });
+    const cases = [
+      ["push", [4], [3, 1, 2, 4]],
+      ["pop", [], [3, 1]],
+      ["shift", [], [1, 2]],
+      ["unshift", [0], [0, 3, 1, 2]],
+      ["splice", [1, 1], [3, 2]],
+      ["sort", [], [1, 2, 3]],
+      ["reverse", [], [2, 1, 3]],
+      ["fill", [0], [0, 0, 0]],
+      ["copyWithin", [0, 1], [1, 2, 2]],
     ];
-    for (const method of methods) {
-      expect(() => rec.produce(d => d.items[method]())).toThrow();
+    for (const [method, args, expected] of cases) {
+      const out = rec.produce(d => {
+        d.items[method](...args);
+      });
+      expect(out.toJSON()).toEqual({ items: expected });
     }
+    expect(rec.toJSON()).toEqual({ items: [3, 1, 2] });
   });
 
   it("produce() allows spread on nested arrays", () => {
