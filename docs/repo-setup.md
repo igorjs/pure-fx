@@ -74,3 +74,5 @@ The rolling release (`node scripts/release.mjs --ci`) creates the release commit
 4. Create an annotated tag with `POST /git/tags`, then `POST /git/refs` for `refs/tags/vX`. Call `GET /git/tags/{sha}`. `verification.verified` must be `true`.
 
 If either check is `false`, do not enable the rolling release. Switch to a release PR with auto-merge instead. The rolling release stays off until both checks pass.
+
+The weekly schedule in `.github/workflows/rolling-release.yml` runs only when the repository variable `ROLLING_RELEASE_ENABLED` is `true`. Set it after both checks pass and one manual dispatch has released a version end to end. Manual dispatches do not need it.

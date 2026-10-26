@@ -24,7 +24,7 @@ import type { ImmutableList } from "../../data/list.js";
 import type { ImmutableRecord } from "../../data/record.js";
 import { Schema, type SchemaError, type SchemaType } from "../../data/schema.js";
 import type { Type } from "../nominal.js";
-import { TypeDef, type TypeDefStatic } from "../type-def.js";
+import { TypeDef, type TypeDefClass, type TypeDefStatic } from "../type-def.js";
 
 // ── Cache helpers ─────────────────────────────────────────────────────────────
 
@@ -138,6 +138,13 @@ export const Pair = <ATag extends string, A, BTag extends string, B>(
 
 // ── Tuple(...) ────────────────────────────────────────────────────────────────
 
+/** Branded element types of a {@link Tuple} built from the given TypeDefs. */
+type TupleBrands<Items extends readonly TypeDefStatic<string, unknown>[]> = {
+  readonly [K in keyof Items]: Items[K] extends TypeDefStatic<infer Tag, infer T>
+    ? Type<Tag & string, T>
+    : never;
+};
+
 /**
  * Build a {@link TypeDef} class that validates a fixed-length n-tuple where
  * each position has its own TypeDef.
@@ -151,18 +158,15 @@ export const Pair = <ATag extends string, A, BTag extends string, B>(
  * Row.parse(['a', 1, true]);
  * ```
  */
-export const Tuple = <Items extends readonly TypeDefStatic<string, unknown>[]>(...items: Items) => {
+export const Tuple = <Items extends readonly TypeDefStatic<string, unknown>[]>(
+  ...items: Items
+): TypeDefClass<string, TupleBrands<Items>> => {
   const schemas = items.map(i => i.schema);
   const tag = `Tuple<${items.map(i => i.tag).join(",")}>`;
-  type Brands = {
-    readonly [K in keyof Items]: Items[K] extends TypeDefStatic<infer Tag, infer T>
-      ? Type<Tag & string, T>
-      : never;
-  };
   // Why: Schema.tuple expects a spread of schemas. The runtime brand on each
   // element is structurally the underlying value, so we transform-cast.
   const schema = Schema.tuple(...(schemas as unknown as readonly SchemaType<unknown>[])).transform(
-    t => deepFreezeT(t as unknown as Brands),
+    t => deepFreezeT(t as unknown as TupleBrands<Items>),
   );
   return TypeDef(tag, schema);
 };
@@ -378,7 +382,7 @@ type StructValue<F extends StructFields> = ImmutableRecord<{
  * if (r.isOk) r.value.id; // Type<'UserId', string>
  * ```
  */
-export const Struct = <F extends StructFields>(fields: F) => {
+export const Struct = <F extends StructFields>(fields: F): TypeDefClass<string, StructValue<F>> => {
   const shape: Record<string, SchemaType<unknown>> = {};
   const keys = Object.keys(fields);
   for (const [key, def] of Object.entries(fields)) shape[key] = def.schema;

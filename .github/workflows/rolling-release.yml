@@ -14,9 +14,9 @@ on:
         required: false
         type: string
         default: ""
-  # Enabled once JSR publishing works.
-  # schedule:
-  #   - cron: "0 6 * * 1"
+  # Weekly release, Mondays at 06:00 UTC.
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions: {}
 
@@ -26,6 +26,8 @@ concurrency:
 
 jobs:
   release:
+    # Scheduled runs stay off until the maintainer sets this repository variable.
+    if: github.event_name != 'schedule' || vars.ROLLING_RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

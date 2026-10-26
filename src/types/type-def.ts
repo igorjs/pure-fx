@@ -46,6 +46,24 @@ export interface TypeDefStatic<Tag extends string, T> {
   readonly _brand: Type<Tag, T>;
 }
 
+/**
+ * The class type returned by {@link TypeDef}: the {@link TypeDefStatic} shape
+ * plus the static validator surface, extendable with `class X extends ...`.
+ */
+export type TypeDefClass<Tag extends string, T> = (abstract new () => object) &
+  TypeDefStatic<Tag, T> & {
+    /** Construct from a typed value; same validation as `parse`. */
+    readonly new: (value: T) => Result<Type<Tag, T>, SchemaError>;
+    /** Parse unknown input into the branded value. */
+    readonly parse: (input: unknown) => Result<Type<Tag, T>, SchemaError>;
+    /** Validate unknown input, accumulating errors. */
+    readonly validate: (input: unknown) => Validation<Type<Tag, T>, SchemaError>;
+    /** Type guard for the branded value. */
+    readonly is: (input: unknown) => input is Type<Tag, T>;
+    /** Cast a known-good value to the branded type. */
+    readonly unsafe: (value: T) => Type<Tag, T>;
+  };
+
 // Why: NODE_ENV may be undefined in browsers/edge runtimes; optional chaining keeps the check safe.
 const isProduction = (): boolean => {
   // biome-ignore lint/suspicious/noExplicitAny: deliberate untyped global access for cross-runtime safety
@@ -82,7 +100,10 @@ const isProduction = (): boolean => {
  * @param tag Unique branding tag used in error messages and the phantom brand.
  * @param schema The underlying validator for inbound values.
  */
-export function TypeDef<Tag extends string, T>(tag: Tag, schema: SchemaType<T>) {
+export function TypeDef<Tag extends string, T>(
+  tag: Tag,
+  schema: SchemaType<T>,
+): TypeDefClass<Tag, T> {
   abstract class TypeDefBase {
     /** The branding tag (also used in error messages). */
     static readonly tag: Tag = tag;

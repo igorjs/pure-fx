@@ -476,17 +476,6 @@ describe("workflow syntax", () => {
     expect(versionHits).toEqual([]);
   });
 
-  it("rolling release schedule stays commented out", () => {
-    // Arrange
-    const text = readRollingRelease();
-
-    // Act
-    const hits = uncommentedScheduleLines(text);
-
-    // Assert
-    expect(hits).toEqual([]);
-  });
-
   it("release verifies every resolved tag except dev builds", () => {
     // Arrange
     const resolve = jobBlock(readWorkflow("release.yml"), "resolve");
@@ -562,5 +551,32 @@ describe("workflow syntax", () => {
 
     // Act and Assert
     expect(job).not.toContain("waits with it");
+  });
+
+  it("publish passes the provenance flag to the JSR publish step", () => {
+    // Arrange
+    const job = jobBlock(readWorkflow("publish.yml"), "publish-jsr");
+
+    // Act
+    const step = stepContaining(job, "jsr publish");
+
+    // Assert
+    expect(step).toContain("jsr publish --provenance");
+  });
+
+  it("rolling release has an enabled weekly schedule", () => {
+    // Arrange
+    const text = readWorkflow("rolling-release.yml");
+
+    // Act
+    const schedule = /^ {2}schedule:\s*\n\s+- cron:\s*"([^"]+)"/m.exec(text);
+    const fields = schedule?.[1].split(/\s+/) ?? [];
+
+    // Assert
+    expect(schedule).not.toBe(null);
+    expect(fields.length).toBe(5);
+    expect(/^\d+$/.test(fields[4] ?? "")).toBe(true);
+    expect(fields[2]).toBe("*");
+    expect(fields[3]).toBe("*");
   });
 });

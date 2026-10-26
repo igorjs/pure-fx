@@ -8,7 +8,11 @@
     "./async": "./src/async/index.ts",
     "./io": "./src/io/index.ts",
     "./runtime": "./src/runtime/index.ts",
-    "./types": "./src/types/index.ts"
+    "./types": "./src/types/index.ts",
+    "./runtime/adapter/node": "./src/runtime/adapter/node.ts",
+    "./runtime/adapter/lambda": "./src/runtime/adapter/lambda.ts",
+    "./runtime/adapter/bun": "./src/runtime/adapter/bun.ts",
+    "./runtime/adapter/workers": "./src/runtime/adapter/workers.ts"
   },
   "include": [
     "src/",
