@@ -31,7 +31,12 @@ concurrency:
 
 jobs:
   badge:
-    if: github.event.workflow_run.conclusion == 'success'
+    # Fork PR runs can share the head branch name "main", so only trust
+    # artifacts from push runs of this repository.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: write

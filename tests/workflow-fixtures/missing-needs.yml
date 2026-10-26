@@ -1,0 +1,9 @@
+name: Missing needs fixture
+on: push
+permissions: {}
+jobs:
+  build:
+    needs: [missing-job]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok

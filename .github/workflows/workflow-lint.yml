@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Lints the workflow files with pinned actionlint and zizmor. A second
+# step proves both linters still catch the seeded problems in
+# tests/workflow-fixtures, so a broken or silent linter fails the job.
+
+name: Workflow Lint
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/zizmor.yml"
+      - "tests/workflow-fixtures/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/zizmor.yml"
+      - "tests/workflow-fixtures/**"
+
+permissions: {}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install pinned linters
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          ZIZMOR_VERSION: "1.31.1"
+          ZIZMOR_SHA256: "d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99"
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"
+          mkdir -p "$bin"
+
+          actionlint_tgz="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -sSfL -o "$actionlint_tgz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${actionlint_tgz}" | sha256sum -c -
+          tar -xzf "$actionlint_tgz" -C "$bin" actionlint
+
+          zizmor_tgz="$RUNNER_TEMP/zizmor.tar.gz"
+          curl -sSfL -o "$zizmor_tgz" \
+            "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${ZIZMOR_SHA256}  ${zizmor_tgz}" | sha256sum -c -
+          tar -xzf "$zizmor_tgz" -C "$bin" zizmor
+
+          echo "$bin" >> "$GITHUB_PATH"
+
+      - name: Print versions
+        run: |
+          actionlint --version
+          zizmor --version
+
+      # zizmor runs offline so it needs no network beyond the install step.
+      - name: Lint workflows
+        run: |
+          actionlint
+          zizmor --offline --no-progress .github/workflows
+
+      # Without this, a linter that crashes or goes silent would pass the job.
+      - name: Linters must fail on the seeded fixtures
+        run: |
+          set -euo pipefail
+
+          expect_failure() {
+            local name="$1" needle="$2"
+            shift 2
+            local status=0 output
+            output="$("$@" 2>&1)" || status=$?
+            if [ "$status" -eq 0 ]; then
+              echo "::error::$name passed on its fixture but must fail"
+              exit 1
+            fi
+            if ! grep -qF -- "$needle" <<<"$output"; then
+              echo "::error::$name failed without reporting: $needle"
+              echo "$output"
+              exit 1
+            fi
+            echo "$name reported the seeded problem (exit $status)"
+          }
+
+          actionlint --version
+          zizmor --version
+          expect_failure actionlint 'needs job "missing-job" which does not exist' \
+            actionlint tests/workflow-fixtures/missing-needs.yml
+          expect_failure zizmor 'template-injection' \
+            zizmor --offline --no-progress tests/workflow-fixtures/template-injection.yml

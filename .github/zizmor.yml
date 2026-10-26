@@ -1,0 +1,12 @@
+rules:
+  dangerous-triggers:
+    ignore:
+      # Needs write access on fork PRs; checks out main only, never the PR head.
+      - auto-label.yml
+      # Needs write access on fork PRs; checks out main only, never the PR head.
+      - cla-dco.yml
+      # Needs write access on fork PRs; never checks out the PR head.
+      - clanker-filter.yml
+      # Runs after CI completes to publish the badge; never checks out code; the job only
+      # runs for push runs of this repository, so the coverage artifact is trusted.
+      - coverage-badge.yml
