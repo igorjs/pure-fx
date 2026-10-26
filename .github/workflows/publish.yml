@@ -5,7 +5,7 @@
 # SLSA L3 provenance attestation). Publish runs in two
 # stages:
 #
-#   1. detect       Read package.json / jsr.json / deno.json from the
+#   1. detect       Read package.json / jsr.json from the
 #                   checked-out source at the release tag. Decide which
 #                   registries the package targets (`publish_npm`,
 #                   `publish_jsr`) and emit the deployment-environment
@@ -76,12 +76,10 @@ jobs:
             echo "::notice::No npm target (package.json missing or private=true)"
           fi
 
-          # JSR — publish when jsr.json or deno.json (with .name) is present
+          # JSR — publish when jsr.json is present
           JSR_FILE=""
           if [[ -f jsr.json ]]; then
             JSR_FILE=jsr.json
-          elif [[ -f deno.json ]] && jq -e '.name' deno.json > /dev/null 2>&1; then
-            JSR_FILE=deno.json
           fi
           if [[ -n "$JSR_FILE" ]]; then
             PKG_JSR=$(jq -r '.name' "$JSR_FILE")
@@ -92,7 +90,7 @@ jobs:
             echo "::notice::Detected JSR target: ${PKG_JSR}"
           else
             echo "publish_jsr=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No JSR target (jsr.json/deno.json absent)"
+            echo "::notice::No JSR target (jsr.json absent)"
           fi
 
       - name: Validate package.json#repository matches this repo

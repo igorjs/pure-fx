@@ -41,7 +41,6 @@ body:
         - Node.js 22
         - Node.js 24
         - Node.js 26
-        - Deno
         - Bun
         - Cloudflare Workers
         - Browser
@@ -52,8 +51,8 @@ body:
     id: runtime-version
     attributes:
       label: Runtime Version
-      description: "e.g. Node 24.14.0, Deno 2.7.5"
-      placeholder: "node --version / deno --version / bun --version"
+      description: "e.g. Node 24.14.0, Bun 1.3.0"
+      placeholder: "node --version / bun --version"
     validations:
       required: true
 

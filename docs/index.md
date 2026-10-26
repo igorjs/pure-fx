@@ -35,19 +35,18 @@ import { File, FFI } from '@igorjs/pure-fx/io'
 2. **Immutability at runtime**: Records and Lists are deep-frozen. Mutations throw TypeError.
 3. **Lazy async**: Task and Stream describe computations. Nothing runs until `.run()`.
 4. **Zero dependencies**: Everything is built from scratch. No node_modules to audit.
-5. **Multi-runtime**: CI-tested on Node.js 22+, Deno, Bun, Cloudflare Workers, and Chromium.
+5. **Multi-runtime**: CI-tested on Node.js 22+, Bun, Cloudflare Workers, and Chromium.
 6. **Batteries included**: Full Web Crypto, FFI, Compression, DNS, TCP, subprocess, and more.
 
 ## Runtime Compatibility
 
-CI-tested on 8 environments:
+CI-tested on 7 environments:
 
 | Runtime | Unit Tests | Integration Tests |
 |---------|-----------|-------------------|
 | Node.js 22 | 1462 | 337 (runtime + web) |
 | Node.js 24 | - | 337 |
 | Node.js 26 | - | 337 (with `--allow-ffi`) |
-| Deno 2+ | - | 337 |
 | Bun | - | 337 |
 | CF Workers (miniflare) | - | 249 (web) |
 | Chromium (Playwright) | - | 249 (web) |

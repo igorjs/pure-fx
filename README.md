@@ -13,7 +13,7 @@ Functional application framework for TypeScript. Zero dependencies.
 
 Errors are values, not exceptions. Data is immutable, enforced at runtime. Async is lazy and composable.
 
-Runs on Node.js 22+, Deno 2+, Bun, Cloudflare Workers, and Chromium.
+Runs on Node.js 22+, Bun, Cloudflare Workers, and Chromium.
 
 ## Install
 
@@ -55,7 +55,7 @@ const validateName = (s: string) => s ? Valid(s) : Invalid('name required');
 const validateAge = (n: number) => n > 0 ? Valid(n) : Invalid('must be positive');
 validateName('').zip(validateAge(-1)); // Invalid(['name required', 'must be positive'])
 
-// Read a file (works on Node, Deno, Bun)
+// Read a file (works on Node, Bun)
 const content = await File.read('./config.json').run();
 ```
 
@@ -76,34 +76,27 @@ const content = await File.read('./config.json').run();
 
 Most modules are pure TypeScript and work everywhere. Runtime-dependent modules adapt automatically:
 
-| Module | Node 22+ | Node 25+ | Deno 2+ | Bun | Workers | Browser |
-|--------|----------|----------|---------|-----|---------|---------|
-| Core, Data, Async, Types | Yes | Yes | Yes | Yes | Yes | Yes |
-| `Crypto` (full Web Crypto) | Yes | Yes | Yes | Yes | Yes | Yes |
-| `Compression` | Yes | Yes | Yes | Yes | Partial | Partial |
-| `File`, `Command`, `Terminal` | Yes | Yes | Yes | Yes | No | No |
-| `Process`, `Os`, `Path` | Yes | Yes | Yes | Yes | No | No |
-| `Dns`, `Net` | Yes | Yes | Yes | Yes | No | No |
-| `FFI` | No | Yes (`--allow-ffi`) | Yes (`--allow-ffi`) | Yes | No | No |
-| `Server` | Yes | Yes | Yes | Yes | Yes (adapter) | No |
+| Module | Node 22+ | Node 25+ | Bun | Workers | Browser |
+|--------|----------|----------|-----|---------|---------|
+| Core, Data, Async, Types | Yes | Yes | Yes | Yes | Yes |
+| `Crypto` (full Web Crypto) | Yes | Yes | Yes | Yes | Yes |
+| `Compression` | Yes | Yes | Yes | Partial | Partial |
+| `File`, `Command`, `Terminal` | Yes | Yes | Yes | No | No |
+| `Process`, `Os`, `Path` | Yes | Yes | Yes | No | No |
+| `Dns`, `Net` | Yes | Yes | Yes | No | No |
+| `FFI` | No | Yes (`--allow-ffi`) | Yes | No | No |
+| `Server` | Yes | Yes | Yes | Yes (adapter) | No |
 
 ## Troubleshooting
-
-### Compression hangs on older Deno versions
-
-Pure FX uses `Blob.stream().pipeThrough()` for compression, which requires Deno 1.38+. If compression operations hang, update Deno.
 
 ### FFI not available
 
 FFI requires native library loading capabilities:
-- **Deno**: Run with `--allow-ffi`
 - **Bun**: Works out of the box
 - **Node 25+**: Run with `--allow-ffi` (experimental)
 - **Node 22-24**: Not available. `FFI.open()` returns `Err(FFIError("..."))`. Use `FFI.isAvailable()` to check.
 
 ### Os/Process return None for some values
-
-Some OS APIs are permission-gated on Deno (e.g. `hostname`, `env`). Run with `--allow-sys` and `--allow-env`, or use `deno run --allow-all`.
 
 On Windows, `Process.uid()` and `Process.gid()` return `None` (POSIX-only APIs).
 
@@ -118,10 +111,6 @@ if (result.isErr) {
   console.log(result.error.message); // "ENOENT: no such file..."
 }
 ```
-
-### Deno requires version 2.0+
-
-Pure FX uses Deno 2.0+ APIs. Deno 1.x is not supported. Compression requires Deno 1.38+ for `CompressionStream`, but all other modules require Deno 2.0+.
 
 ### Modules return Err in Workers/Browser
 
@@ -150,7 +139,7 @@ import { File, Command, FFI } from '@igorjs/pure-fx/io'
 | **Bundle size** | Small, tree-shakeable subpaths | Large (full runtime) | Medium |
 | **Error handling** | `Result<T, E>` and `Task<T, E>` | Typed errors via `Effect<A, E, R>` | `Either<E, A>`, `TaskEither` |
 | **Async** | `Task` (lazy Promise wrapper) | Fiber-based with structured concurrency | `TaskEither`, `ReaderTaskEither` |
-| **Runtime support** | Node, Deno, Bun, Workers, Browser | Node (primary), limited Deno/Bun | Node (primary) |
+| **Runtime support** | Node, Bun, Workers, Browser | Node (primary), limited Bun | Node (primary) |
 | **IO** | Built-in File, Command, Server, Crypto, FFI | Via services and layers | BYO (no IO primitives) |
 
 **Choose Pure FX when** you want typed errors and immutable data without adopting a framework. It adds `Result`, `Task`, `Schema`, and IO adapters on top of plain TypeScript: no generators, no layers, no HKT. If your code already uses `pipe` and explicit error returns, Pure FX fits in without reshaping your architecture.

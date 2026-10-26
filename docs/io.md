@@ -4,7 +4,7 @@ Type-safe wrappers for file system, subprocess, encoding, and network operations
 
 ## File
 
-Multi-runtime file system operations (Node, Deno, Bun).
+Multi-runtime file system operations (Node, Bun).
 
 ```ts
 import { File } from '@igorjs/pure-fx'
@@ -146,7 +146,7 @@ const deflated = await Compression.deflate(data).run();
 const inflated = await Compression.inflate(deflated.unwrap()).run();
 ```
 
-**Runtime notes:** Requires `CompressionStream` support (Node 22.15+, Deno 1.38+, Bun). Returns `Err(CompressionError(...))` if unavailable.
+**Runtime notes:** Requires `CompressionStream` support (Node 22.15+, Bun). Returns `Err(CompressionError(...))` if unavailable.
 
 ## Url
 
@@ -210,7 +210,7 @@ if (conn.isOk) {
 
 ## Terminal
 
-Cross-runtime terminal interaction for stdin reading, prompting, and password input. Handles TTY detection, piped input, timeouts, and EOF across Node, Deno, and Bun.
+Cross-runtime terminal interaction for stdin reading, prompting, and password input. Handles TTY detection, piped input, timeouts, and EOF across Node and Bun.
 
 ```ts
 import { Terminal } from '@igorjs/pure-fx'
@@ -253,7 +253,7 @@ Terminal.writeLine('done');
 
 ## WebSocket
 
-Type-safe WebSocket routing with event handlers. Defines routes and handlers; actual upgrade is handled by the runtime adapter (Bun, Deno, or Node).
+Type-safe WebSocket routing with event handlers. Defines routes and handlers; actual upgrade is handled by the runtime adapter (Bun or Node).
 
 ```ts
 import { WebSocket } from '@igorjs/pure-fx'
@@ -276,7 +276,7 @@ ws.match('/chat'); // WebSocketHandler | undefined
 
 ## FFI
 
-Cross-runtime Foreign Function Interface for loading and calling native shared libraries (.so, .dylib, .dll). Wraps `Deno.dlopen`, `bun:ffi`, and `node:ffi` behind a unified API.
+Cross-runtime Foreign Function Interface for loading and calling native shared libraries (.so, .dylib, .dll). Wraps `bun:ffi`, and `node:ffi` behind a unified API.
 
 ### Basic usage
 
@@ -373,7 +373,6 @@ const libPath = `./target/release/libcalc.${FFI.suffix}`;
 
 | Runtime | Support | Flags needed |
 |---------|---------|-------------|
-| **Deno 2+** | Full | `--allow-ffi` |
 | **Bun** | Full | None |
 | **Node 25+** | Experimental | `--allow-ffi` |
 | **Node 22-24** | Not available | `FFI.open()` returns `Err` |
@@ -389,7 +388,7 @@ if (result.isErr) {
   switch (true) {
     case result.error.message.includes('not available'):
       // Runtime doesn't support FFI (Node <25, Workers, Browser)
-      // Fix: upgrade to Node 25+ or use Deno/Bun
+      // Fix: upgrade to Node 25+ or use Bun
       break;
     case result.error.message.includes('not found'):
     case result.error.message.includes('No such file'):
