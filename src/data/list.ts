@@ -340,7 +340,9 @@ const LIST_HANDLER: ProxyHandler<readonly unknown[]> = {
  * intercepts index access to wrap nested objects as records.
  * This is the internal factory; prefer the public {@link List} constructor.
  */
-export const createListProxy = <T>(raw: readonly T[]): ImmutableList<T> => {
+export const createListProxy = <T>(input: readonly T[]): ImmutableList<T> => {
+  // Why: the IMMUTABLE brand is defined on the target, so a frozen input is copied.
+  const raw = Object.isExtensible(input) ? input : [...input];
   const cached = LIST_PROXY_CACHE.get(raw);
   if (cached) return cached as ImmutableList<T>;
   // Proxy traps enforce immutability - no Object.freeze needed. The IMMUTABLE

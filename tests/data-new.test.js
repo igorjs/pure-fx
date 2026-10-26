@@ -41,6 +41,12 @@ const {
   Some,
   None,
   Match,
+  TypeDef,
+  Dict,
+  MapOf,
+  DateTime,
+  Str,
+  Num,
 } = await import("../dist/index.js");
 
 // =============================================================================
@@ -1813,5 +1819,155 @@ describe("Record shape cache", () => {
     expect(b.b).toBe(2);
     expect(a["a\0b"]).toBe(1);
     expect(a.a).toBe(undefined);
+  });
+});
+
+describe("Prototype-named keys", () => {
+  it.each([
+    "__proto__",
+    "constructor",
+    "toString",
+  ])("discriminatedUnion rejects inherited tag %s", tag => {
+    // Arrange
+    const schema = Schema.discriminatedUnion("type", {
+      a: Schema.object({ type: Schema.literal("a") }),
+    });
+    // Act
+    const result = schema.parse({ type: tag });
+    // Assert
+    expect(result.isErr).toBe(true);
+  });
+
+  it.each([
+    "__proto__",
+    "constructor",
+    "toString",
+  ])("discriminatedUnion matches own mapping key %s", tag => {
+    // Arrange
+    const mapping = Object.create(null);
+    mapping[tag] = Schema.object({ type: Schema.literal(tag) });
+    const schema = Schema.discriminatedUnion("type", mapping);
+    // Act
+    const result = schema.parse(JSON.parse(`{"type":"${tag}"}`));
+    // Assert
+    expect(result.isOk).toBe(true);
+  });
+
+  it("Schema.record keeps an own __proto__ key as data", () => {
+    // Arrange
+    const schema = Schema.record(Schema.number);
+    // Act
+    const result = schema.parse(JSON.parse('{"__proto__":1}'));
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(Object.hasOwn(result.value, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(result.value)).toBe(Object.prototype);
+  });
+});
+
+describe("List of a frozen array", () => {
+  it("List accepts a frozen array", () => {
+    // Arrange
+    const frozen = Object.freeze([1, 2]);
+    // Act
+    const list = List(frozen);
+    // Assert
+    expect(list.length).toBe(2);
+    expect(list.toJSON()).toEqual([1, 2]);
+  });
+
+  it("NonEmptyList accepts a frozen array", () => {
+    // Arrange
+    const frozen = Object.freeze([1, 2]);
+    // Act
+    const nel = NonEmptyList(frozen);
+    const from = NonEmptyList.from(frozen);
+    // Assert
+    expect(nel.head).toBe(1);
+    expect(nel.length).toBe(2);
+    expect(from.isSome).toBe(true);
+  });
+});
+
+describe("DateTime never throws on parse", () => {
+  it.each([
+    ["Infinity", Infinity],
+    ["-Infinity", -Infinity],
+    ["out-of-range number", 1e20],
+    ["invalid Date", new Date(Number.NaN)],
+    ["NaN", Number.NaN],
+    ["invalid string", "nope"],
+    ["null", null],
+    ["object", {}],
+    ["bigint", 1n],
+  ])("returns Err for %s", (_label, input) => {
+    // Arrange
+    let result;
+    // Act
+    const act = () => {
+      result = DateTime.parse(input);
+    };
+    // Assert
+    expect(act).not.toThrow();
+    expect(result.isErr).toBe(true);
+  });
+
+  it("still parses a valid ISO string", () => {
+    // Arrange / Act
+    const result = DateTime.parse("2026-05-22T10:00:00Z");
+    // Assert
+    expect(result.isOk).toBe(true);
+  });
+});
+
+describe("Dict and MapOf key validation", () => {
+  const Key = TypeDef("Key", Schema.regex(/^[a-z]+$/));
+
+  it("Dict fails on an invalid key and names it in the path", () => {
+    // Arrange
+    const D = Dict(Key, Num);
+    // Act
+    const result = D.parse({ ok: 1, BAD: 2 });
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(result.error.path).toEqual(["BAD"]);
+  });
+
+  it("MapOf fails on an invalid key and names it in the path", () => {
+    // Arrange
+    const M = MapOf(Key, Num);
+    // Act
+    const result = M.parse({ ok: 1, BAD: 2 });
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(result.error.path).toEqual(["BAD"]);
+  });
+
+  it("Dict accepts valid keys", () => {
+    // Arrange / Act
+    const result = Dict(Key, Num).parse({ ok: 1 });
+    // Assert
+    expect(result.isOk).toBe(true);
+  });
+
+  it("Dict treats prototype-named keys as data", () => {
+    // Arrange
+    const D = Dict(Str, Num);
+    // Act
+    const result = D.parse(JSON.parse('{"__proto__":1,"constructor":2}'));
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(Object.keys(result.value).sort()).toEqual(["__proto__", "constructor"]);
+  });
+
+  it("MapOf treats prototype-named keys as data", () => {
+    // Arrange
+    const M = MapOf(Str, Num);
+    // Act
+    const result = M.parse(JSON.parse('{"__proto__":1,"constructor":2}'));
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(result.value.size).toBe(2);
+    expect(result.value.get("__proto__").isSome).toBe(true);
   });
 });
