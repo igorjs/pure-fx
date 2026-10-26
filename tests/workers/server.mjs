@@ -6,7 +6,7 @@
 import { rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
-import { esModules } from "../../scripts/miniflare-modules.mjs";
+import { esModules, withTimeout } from "../../scripts/miniflare-modules.mjs";
 
 const ROOT = resolve(new URL("../../", import.meta.url).pathname);
 const CASE_TIMEOUT_MS = 30_000;
@@ -147,14 +147,6 @@ const CASES = [
   ],
 ];
 
-const withTimeout = (promise, label) => {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out`)), CASE_TIMEOUT_MS);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-};
-
 const runCase = async ([name, check]) => {
   const mf = new Miniflare({
     modules: esModules(WORKER_PATH, resolve(ROOT, "dist")),
@@ -163,7 +155,7 @@ const runCase = async ([name, check]) => {
     bindings: { GREETING: ENV_VALUE },
   });
   try {
-    const [ok, detail] = await withTimeout(check(mf), name);
+    const [ok, detail] = await withTimeout(check(mf), CASE_TIMEOUT_MS, `${name} timed out`);
     console.log(`  ${ok ? "PASS" : "FAIL"}  workers server: ${name}${ok ? "" : ` (${detail})`}`);
     return ok;
   } catch (err) {

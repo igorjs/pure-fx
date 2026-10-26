@@ -19,7 +19,7 @@ interface NodeReadlineModule {
   };
 }
 
-const getNodeReadline = importNode<NodeReadlineModule>("node:readline");
+const getNodeReadline = importNode<NodeReadlineModule>("readline");
 
 // ── Node/Bun stdin adapter ──────────────────────────────────────────────────
 

@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { esModules } from "./miniflare-modules.mjs";
+import { esModules, withTimeout } from "./miniflare-modules.mjs";
 
 const PACKAGE_NAME = "@igorjs/pure-fx";
 const REGISTRY_URL = "https://registry.npmjs.org";
@@ -117,20 +117,16 @@ export default {
     modulesRoot: dirname(entry),
     compatibilityDate: "2024-01-01",
   });
-  let timer;
   try {
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`Miniflare did not answer within ${WORKER_TIMEOUT_MS} ms`)),
-        WORKER_TIMEOUT_MS,
-      );
-    });
-    const response = await Promise.race([mf.dispatchFetch("http://localhost/"), timeout]);
+    const response = await withTimeout(
+      mf.dispatchFetch("http://localhost/"),
+      WORKER_TIMEOUT_MS,
+      `Miniflare did not answer within ${WORKER_TIMEOUT_MS} ms`,
+    );
     const names = await response.json();
     if (names.length === 0) throw new Error("core entry exported nothing inside Miniflare");
     console.log(`ok   ${PACKAGE_NAME} (Miniflare, ${names.length} exports)`);
   } finally {
-    clearTimeout(timer);
     await mf.dispose();
   }
 }

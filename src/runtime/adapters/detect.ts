@@ -92,12 +92,12 @@ export const importNodeBuiltin = <T>(name: NodeBuiltinName): Promise<T> =>
  *
  * Resolves to null when the module is unavailable on this runtime.
  */
-export const importNode = <T>(specifier: `node:${NodeBuiltinName}`): (() => Promise<T | null>) => {
+export const importNode = <T>(name: NodeBuiltinName): (() => Promise<T | null>) => {
   let cached: T | null | undefined;
   return async (): Promise<T | null> => {
     if (cached !== undefined) return cached;
     try {
-      cached = await importNodeBuiltin<T>(specifier.slice("node:".length) as NodeBuiltinName);
+      cached = await importNodeBuiltin<T>(name);
       return cached;
     } catch {
       cached = null;
