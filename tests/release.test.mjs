@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * release.test.mjs - Bump rules, commit parsing and changelog grouping of
- * scripts/release.mjs, plus the commit range read from a real temp git repo.
+ * scripts/release-lib.mjs, plus the commit range read from a real temp git repo.
  *
  * Run: pnpm test
  */
@@ -11,13 +11,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "@igorjs/pure-test";
+import { createGitHubApi, runCiRelease } from "../scripts/release-ci.mjs";
 import {
+  ALLOWED_RELEASE_FILES,
+  assertAllowedChanges,
   computeNextVersion,
   groupChangelog,
   latestSemverTag,
   parseCommit,
   readCommitsSince,
-} from "../scripts/release.mjs";
+} from "../scripts/release-lib.mjs";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -244,5 +247,315 @@ describe("readCommitsSince", () => {
 
     // Assert
     expect(next).toBe("0.3.1");
+  });
+});
+
+// ── --ci mode ───────────────────────────────────────────────────────────────
+
+const WRITE_CALLS = new Set([
+  "createBlob",
+  "createTree",
+  "createCommit",
+  "updateRef",
+  "createTag",
+  "createRef",
+]);
+
+const ciCommit = (type, description = "something", { breaking = false } = {}) => ({
+  hash: "abc1234",
+  type,
+  scope: null,
+  breaking,
+  description,
+});
+
+const CI_FILES = {
+  "package.json": `${JSON.stringify({ name: "x", version: "0.3.0" }, null, 2)}\n`,
+  "jsr.json": `${JSON.stringify({ name: "@x/y", version: "0.3.0" }, null, 2)}\n`,
+  "CHANGELOG.md": [
+    "# Changelog",
+    "",
+    "## [0.3.0] - 2026-05-25",
+    "",
+    "### Added",
+    "- Old thing",
+    "",
+    "[0.3.0]: https://github.com/o/r/releases/tag/v0.3.0",
+    "",
+  ].join("\n"),
+};
+
+const makeCi = ({
+  commits = [ciCommit("feat", "add thing")],
+  tags = ["v0.3.0"],
+  status = "",
+  tagRef = null,
+  headMessage = "feat: previous",
+} = {}) => {
+  const calls = [];
+  const writes = [];
+  const lines = [];
+  const call =
+    (name, result) =>
+    (...args) => {
+      calls.push({ name, args });
+      return Promise.resolve(result(...args));
+    };
+  const api = {
+    getRef: call("getRef", ref =>
+      ref.startsWith("tags/") ? tagRef : { object: { sha: "head1" } },
+    ),
+    getCommit: call("getCommit", () => ({ message: headMessage, tree: { sha: "tree0" } })),
+    createBlob: call("createBlob", () => ({ sha: `blob${calls.length}` })),
+    createTree: call("createTree", () => ({ sha: "tree1" })),
+    createCommit: call("createCommit", () => ({ sha: "commit1" })),
+    updateRef: call("updateRef", () => ({})),
+    createTag: call("createTag", () => ({ sha: "tagobj1" })),
+    createRef: call("createRef", () => ({})),
+  };
+  const deps = {
+    api,
+    git: { status: () => status, tags: () => tags, logSince: () => commits },
+    fs: {
+      readFile: path => {
+        if (!(path in CI_FILES)) throw new Error(`ENOENT ${path}`);
+        return CI_FILES[path];
+      },
+      writeFile: (path, content) => writes.push({ path, content }),
+    },
+    now: () => new Date("2026-10-26T12:00:00Z"),
+    log: msg => lines.push(msg),
+    repository: "o/r",
+  };
+  const mutations = () => calls.filter(c => WRITE_CALLS.has(c.name));
+  return { deps, calls, writes, lines, mutations };
+};
+
+describe("runCiRelease", () => {
+  it("exits 0 with no writes and no API calls when nothing is releasable", async () => {
+    // Arrange
+    const ci = makeCi({ commits: [ciCommit("chore"), ciCommit("docs")] });
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    expect(ci.writes.length).toBe(0);
+    expect(ci.calls.length).toBe(0);
+  });
+
+  it("creates blobs, tree, commit, ref update, tag object and tag ref in order", async () => {
+    // Arrange
+    const ci = makeCi();
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    expect(
+      ci
+        .mutations()
+        .map(c => c.name)
+        .join(","),
+    ).toBe(
+      "createBlob,createBlob,createBlob,createTree,createCommit,updateRef,createTag,createRef",
+    );
+    const commitCall = ci.calls.find(c => c.name === "createCommit");
+    expect(commitCall.args[0].message.startsWith("chore(release): v0.4.0")).toBe(true);
+    expect(commitCall.args[0].parents.join(",")).toBe("head1");
+    expect(ci.writes.length).toBe(0);
+  });
+
+  it("updates only the allowlisted files with the new version and a dated section", async () => {
+    // Arrange
+    const ci = makeCi();
+
+    // Act
+    await runCiRelease([], ci.deps);
+
+    // Assert
+    const blobs = ci.calls.filter(c => c.name === "createBlob").map(c => c.args[0]);
+    const tree = ci.calls.find(c => c.name === "createTree").args[0];
+    expect(
+      tree.tree
+        .map(e => e.path)
+        .sort()
+        .join(","),
+    ).toBe([...ALLOWED_RELEASE_FILES].sort().join(","));
+    expect(tree.base_tree).toBe("tree0");
+    expect(blobs.some(b => b.includes('"version": "0.4.0"'))).toBe(true);
+    expect(blobs.some(b => b.includes("## [0.4.0] - 2026-10-26"))).toBe(true);
+  });
+
+  it("creates only the tag when HEAD is already the release commit", async () => {
+    // Arrange
+    const ci = makeCi({
+      commits: [ciCommit("feat", "add thing"), ciCommit("chore", "release v0.4.0")],
+      headMessage: "chore(release): v0.4.0\n\nnotes",
+    });
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    expect(
+      ci
+        .mutations()
+        .map(c => c.name)
+        .join(","),
+    ).toBe("createTag,createRef");
+    expect(ci.calls.find(c => c.name === "createTag").args[0].object).toBe("head1");
+  });
+
+  it("exits 0 with no writes when the tag already exists", async () => {
+    // Arrange
+    const ci = makeCi({ tagRef: { object: { sha: "tagobj0" } } });
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    expect(ci.mutations().length).toBe(0);
+    expect(ci.writes.length).toBe(0);
+  });
+
+  it("prints the version and makes no writes and no API calls on --dry-run", async () => {
+    // Arrange
+    const ci = makeCi();
+
+    // Act
+    const code = await runCiRelease(["--dry-run"], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    expect(ci.calls.length).toBe(0);
+    expect(ci.writes.length).toBe(0);
+    expect(ci.lines.join("\n").includes("0.4.0")).toBe(true);
+  });
+
+  it("releases --version 1.0.0 from only chore commits with a No user-facing changes section", async () => {
+    // Arrange
+    const ci = makeCi({ commits: [ciCommit("chore")] });
+
+    // Act
+    const code = await runCiRelease(["--version", "1.0.0"], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    const changelog = ci.calls
+      .filter(c => c.name === "createBlob")
+      .map(c => c.args[0])
+      .find(b => b.includes("# Changelog"));
+    expect(changelog.includes("## [1.0.0] - 2026-10-26")).toBe(true);
+    expect(changelog.includes("No user-facing changes")).toBe(true);
+  });
+
+  it("aborts on a dirty tree with no writes", async () => {
+    // Arrange
+    const ci = makeCi({ status: " M src/index.ts" });
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(1);
+    expect(ci.mutations().length).toBe(0);
+    expect(ci.writes.length).toBe(0);
+  });
+
+  for (const bad of ["0.1.0", "0.3.0", "1.0.0-rc.1", "v1.0.0"]) {
+    it(`aborts with no writes for --version ${bad}`, async () => {
+      // Arrange
+      const ci = makeCi();
+
+      // Act
+      const code = await runCiRelease(["--version", bad], ci.deps);
+
+      // Assert
+      expect(code).toBe(1);
+      expect(ci.mutations().length).toBe(0);
+      expect(ci.writes.length).toBe(0);
+    });
+  }
+
+  it("passes a commit subject with shell metacharacters through as literal text", async () => {
+    // Arrange
+    const nasty = "Handle $(id) and `whoami`";
+    const ci = makeCi({ commits: [ciCommit("feat", nasty)] });
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(0);
+    const message = ci.calls.find(c => c.name === "createCommit").args[0].message;
+    expect(message.includes(nasty)).toBe(true);
+  });
+});
+
+describe("assertAllowedChanges", () => {
+  it("accepts the release files", () => {
+    // Arrange
+    const paths = ["package.json", "jsr.json", "CHANGELOG.md"];
+
+    // Act
+    const act = () => assertAllowedChanges(paths);
+
+    // Assert
+    expect(act).not.toThrow();
+  });
+
+  it("rejects a path outside the allowlist", () => {
+    // Arrange
+    const paths = ["package.json", "README.md"];
+
+    // Act
+    const act = () => assertAllowedChanges(paths);
+
+    // Assert
+    expect(act).toThrow();
+  });
+});
+
+describe("createGitHubApi", () => {
+  const respond = (status, body) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  });
+
+  it("returns null from getRef on a 404", async () => {
+    // Arrange
+    const fetch = async () => respond(404, { message: "Not Found" });
+    const api = createGitHubApi({ token: "t", repository: "o/r", fetch });
+
+    // Act
+    const ref = await api.getRef("tags/v1.0.0");
+
+    // Assert
+    expect(ref).toBe(null);
+  });
+
+  it("sends a non-forced ref update with the bearer token", async () => {
+    // Arrange
+    const seen = [];
+    const fetch = async (url, init) => {
+      seen.push({ url, init });
+      return respond(200, {});
+    };
+    const api = createGitHubApi({ token: "tok", repository: "o/r", fetch });
+
+    // Act
+    await api.updateRef("heads/main", "sha1");
+
+    // Assert
+    expect(seen[0].url).toBe("https://api.github.com/repos/o/r/git/refs/heads/main");
+    expect(seen[0].init.method).toBe("PATCH");
+    expect(seen[0].init.headers.Authorization).toBe("Bearer tok");
+    expect(JSON.parse(seen[0].init.body).force).toBe(false);
   });
 });
