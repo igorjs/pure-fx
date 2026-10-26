@@ -89,6 +89,8 @@ function missingBacktickedNames(section, names) {
   return names.filter(name => !section.includes(`\`${name}\``));
 }
 
+const IMAGE_DIGEST = /image:\s*mcr\.microsoft\.com\/playwright:\S+@sha256:[0-9a-f]{64}\b/;
+
 function playwrightImageVersion(text) {
   return /image:\s*mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-/.exec(text)?.[1] ?? null;
 }
@@ -194,10 +196,6 @@ function ungatedFlagLines(text, flag, guard) {
     if (line.includes(flag) && !stack.some(cond => cond.includes(guard))) hits.push(line.trim());
   }
   return hits;
-}
-
-function uncommentedScheduleLines(text) {
-  return text.split("\n").filter(line => /^\s*schedule:/.test(line));
 }
 
 function validationPrecedesRelease(text) {
@@ -473,20 +471,6 @@ describe("workflow syntax", () => {
     expect(versionHits.length).toBe(1);
   });
 
-  it("an uncommented schedule line is reported", () => {
-    // Arrange
-    const bad = "on:\n  schedule:\n    - cron: '0 6 * * 1'";
-    const good = "on:\n  # schedule:\n  #   - cron: '0 6 * * 1'";
-
-    // Act
-    const badHits = uncommentedScheduleLines(bad);
-    const goodHits = uncommentedScheduleLines(good);
-
-    // Assert
-    expect(badHits.length).toBe(1);
-    expect(goodHits).toEqual([]);
-  });
-
   it("rolling release is dispatchable with dry_run boolean and version string inputs", () => {
     // Arrange
     const lines = activeLines(readRollingRelease());
@@ -678,6 +662,18 @@ describe("workflow syntax", () => {
 
     // Assert
     expect(tag).toBe(pkg.devDependencies.playwright);
+  });
+
+  it("the CI Playwright image is pinned by digest", () => {
+    // Arrange
+    const ci = readWorkflow("ci.yml");
+
+    // Act
+    const pinned = IMAGE_DIGEST.test(ci);
+
+    // Assert
+    expect(pinned).toBe(true);
+    expect(IMAGE_DIGEST.test("image: mcr.microsoft.com/playwright:v1.60.0-noble")).toBe(false);
   });
 
   it("a Playwright image tag that differs from the package version is reported", () => {

@@ -337,7 +337,6 @@ const makeCi = ({
   headMessage = "feat: previous",
 } = {}) => {
   const calls = [];
-  const writes = [];
   const lines = [];
   const call =
     (name, result) =>
@@ -365,14 +364,13 @@ const makeCi = ({
         if (!(path in CI_FILES)) throw new Error(`ENOENT ${path}`);
         return CI_FILES[path];
       },
-      writeFile: (path, content) => writes.push({ path, content }),
     },
     now: () => new Date("2026-10-26T12:00:00Z"),
     log: msg => lines.push(msg),
     repository: "o/r",
   };
   const mutations = () => calls.filter(c => WRITE_CALLS.has(c.name));
-  return { deps, calls, writes, lines, mutations };
+  return { deps, calls, lines, mutations };
 };
 
 describe("runCiRelease", () => {
@@ -385,7 +383,6 @@ describe("runCiRelease", () => {
 
     // Assert
     expect(code).toBe(0);
-    expect(ci.writes.length).toBe(0);
     expect(ci.calls.length).toBe(0);
   });
 
@@ -409,7 +406,6 @@ describe("runCiRelease", () => {
     const commitCall = ci.calls.find(c => c.name === "createCommit");
     expect(commitCall.args[0].message.startsWith("chore(release): v0.4.0")).toBe(true);
     expect(commitCall.args[0].parents.join(",")).toBe("head1");
-    expect(ci.writes.length).toBe(0);
   });
 
   it("updates only the allowlisted files with the new version and a dated section", async () => {
@@ -482,7 +478,6 @@ describe("runCiRelease", () => {
     // Assert
     expect(code).toBe(0);
     expect(ci.mutations().length).toBe(0);
-    expect(ci.writes.length).toBe(0);
   });
 
   it("prints the version and makes no writes and no API calls on --dry-run", async () => {
@@ -495,7 +490,6 @@ describe("runCiRelease", () => {
     // Assert
     expect(code).toBe(0);
     expect(ci.calls.length).toBe(0);
-    expect(ci.writes.length).toBe(0);
     expect(ci.lines.join("\n").includes("0.4.0")).toBe(true);
   });
 
@@ -526,7 +520,6 @@ describe("runCiRelease", () => {
     // Assert
     expect(code).toBe(1);
     expect(ci.mutations().length).toBe(0);
-    expect(ci.writes.length).toBe(0);
   });
 
   for (const bad of ["0.1.0", "0.3.0", "1.0.0-rc.1", "v1.0.0"]) {
@@ -540,7 +533,6 @@ describe("runCiRelease", () => {
       // Assert
       expect(code).toBe(1);
       expect(ci.mutations().length).toBe(0);
-      expect(ci.writes.length).toBe(0);
     });
   }
 
@@ -625,22 +617,14 @@ describe("createGitHubApi", () => {
 // ── tagCommandFor ───────────────────────────────────────────────────────────
 
 describe("tagCommandFor", () => {
-  it("returns the signed tag arguments when a signing key is set", () => {
+  it("returns the signed tag arguments", () => {
     // Arrange
-    const key = "ABCDEF0123456789";
+    const tag = "v1.2.3";
 
     // Act
-    const args = tagCommandFor("v1.2.3", key);
+    const args = tagCommandFor(tag);
 
     // Assert
     expect(args).toEqual(["tag", "-s", "v1.2.3", "-m", "v1.2.3"]);
-  });
-
-  it("throws instead of falling back to an unsigned tag when the key is empty", () => {
-    // Arrange
-    const act = () => tagCommandFor("v1.2.3", "");
-
-    // Act and Assert
-    expect(act).toThrow();
   });
 });

@@ -66,11 +66,6 @@ jobs:
 
           echo "$bin" >> "$GITHUB_PATH"
 
-      - name: Print versions
-        run: |
-          actionlint --version
-          zizmor --version
-
       # zizmor runs offline so it needs no network beyond the install step.
       - name: Lint workflows
         run: |

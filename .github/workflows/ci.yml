@@ -296,7 +296,7 @@ jobs:
       contents: read
     name: "integration / browser"
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
     # harden-runner needs sudo on the runner VM and does not support
     # container jobs. This job runs without it.
     steps:

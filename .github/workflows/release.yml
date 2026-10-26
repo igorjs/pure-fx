@@ -274,7 +274,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Attach assets to GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1  # zizmor: ignore[superfluous-actions] step is reworked separately
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1  # zizmor: ignore[superfluous-actions] publishes the SLSA draft release by tag_name with the App token
         with:
           tag_name: ${{ needs.resolve.outputs.tag }}
           token: ${{ steps.app-token.outputs.token }}

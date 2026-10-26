@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * remaining.test.js - Tests for the 7 previously untested modules:
+ * remaining.test.js - Tests for the 6 previously untested modules:
  * Dns, Net, nodeAdapter, bunAdapter, lambdaAdapter, nominal Type.
  *
  * Uses @igorjs/pure-test.
@@ -193,7 +193,7 @@ describe("bunAdapter (no Bun runtime)", () => {
 });
 
 // =============================================================================
-// 6. nodeAdapter - integration test
+// 5. nodeAdapter - integration test
 // =============================================================================
 
 describe("nodeAdapter (integration)", () => {
@@ -290,7 +290,7 @@ describe("nodeAdapter (integration)", () => {
 });
 
 // =============================================================================
-// 7. Lambda Adapter
+// 6. Lambda Adapter
 // =============================================================================
 
 describe("toLambdaHandler", () => {
@@ -529,7 +529,7 @@ describe("toLambdaStreamHandler", () => {
 });
 
 // =============================================================================
-// 8. Nominal Type branding
+// 7. Nominal Type branding
 // =============================================================================
 
 describe("Type (nominal branding)", () => {

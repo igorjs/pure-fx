@@ -113,9 +113,8 @@ const runLane = lane => {
 const counts = { run: 0, skipped: 0, failed: 0 };
 for (const lane of lanes) {
   const outcome = runLane(lane);
-  counts[outcome === "run" ? "run" : outcome]++;
+  counts[outcome]++;
 }
-// A lane that ran and failed counts as failed, not as run.
 log(
   `\nConformance lanes: ${lanes.length} (${counts.run} run, ${counts.skipped} skipped, ${counts.failed} failed)`,
 );

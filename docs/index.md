@@ -40,7 +40,7 @@ import { File, FFI } from '@igorjs/pure-fx/io'
 
 ## Runtime Compatibility
 
-CI-tested on 7 environments:
+CI-tested on 6 environments:
 
 | Runtime | Unit Tests | Integration Tests |
 |---------|-----------|-------------------|

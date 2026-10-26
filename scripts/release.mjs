@@ -113,8 +113,7 @@ const runMut = (cmd, opts) => {
 // -- Pre-flight checks --------------------------------------------------------
 
 // Fail before any write: every tag must be signed.
-const signingKey = run("git config user.signingkey || true");
-if (!signingKey) {
+if (!run("git config user.signingkey || true")) {
   die("No git signing key is configured (user.signingkey). Releases need a signed tag.");
 }
 
@@ -450,11 +449,11 @@ if (stagedChanges.length > 0 || dryRun) {
 
 if (!localTagExists) {
   log("Tagging...");
-  const [, ...tagArgs] = tagCommandFor(newTag, signingKey);
+  const tagCommand = tagCommandFor(newTag);
   if (dryRun) {
-    log(`[dry-run] WOULD run \`git tag ${tagArgs.join(" ")}\``);
+    log(`[dry-run] WOULD run \`git ${tagCommand.join(" ")}\``);
   } else {
-    execFileSync("git", ["tag", ...tagArgs]);
+    execFileSync("git", tagCommand);
   }
 } else {
   log(`Skipping tag creation — ${newTag} already exists locally.`);

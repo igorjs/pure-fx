@@ -36,7 +36,7 @@ The environment URL shown on the release page comes from the `detect` job output
 Branch ruleset "Protect default branch" targets the default branch and is active.
 
 - Rules: `deletion`, `non_fast_forward`, `required_signatures`, `pull_request`, `required_status_checks`.
-- Required status check: `lint-and-test`, a job in `.github/workflows/ci.yml`. It is the only required check. The browser job runs inside the Playwright container image without harden-runner, which does not support container jobs.
+- Required status check: `lint-and-test`, a job in `.github/workflows/ci.yml`. It is the only required check; `workflow-lint.yml` (Workflow Lint) runs on workflow changes and is intentionally not required. The browser job runs inside the Playwright container image without harden-runner, which does not support container jobs.
 - Pull request rule: one approving review, code owner review required, stale reviews dismissed on push, review threads must be resolved, an extra approval for unattributed changes, squash merge only.
 - Bypass actors: the repository Admin role and the bot GitHub App, both always.
 
