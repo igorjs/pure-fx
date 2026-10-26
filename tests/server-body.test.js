@@ -258,3 +258,221 @@ describe("response backpressure", () => {
     expect(ended).toBe(true);
   });
 });
+
+const BOUND_MS = 3000;
+const SHORT_DRAIN_MS = 200;
+
+/** Reject if `promise` has not settled within `ms`, so a hang fails the test. */
+const within = (promise, ms, label) =>
+  Promise.race([
+    promise,
+    sleep(ms).then(() => {
+      throw new Error(`timed out waiting for ${label}`);
+    }),
+  ]);
+
+const deferred = () => {
+  let resolve;
+  const promise = new Promise(r => {
+    resolve = r;
+  });
+  return { promise, resolve };
+};
+
+/** Start `app.serve` on a free port and wait until it accepts connections. */
+const startServer = async (app, adapter, extra = {}) => {
+  const port = await freePort();
+  const controller = new AbortController();
+  const served = app
+    .serve({ port, hostname: HOST, signal: controller.signal, ...extra }, adapter)
+    .run();
+  const baseUrl = `http://${HOST}:${port}`;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fetch(`${baseUrl}/ready`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
+      break;
+    } catch (err) {
+      if (attempt > 50) throw err;
+      await sleep(40);
+    }
+  }
+  return { baseUrl, served, abort: () => controller.abort() };
+};
+
+describe("listen errors", () => {
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`serve resolves to a ListenError when the port is in use on the ${adapterName}`, async () => {
+      // Arrange
+      const blocker = createServer();
+      await new Promise((resolve, reject) => {
+        blocker.once("error", reject);
+        blocker.listen(0, HOST, resolve);
+      });
+      const { port } = blocker.address();
+      const controller = new AbortController();
+
+      try {
+        // Act
+        const result = await within(
+          Server("busy")
+            .get("/", () => json({ ok: true }))
+            .serve({ port, hostname: HOST, signal: controller.signal }, adapter)
+            .run(),
+          BOUND_MS,
+          "serve on a busy port",
+        );
+
+        // Assert
+        expect(result.isErr).toBe(true);
+        expect(result.unwrapErr().tag).toBe("ListenError");
+      } finally {
+        controller.abort();
+        await new Promise(resolve => blocker.close(resolve));
+      }
+    });
+  }
+});
+
+describe("shutdown drain", () => {
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`close waits for a slow in-flight request on the ${adapterName}`, async () => {
+      // Arrange
+      const entered = deferred();
+      const gate = deferred();
+      const app = Server("slow")
+        .get("/ready", () => json({ ok: true }))
+        .get("/slow", () =>
+          Task(async () => {
+            entered.resolve();
+            await gate.promise;
+            return Ok(new Response("finished"));
+          }),
+        );
+      const { baseUrl, served, abort } = await startServer(app, adapter);
+
+      try {
+        const pending = fetch(`${baseUrl}/slow`, {
+          signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+        });
+        await within(entered.promise, BOUND_MS, "handler to start");
+
+        // Act
+        abort();
+        let settledEarly = false;
+        void served.then(() => {
+          settledEarly = true;
+        });
+        await sleep(SETTLE_MS);
+        const stillDraining = !settledEarly;
+        gate.resolve();
+        const res = await within(pending, BOUND_MS, "the in-flight response");
+        const body = await within(res.text(), BOUND_MS, "the in-flight body");
+        await within(served, BOUND_MS, "serve to resolve after the drain");
+
+        // Assert
+        expect(stillDraining).toBe(true);
+        expect(res.status).toBe(200);
+        expect(body).toBe("finished");
+      } finally {
+        gate.resolve();
+        abort();
+      }
+    });
+  }
+
+  it("force-closes a request still running after drainTimeoutMs and serve resolves", async () => {
+    // Arrange
+    const entered = deferred();
+    const gate = deferred();
+    const app = Server("stuck")
+      .get("/ready", () => json({ ok: true }))
+      .get("/stuck", () =>
+        Task(async () => {
+          entered.resolve();
+          await gate.promise;
+          return Ok(new Response("late"));
+        }),
+      );
+    const { baseUrl, served, abort } = await startServer(app, undefined, {
+      drainTimeoutMs: SHORT_DRAIN_MS,
+    });
+
+    try {
+      const outcome = fetch(`${baseUrl}/stuck`, { signal: AbortSignal.timeout(BOUND_MS) }).then(
+        () => "responded",
+        err => (err?.name === "TimeoutError" ? "hung" : "cut"),
+      );
+      await within(entered.promise, BOUND_MS, "handler to start");
+
+      // Act
+      abort();
+      const result = await within(served, BOUND_MS, "serve to resolve after the drain timeout");
+
+      // Assert
+      expect(result.isOk).toBe(true);
+      expect(await within(outcome, BOUND_MS + SETTLE_MS, "the client outcome")).toBe("cut");
+    } finally {
+      gate.resolve();
+      abort();
+    }
+  });
+
+  it("close mid-stream finishes a clean stream and cuts an erroring one without hanging", async () => {
+    // Arrange
+    const encoder = new TextEncoder();
+    const gate = deferred();
+    const streamResponse = finish =>
+      new Response(
+        new ReadableStream({
+          async start(controller) {
+            controller.enqueue(encoder.encode("first"));
+            await gate.promise;
+            finish(controller);
+          },
+        }),
+      );
+    const app = Server("streams")
+      .get("/ready", () => json({ ok: true }))
+      .get("/clean", () => streamResponse(c => c.close()))
+      .get("/bad", () =>
+        streamResponse(c => {
+          c.error(new Error("boom"));
+        }),
+      );
+    const { baseUrl, served, abort } = await startServer(app, undefined);
+
+    try {
+      // Headers reach the client with the first chunk, so wait for them before closing.
+      const open = path => fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(BOUND_MS) });
+      const [cleanRes, badRes] = await within(
+        Promise.all([open("/clean"), open("/bad")]),
+        BOUND_MS,
+        "both streams to start",
+      );
+      const read = res =>
+        res.text().then(
+          text => ({ ok: true, text }),
+          () => ({ ok: false }),
+        );
+      const clean = read(cleanRes);
+      const bad = read(badRes);
+
+      // Act
+      abort();
+      gate.resolve();
+      const [cleanOutcome, badOutcome] = await within(
+        Promise.all([clean, bad]),
+        BOUND_MS + SETTLE_MS,
+        "both streams to settle",
+      );
+      await within(served, BOUND_MS, "serve to resolve");
+
+      // Assert
+      expect(cleanOutcome).toEqual({ ok: true, text: "first" });
+      expect(badOutcome.ok).toBe(false);
+    } finally {
+      gate.resolve();
+      abort();
+    }
+  });
+});

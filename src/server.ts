@@ -28,6 +28,7 @@ import { Task } from "./async/task.js";
 import type { Result } from "./core/result.js";
 import { Err, Ok } from "./core/result.js";
 import { Program } from "./program.js";
+import { LISTEN_ERROR_NAME } from "./runtime/adapter/listen-error.js";
 import { ErrType, type ErrTypeConstructor } from "./types/error.js";
 
 // ── Type-level utilities ────────────────────────────────────────────────────
@@ -64,12 +65,16 @@ export const BodyReadError: ErrTypeConstructor<"BodyReadError", string> = ErrTyp
 /** Handler threw or returned a failed Task. */
 export const HandlerError: ErrTypeConstructor<"HandlerError", string> = ErrType("HandlerError");
 
+/** The server could not start listening, for example because the port is in use. */
+export const ListenError: ErrTypeConstructor<"ListenError", string> = ErrType("ListenError");
+
 /** Union of all server-related error types. */
 export type ServerError =
   | ErrType<"RouteNotFound">
   | ErrType<"MethodNotAllowed">
   | ErrType<"BodyReadError">
-  | ErrType<"HandlerError">;
+  | ErrType<"HandlerError">
+  | ErrType<"ListenError">;
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -134,6 +139,8 @@ export interface ServerAdapter {
       readonly port: number;
       readonly hostname?: string | undefined;
       readonly signal: AbortSignal;
+      /** Max ms to let in-flight requests finish on shutdown before cutting them off. */
+      readonly drainTimeoutMs?: number | undefined;
       /** Called when writing a response fails after the handler returned. */
       readonly onError?: ((error: unknown, request: Request) => void) | undefined;
     },
@@ -148,6 +155,8 @@ export interface ListenOptions {
   readonly hostname?: string | undefined;
   /** Max ms to wait for graceful shutdown before force-exiting. */
   readonly teardownTimeoutMs?: number | undefined;
+  /** Max ms to let in-flight requests finish on shutdown before cutting them off. */
+  readonly drainTimeoutMs?: number | undefined;
 }
 
 /** A single route definition stored in the builder. */
@@ -529,7 +538,12 @@ export interface ServerBuilder<Ctx extends Record<string, unknown> = Record<stri
    * ```
    */
   serve(
-    options: { readonly port: number; readonly hostname?: string; readonly signal: AbortSignal },
+    options: {
+      readonly port: number;
+      readonly hostname?: string;
+      readonly signal: AbortSignal;
+      readonly drainTimeoutMs?: number;
+    },
     adapter?: ServerAdapter,
   ): Task<void, ServerError>;
 
@@ -811,6 +825,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
         readonly port: number;
         readonly hostname?: string;
         readonly signal: AbortSignal;
+        readonly drainTimeoutMs?: number;
       },
       adapter?: ServerAdapter,
     ): Task<void, ServerError> {
@@ -823,6 +838,7 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
             port: serveOpts.port,
             hostname: serveOpts.hostname,
             signal: serveOpts.signal,
+            drainTimeoutMs: serveOpts.drainTimeoutMs,
             onError: (thrown: unknown, request: Request): void => {
               const message = thrown instanceof Error ? thrown.message : String(thrown);
               state.errorHandler(HandlerError(message), request);
@@ -831,6 +847,9 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
           return Ok(undefined);
         } catch (thrown: unknown) {
           const message = thrown instanceof Error ? thrown.message : String(thrown);
+          if (thrown instanceof Error && thrown.name === LISTEN_ERROR_NAME) {
+            return Err(ListenError(message));
+          }
           return Err(HandlerError(message));
         }
       });
@@ -849,9 +868,13 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
             readonly port: number;
             readonly hostname?: string;
             readonly signal: AbortSignal;
+            readonly drainTimeoutMs?: number;
           } = { port: options.port, signal };
           if (options.hostname !== undefined) {
             (serveOpts as { hostname: string }).hostname = options.hostname;
+          }
+          if (options.drainTimeoutMs !== undefined) {
+            (serveOpts as { drainTimeoutMs: number }).drainTimeoutMs = options.drainTimeoutMs;
           }
           return builder.serve(serveOpts, adapter);
         },

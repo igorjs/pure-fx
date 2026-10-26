@@ -15,6 +15,7 @@
  * 2. **Direct**: `Bun.serve({ fetch: app.fetch })` when Program is not needed.
  */
 
+import { toListenError } from "./listen-error.js";
 import type { ServerAdapter } from "./types.js";
 
 // ── Structural types for Bun.serve (avoids @types/bun) ──────────────────────
@@ -95,7 +96,12 @@ export const bunAdapter: ServerAdapter = {
       (serveOptions as { hostname: string }).hostname = options.hostname;
     }
 
-    const server = bunGlobal.Bun.serve(serveOptions);
+    let server: BunServer;
+    try {
+      server = bunGlobal.Bun.serve(serveOptions);
+    } catch (err: unknown) {
+      throw toListenError(options.port, err);
+    }
 
     // Wait for the abort signal, then stop the server
     await new Promise<void>(resolve => {

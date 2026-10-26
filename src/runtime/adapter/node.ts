@@ -13,6 +13,7 @@
  * body, chunks are piped to `res.write()` incrementally rather than buffered.
  */
 
+import { toListenError } from "./listen-error.js";
 import type { ServerAdapter } from "./types.js";
 
 // ── Structural types for node:http (avoids @types/node) ─────────────────────
@@ -42,6 +43,16 @@ interface NodeResponse {
 interface NodeServer {
   listen(port: number, hostname: string | undefined, cb: () => void): void;
   close(cb?: (err?: Error) => void): void;
+  on(event: "error", cb: (err: Error) => void): void;
+  on(event: "connection", cb: (socket: NodeSocket) => void): void;
+  closeAllConnections?(): void;
+  closeIdleConnections?(): void;
+}
+
+/** Subset of net.Socket used to force-close connections. */
+interface NodeSocket {
+  destroy(): void;
+  once(event: "close", cb: () => void): void;
 }
 
 /** Structural type for the `node:http` module. */
@@ -50,6 +61,9 @@ interface NodeHttpModule {
 }
 
 const STATUS_INTERNAL_SERVER_ERROR = 500;
+
+/** Default ms in-flight requests get to finish after shutdown starts. */
+const DEFAULT_DRAIN_TIMEOUT_MS = 10_000;
 
 // ── Header conversion ───────────────────────────────────────────────────────
 
@@ -202,8 +216,15 @@ export const nodeAdapter: ServerAdapter = {
 
     await new Promise<void>((resolve, reject) => {
       const hostname = options.hostname ?? "localhost";
+      const drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
+      const sockets = new Set<NodeSocket>();
+      let draining = false;
 
       const server = http.createServer((nodeReq, nodeRes) => {
+        nodeRes.once("close", () => {
+          // A keep-alive connection that just finished its request would otherwise hold close() open.
+          if (draining) server.closeIdleConnections?.();
+        });
         const request = toRequest(nodeReq, hostname, options.port);
         void handler(request)
           .then(
@@ -213,15 +234,39 @@ export const nodeAdapter: ServerAdapter = {
           .catch((err: unknown) => options.onError?.(err, request));
       });
 
-      const onAbort = (): void => {
+      server.on("connection", socket => {
+        sockets.add(socket);
+        socket.once("close", () => sockets.delete(socket));
+      });
+
+      // Without a listener, a bind failure such as EADDRINUSE crashes the process.
+      server.on("error", err => {
+        options.signal.removeEventListener("abort", onAbort);
+        reject(toListenError(options.port, err));
+      });
+
+      const forceCloseConnections = (): void => {
+        if (server.closeAllConnections !== undefined) {
+          server.closeAllConnections();
+          return;
+        }
+        for (const socket of sockets) socket.destroy();
+      };
+
+      // close() stops accepting and resolves once every connection has ended;
+      // connections still open after the drain timeout are cut off.
+      function onAbort(): void {
+        draining = true;
+        const timer = setTimeout(forceCloseConnections, drainTimeoutMs);
         server.close(err => {
+          clearTimeout(timer);
           if (err !== undefined) {
             reject(err);
           } else {
             resolve();
           }
         });
-      };
+      }
 
       if (options.signal.aborted) {
         resolve();
