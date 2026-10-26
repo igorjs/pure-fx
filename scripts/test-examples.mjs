@@ -73,6 +73,8 @@ const waitReady = async url => {
 
 const stop = child =>
   new Promise(resolve => {
+    // An exited child never emits "exit" again, so waiting for it would hang.
+    if (child.exitCode !== null || child.signalCode !== null) return resolve();
     child.removeAllListeners("exit");
     child.once("exit", resolve);
     child.kill();
@@ -116,6 +118,10 @@ const restApi = async base => {
   const patched = await call(base, "PATCH", "/notes/1", { body: "hello" });
   assertEqual(patched.status, 200, "patch status");
   assertEqual(patched.body, { id: "1", title: "first", body: "hello" }, "patch body");
+
+  expectError(await call(base, "PATCH", "/notes/1", { title: "  " }), 400, "ValidationFailed", "VALIDATION_FAILED", "patch blank title");
+  expectError(await call(base, "PATCH", "/notes/1", "{not json"), 400, "ValidationFailed", "VALIDATION_FAILED", "patch malformed JSON");
+  assertEqual((await call(base, "GET", "/notes/1")).body, patched.body, "invalid patch changed nothing");
 
   const deleted = await call(base, "DELETE", "/notes/1");
   assertEqual(deleted.status, 204, "delete status");
