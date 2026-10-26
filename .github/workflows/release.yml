@@ -86,7 +86,7 @@ jobs:
           echo "::notice::Resolved tag=${TAG} version=${VERSION}"
 
       - name: Verify release tag
-        if: github.event_name == 'push'
+        if: ${{ !startsWith(steps.r.outputs.tag, 'dev-') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.r.outputs.tag }}

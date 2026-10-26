@@ -25,7 +25,11 @@ const { publicSubpaths, waitForVersion } = await import(pathToFileURL(scriptPath
 const PACKAGE_NAME = "@igorjs/pure-fx";
 const VERSION = "9.9.9";
 const NOT_FOUND = { status: 404 };
-const FOUND = { status: 200 };
+const packument = versions => ({
+  status: 200,
+  json: async () => ({ versions: Object.fromEntries(versions.map(v => [v, {}])) }),
+});
+const FOUND = packument([VERSION]);
 const POLL_TIMEOUT_MS = 1_000;
 const POLL_INTERVAL_MS = 100;
 const SCRIPT_TIMEOUT_MS = 180_000;
@@ -105,7 +109,8 @@ describe("waitForVersion", () => {
     // Act
     await waitForVersion({
       fetch,
-      url: "https://registry.test/pkg/9.9.9",
+      url: "https://registry.test/pkg",
+      version: VERSION,
       timeoutMs: POLL_TIMEOUT_MS,
       intervalMs: POLL_INTERVAL_MS,
       sleep,
@@ -114,6 +119,30 @@ describe("waitForVersion", () => {
     // Assert
     expect(answers.length).toBe(0);
     expect(sleeps).toBe(2);
+  });
+
+  it("keeps polling while the packument answers 200 without the version", async () => {
+    // Arrange
+    const answers = [packument(["9.9.8"]), FOUND];
+    const fetch = async () => answers.shift();
+    let sleeps = 0;
+    const sleep = async () => {
+      sleeps += 1;
+    };
+
+    // Act
+    await waitForVersion({
+      fetch,
+      url: "https://registry.test/pkg",
+      version: VERSION,
+      timeoutMs: POLL_TIMEOUT_MS,
+      intervalMs: POLL_INTERVAL_MS,
+      sleep,
+    });
+
+    // Assert
+    expect(answers.length).toBe(0);
+    expect(sleeps).toBe(1);
   });
 
   it("rejects naming the version and the waited time when it never appears", async () => {
@@ -126,7 +155,8 @@ describe("waitForVersion", () => {
     try {
       await waitForVersion({
         fetch,
-        url: `https://registry.test/pkg/${VERSION}`,
+        url: "https://registry.test/pkg",
+        version: VERSION,
         timeoutMs: POLL_TIMEOUT_MS,
         intervalMs: POLL_INTERVAL_MS,
         sleep,

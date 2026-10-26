@@ -167,6 +167,11 @@ export function groupChangelog(commits) {
   return sections;
 }
 
+/** Lists the tags reachable from HEAD, so a tag on an unmerged branch is never the base. */
+export function reachableTags({ cwd } = {}) {
+  return run("git tag --merged HEAD", { cwd }).split("\n").filter(Boolean);
+}
+
 /** Picks the highest plain `vMAJOR.MINOR.PATCH` tag, or null. */
 export function latestSemverTag(tags) {
   const parse = (tag) => /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag)?.slice(1).map(Number);

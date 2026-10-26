@@ -19,6 +19,7 @@ import {
   groupChangelog,
   latestSemverTag,
   parseCommit,
+  reachableTags,
   readCommitsSince,
   tagCommandFor,
 } from "../scripts/release-lib.mjs";
@@ -251,6 +252,48 @@ describe("readCommitsSince", () => {
   });
 });
 
+describe("reachableTags", () => {
+  let dir;
+  const git = cmd => execSync(`git ${cmd}`, { cwd: dir, stdio: "pipe" });
+  const commitFile = name => {
+    writeFileSync(join(dir, name), name);
+    git(`add ${name}`);
+    git(`commit -q -m "${name}"`);
+  };
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "release-tags-test-"));
+    git("init -q -b main");
+    git("config user.email test@example.com");
+    git("config user.name Test");
+    git("config commit.gpgsign false");
+    git("config tag.gpgsign false");
+    commitFile("a");
+    git("tag v0.3.0");
+    git("checkout -q -b side");
+    commitFile("b");
+    git("tag v0.5.0");
+    git("checkout -q main");
+    commitFile("c");
+  });
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("lists only the tags reachable from HEAD, so an unmerged higher tag is ignored", () => {
+    // Arrange
+    const cwd = dir;
+
+    // Act
+    const tags = reachableTags({ cwd });
+
+    // Assert
+    expect(tags.join(",")).toBe("v0.3.0");
+    expect(latestSemverTag(tags)).toBe("v0.3.0");
+  });
+});
+
 // ── --ci mode ───────────────────────────────────────────────────────────────
 
 const WRITE_CALLS = new Set([
@@ -409,6 +452,24 @@ describe("runCiRelease", () => {
         .join(","),
     ).toBe("createTag,createRef");
     expect(ci.calls.find(c => c.name === "createTag").args[0].object).toBe("head1");
+  });
+
+  it("aborts without a second release commit when the changelog already has the version section", async () => {
+    // Arrange
+    const ci = makeCi({ headMessage: "fix: landed after the failed tag step" });
+    const original = ci.deps.fs.readFile;
+    ci.deps.fs.readFile = path =>
+      path === "CHANGELOG.md"
+        ? `${original(path)}\n## [0.4.0] - 2026-10-25\n\n### Added\n- Thing\n`
+        : original(path);
+
+    // Act
+    const code = await runCiRelease([], ci.deps);
+
+    // Assert
+    expect(code).toBe(1);
+    expect(ci.mutations().length).toBe(0);
+    expect(ci.lines.join("\n")).toContain("0.4.0");
   });
 
   it("exits 0 with no writes when the tag already exists", async () => {

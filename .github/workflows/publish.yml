@@ -282,8 +282,8 @@ jobs:
   # ── Post-release smoke test of the published package ───────────────
   # Waits for the version to appear on npm, installs it into a fresh
   # project and imports every public subpath on Node, Bun and Miniflare.
-  # If the npm-publish environment is waiting for a reviewer, this job
-  # waits with it and the job timeout ends the run with a clear failure.
+  # It starts only after publish-npm ends, so the timeout covers the smoke
+  # run itself, not a pending npm-publish reviewer approval.
   smoke:
     needs: [detect, publish-npm]
     if: ${{ needs.detect.outputs.publish_npm == 'true' && !github.event.release.prerelease }}

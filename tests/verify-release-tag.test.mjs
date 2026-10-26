@@ -29,11 +29,13 @@ const commitFile = name => {
   return git("rev-parse", "HEAD");
 };
 
-const fakeApi = ({ refType = "tag", verified = true, commitSha }) => ({
-  getRef: async () => ({
-    object: { type: refType, sha: refType === "tag" ? TAG_OBJECT_SHA : commitSha },
-  }),
-  getTag: async () => ({ verification: { verified }, object: { sha: commitSha } }),
+const fakeApi = ({ refType = "tag", verified = true, commitSha, missing = false }) => ({
+  getRef: async ref =>
+    missing || ref !== `tags/${TAG}`
+      ? null
+      : { object: { type: refType, sha: refType === "tag" ? TAG_OBJECT_SHA : commitSha } },
+  getTag: async sha =>
+    sha === TAG_OBJECT_SHA ? { verification: { verified }, object: { sha: commitSha } } : null,
 });
 
 beforeAll(() => {
@@ -100,5 +102,17 @@ describe("verifyReleaseTag", () => {
     // Assert
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("annotated");
+  });
+
+  it("rejects a tag that does not exist", async () => {
+    // Arrange
+    const api = fakeApi({ missing: true, commitSha: mainSha });
+
+    // Act
+    const result = await verifyReleaseTag({ api, tag: TAG, cwd: dir });
+
+    // Assert
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain("does not exist");
   });
 });

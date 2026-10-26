@@ -35,6 +35,7 @@ import {
   describeCommit,
   groupChangelog,
   insertChangelogSection,
+  reachableTags,
   readCommitsSince,
   renderChangelogSection,
   run,
@@ -74,7 +75,7 @@ if (args.includes("--ci")) {
     api: createGitHubApi({ token, repository, fetch }),
     git: {
       status: () => git(["status", "--porcelain"]),
-      tags: () => git(["tag", "--list"]).split("\n").filter(Boolean),
+      tags: () => reachableTags(),
       logSince: (tag) => readCommitsSince(tag),
     },
     fs: { readFile: (path) => readFileSync(path, "utf8") },

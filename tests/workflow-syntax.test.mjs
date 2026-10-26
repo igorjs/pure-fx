@@ -487,7 +487,7 @@ describe("workflow syntax", () => {
     expect(hits).toEqual([]);
   });
 
-  it("release verifies the tag only on a tag push", () => {
+  it("release verifies every resolved tag except dev builds", () => {
     // Arrange
     const resolve = jobBlock(readWorkflow("release.yml"), "resolve");
 
@@ -495,7 +495,7 @@ describe("workflow syntax", () => {
     const step = stepContaining(resolve, "verify-release-tag.mjs");
 
     // Assert
-    expect(step).toContain("if: github.event_name == 'push'");
+    expect(step).toContain("if: $" + "{{ !startsWith(steps.r.outputs.tag, 'dev-') }}");
   });
 
   it("release resolve checks out full history", () => {
@@ -554,5 +554,13 @@ describe("workflow syntax", () => {
     expect(job).toMatch(/^ {4}needs:\s*\[[^\]]*\bpublish-npm\b[^\]]*\]/m);
     expect(job).toMatch(/^ {4}timeout-minutes:\s*\d+/m);
     expect(job).toContain("scripts/smoke-install.mjs");
+  });
+
+  it("publish smoke comment does not promise a timeout during the reviewer wait", () => {
+    // Arrange
+    const job = readWorkflow("publish.yml");
+
+    // Act and Assert
+    expect(job).not.toContain("waits with it");
   });
 });

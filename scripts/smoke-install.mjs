@@ -4,7 +4,7 @@
  * every public subpath on the current runtime (Node, or Bun via `bun <script>`).
  *
  * Usage:
- *   node scripts/smoke-install.mjs --version <v> [--registry-wait <ms>] [--workers]
+ *   node scripts/smoke-install.mjs --version <v> [--workers]
  *   node scripts/smoke-install.mjs --tarball <path> [--workers]
  *
  * Registry mode first waits for the version to appear on npm. `--workers`
@@ -26,6 +26,7 @@ const IMPORT_TIMEOUT_MS = 60 * 1000;
 const INSTALL_TIMEOUT_MS = 5 * 60 * 1000;
 const WORKER_TIMEOUT_MS = 60 * 1000;
 const HTTP_OK = 200;
+const PACKUMENT_ACCEPT = "application/vnd.npm.install-v1+json";
 
 const projectRoot = resolve(dirname(new URL(import.meta.url).pathname), "..");
 
@@ -38,23 +39,30 @@ export function publicSubpaths(exportsMap) {
 
 const defaultSleep = ms => new Promise(done => setTimeout(done, ms));
 
-/** Polls `url` until it answers 200; rejects once `timeoutMs` of waiting has passed. */
+/**
+ * Polls the package document at `url` until its `versions` lists `version`
+ * (npm resolves installs through it, not the per-version document); rejects
+ * once `timeoutMs` of waiting has passed.
+ */
 export async function waitForVersion({
   fetch,
   url,
+  version,
   timeoutMs = REGISTRY_WAIT_MS,
   intervalMs = POLL_INTERVAL_MS,
   sleep = defaultSleep,
 }) {
   let waited = 0;
   for (;;) {
-    const response = await fetch(url).catch(() => undefined);
-    if (response?.status === HTTP_OK) return;
+    const response = await fetch(url, { headers: { Accept: PACKUMENT_ACCEPT } }).catch(() => undefined);
+    if (response?.status === HTTP_OK) {
+      const document = await response.json().catch(() => undefined);
+      if (document?.versions?.[version]) return;
+    }
     if (waited >= timeoutMs) break;
     await sleep(intervalMs);
     waited += intervalMs;
   }
-  const version = decodeURIComponent(url.split("/").pop() ?? url);
   throw new Error(`Version ${version} was not available at ${url} after waiting ${waited} ms`);
 }
 
@@ -134,7 +142,6 @@ async function main(argv) {
     options: {
       version: { type: "string" },
       tarball: { type: "string" },
-      "registry-wait": { type: "string", default: String(REGISTRY_WAIT_MS) },
       workers: { type: "boolean", default: false },
     },
   });
@@ -148,8 +155,8 @@ async function main(argv) {
     if (!existsSync(spec)) throw new Error(`tarball not found: ${spec}`);
   } else {
     spec = `${PACKAGE_NAME}@${values.version}`;
-    const url = `${REGISTRY_URL}/${PACKAGE_NAME.replace("/", "%2f")}/${values.version}`;
-    await waitForVersion({ fetch, url, timeoutMs: Number(values["registry-wait"]) });
+    const url = `${REGISTRY_URL}/${PACKAGE_NAME.replace("/", "%2f")}`;
+    await waitForVersion({ fetch, url, version: values.version });
   }
 
   const { exports: exportsMap } = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8"));
