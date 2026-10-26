@@ -206,17 +206,14 @@ export const setByPath = <T>(obj: T, path: readonly string[], value: unknown, de
     resized.length = value as number;
     return resized as T;
   }
-  const current = obj as Record<string, unknown>;
-  const child = current[key];
-  if (Array.isArray(child) && depth + 1 < path.length) {
-    const idx = Number(path[depth + 1]);
-    if (!Number.isNaN(idx)) {
-      const copy = child.slice();
-      copy[idx] = depth + 2 === path.length ? value : setByPath(copy[idx], path, value, depth + 2);
-      return { ...current, [key]: copy } as T;
-    }
+  if (Array.isArray(obj)) {
+    const copy = obj.slice() as unknown[];
+    const idx = key as unknown as number;
+    copy[idx] = setByPath(copy[idx], path, value, depth + 1);
+    return copy as T;
   }
-  return { ...current, [key]: setByPath(child, path, value, depth + 1) } as T;
+  const current = obj as Record<string, unknown>;
+  return { ...current, [key]: setByPath(current[key], path, value, depth + 1) } as T;
 };
 
 // ── Draft proxy ─────────────────────────────────────────────────────────────
@@ -330,8 +327,13 @@ export const createDraft = <T extends object>(
           return result;
         };
       }
-      if (Array.isArray(tgt) && prop === "length") {
-        return (currentValueAt(tgt, mutations, currentPath) as unknown[]).length;
+      if (Array.isArray(tgt)) {
+        // Every array read resolves against the replayed value so it sees earlier index writes and methods.
+        const current = currentValueAt(tgt, mutations, currentPath) as unknown[];
+        const val = Reflect.get(current, prop, receiver);
+        return isObjectLike(val)
+          ? createDraft(val as object, mutations, appendPath(currentPath, prop))
+          : val;
       }
 
       const mutated = findMutationValue(mutations, currentPath, prop);
@@ -342,6 +344,12 @@ export const createDraft = <T extends object>(
         return createDraft(val as object, mutations, appendPath(currentPath, prop));
       }
       return val;
+    },
+    has(tgt, prop) {
+      if (Array.isArray(tgt) && typeof prop === "string") {
+        return Reflect.has(currentValueAt(tgt, mutations, currentPath) as object, prop);
+      }
+      return Reflect.has(tgt, prop);
     },
     set(_, prop, value) {
       if (typeof prop === "string") mutations.push({ path: appendPath(currentPath, prop), value });

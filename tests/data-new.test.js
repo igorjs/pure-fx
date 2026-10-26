@@ -1971,3 +1971,71 @@ describe("Dict and MapOf key validation", () => {
     expect(result.value.get("__proto__").isSome).toBe(true);
   });
 });
+
+describe("produce on array drafts mixing writes and methods", () => {
+  it("push after an index write keeps the write", () => {
+    // Arrange
+    const rec = Record({ items: [3, 1, 2] });
+    // Act
+    const out = rec.produce(d => {
+      d.items[0] = 9;
+      d.items.push(4);
+    });
+    // Assert
+    expect(out.toJSON().items).toEqual([9, 1, 2, 4]);
+  });
+
+  it("length reflects an earlier index write beyond the end", () => {
+    // Arrange
+    const rec = Record({ items: [1, 2] });
+    let len = -1;
+    // Act
+    rec.produce(d => {
+      d.items[3] = 7;
+      len = d.items.length;
+    });
+    // Assert
+    expect(len).toBe(4);
+  });
+
+  it("nested field write then sort keeps both", () => {
+    // Arrange
+    const rec = Record({ items: [{ n: 2 }, { n: 1 }] });
+    // Act
+    const out = rec.produce(d => {
+      d.items[0].n = 5;
+      d.items.reverse();
+    });
+    // Assert
+    expect(out.toJSON().items).toEqual([{ n: 1 }, { n: 5 }]);
+  });
+
+  it("reads an element back through a held draft after sort", () => {
+    // Arrange
+    const rec = Record({ items: [3, 1, 2] });
+    let first;
+    // Act
+    rec.produce(d => {
+      const items = d.items;
+      items.sort();
+      first = items[0];
+    });
+    // Assert
+    expect(first).toBe(1);
+  });
+
+  it("iterates a held draft after push", () => {
+    // Arrange
+    const rec = Record({ items: [1] });
+    const seen = [];
+    // Act
+    rec.produce(d => {
+      const items = d.items;
+      items.push(2);
+      for (const x of items) seen.push(x);
+      seen.push(0 in items, 5 in items);
+    });
+    // Assert
+    expect(seen).toEqual([1, 2, true, false]);
+  });
+});
