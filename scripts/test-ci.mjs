@@ -2,7 +2,7 @@
 /**
  * test-ci.mjs - Run the full CI test matrix locally.
  *
- * 1. Native tests: Node 22/23/24/26 (via fnm) + Bun
+ * 1. Native tests: Node 22/24/26 (via fnm) + Bun, then the conformance lanes
  * 2. Docker containers: Node, Bun, browser and Workers images (parallel)
  *
  * Output is quiet locally, verbose in CI or with --verbose.
@@ -29,10 +29,12 @@ const hasCommand = (cmd) => {
 const args = process.argv.slice(2);
 const runNative = !args.includes("--docker");
 const runDocker = !args.includes("--native");
+// In CI a skipped runtime would let a green run hide untested code.
+const strict = Boolean(process.env.CI);
 
 const COMPOSE_FILE = "docker-compose.test.yml";
 const COMPOSE_PROJECT = "pure-fx-test";
-const NODE_VERSIONS = ["22", "23", "24", "26"];
+const NODE_VERSIONS = ["22", "24", "26"];
 
 let failed = false;
 const dockerErrors = [];
@@ -84,6 +86,7 @@ if (runNative) {
         execSync("node scripts/test-matrix.mjs --no-summary --runtime node", { stdio: "inherit" });
       } else {
         log(`  node ${nodeVersion} ... SKIP (fnm not available)`);
+        if (strict) failed = true;
       }
     } catch {
       failed = true;
@@ -98,6 +101,13 @@ if (runNative) {
       failed = true;
     }
   }
+
+  // Cross-runtime conformance suites (a missing lane fails when CI is set)
+  try {
+    execSync("pnpm run test:conformance", { stdio: "inherit" });
+  } catch {
+    failed = true;
+  }
 }
 
 // -- Docker matrix (parallel) ------------------------------------------------
@@ -105,6 +115,7 @@ if (runNative) {
 if (runDocker) {
   if (!hasCommand("docker")) {
     log("\nWARN: Docker not available, skipping container tests.");
+    if (strict) failed = true;
   } else {
     log("\n── Docker ──");
 

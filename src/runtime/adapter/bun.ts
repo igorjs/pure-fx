@@ -44,6 +44,75 @@ interface BunServer {
 /** Structural type for the Bun.serve() function. */
 type BunServeFn = (options: BunServeOptions) => BunServer;
 
+// ── Request bridge ──────────────────────────────────────────────────────────
+
+const STATUS_BAD_REQUEST = 400;
+const STATUS_PAYLOAD_TOO_LARGE = 413;
+const STATUS_INTERNAL_SERVER_ERROR = 500;
+
+/** Tracks whether a request body went over the size limit while streaming. */
+interface BodyLimit {
+  exceeded: boolean;
+}
+
+/** Pass chunks through, erroring the stream once more than `maxBodyBytes` have arrived. */
+const limitBody = (
+  body: ReadableStream<Uint8Array>,
+  maxBodyBytes: number,
+  limit: BodyLimit,
+): ReadableStream<Uint8Array> => {
+  const reader = body.getReader();
+  let received = 0;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+      received += value.byteLength;
+      if (received > maxBodyBytes) {
+        limit.exceeded = true;
+        controller.error(new Error(`Request body exceeds ${maxBodyBytes} bytes`));
+        await reader.cancel();
+        return;
+      }
+      controller.enqueue(value);
+    },
+    cancel: reason => reader.cancel(reason),
+  });
+};
+
+/**
+ * Rebuild the request on the configured origin, so the Host header never decides
+ * `request.url`, with the body capped at `maxBodyBytes`. Returns undefined when
+ * Bun could not parse the request URL.
+ */
+const toRequest = (
+  request: Request,
+  origin: string,
+  maxBodyBytes: number,
+  limit: BodyLimit,
+): Request | undefined => {
+  let parsed: URL;
+  try {
+    parsed = new URL(request.url);
+  } catch {
+    return undefined;
+  }
+  const target = `${origin}${parsed.pathname}${parsed.search}`;
+  const { method, headers } = request;
+  // Bun's fetch rejects a streamed body unless duplex is "half".
+  const init: RequestInit & { duplex?: "half" } =
+    request.body === null
+      ? { method, headers }
+      : { method, headers, body: limitBody(request.body, maxBodyBytes, limit), duplex: "half" };
+  return new Request(target, init);
+};
+
+const plain = (status: number, message: string): Response =>
+  new Response(message, { status, headers: { "content-type": "text/plain" } });
+
 // ── Adapter ─────────────────────────────────────────────────────────────────
 
 /**
@@ -87,10 +156,27 @@ export const bunAdapter: ServerAdapter = {
       );
     }
 
+    const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+    const origin =
+      options.publicOrigin ?? `http://${options.hostname ?? "localhost"}:${options.port}`;
+
+    // Bun's own cap does not stop a chunked body, so the stream is counted here too.
     const serveOptions: BunServeOptions = {
       port: options.port,
-      maxRequestBodySize: options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES,
-      fetch: handler,
+      maxRequestBodySize: maxBodyBytes,
+      fetch: async bunRequest => {
+        const limit: BodyLimit = { exceeded: false };
+        const request = toRequest(bunRequest, origin, maxBodyBytes, limit);
+        if (request === undefined) return plain(STATUS_BAD_REQUEST, "Bad Request");
+        try {
+          const response = await handler(request);
+          return limit.exceeded ? plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large") : response;
+        } catch (err: unknown) {
+          if (limit.exceeded) return plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large");
+          options.onError?.(err, request);
+          return plain(STATUS_INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+      },
     };
 
     // Only set hostname when provided (exactOptionalPropertyTypes)

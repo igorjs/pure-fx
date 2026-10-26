@@ -1,0 +1,10 @@
+{
+  "lanes": [
+    {
+      "name": "fixture-present",
+      "bin": "node",
+      "args": ["tests/fixtures/conformance-lane-ok.mjs"]
+    },
+    { "name": "fixture-missing", "bin": "pure-fx-no-such-runtime", "args": ["lane.mjs"] }
+  ]
+}
