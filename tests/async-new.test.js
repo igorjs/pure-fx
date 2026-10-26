@@ -1287,6 +1287,83 @@ describe("Channel", () => {
   });
 });
 
+describe("Channel rendezvous and iterator return", () => {
+  it("capacity 0 send resolves only when a receiver takes the value", async () => {
+    // Arrange
+    const ch = Channel.bounded(0);
+    let sent = false;
+    const sendP = ch.send(1).then(ok => {
+      sent = true;
+      return ok;
+    });
+    await sleep(0);
+    const it = ch.receive()[Symbol.asyncIterator]();
+
+    // Act
+    const sentBefore = sent;
+    const got = await Promise.race([it.next(), sleep(50).then(() => "hung")]);
+
+    // Assert
+    expect(sentBefore).toBe(false);
+    expect(got === "hung").toBe(false);
+    expect(got.value).toBe(1);
+    expect(await sendP).toBe(true);
+  });
+
+  it("capacity 0 receive waits for a sender", async () => {
+    // Arrange
+    const ch = Channel.bounded(0);
+    const it = ch.receive()[Symbol.asyncIterator]();
+    const nextP = it.next();
+
+    // Act
+    const ok = await ch.send(7);
+    const got = await nextP;
+
+    // Assert
+    expect(ok).toBe(true);
+    expect(got.value).toBe(7);
+    expect(ch.size()).toBe(0);
+  });
+
+  it("iterator return() detaches a pending receiver", async () => {
+    // Arrange
+    const ch = Channel.bounded(4);
+    const it = ch.receive()[Symbol.asyncIterator]();
+    const pending = it.next();
+
+    // Act
+    const ret = await it.return();
+    const pendingResult = await Promise.race([pending, sleep(50).then(() => "hung")]);
+    await ch.send(5);
+
+    // Assert
+    expect(ret.done).toBe(true);
+    expect(pendingResult === "hung").toBe(false);
+    expect(pendingResult.done).toBe(true);
+    expect(ch.size()).toBe(1);
+  });
+
+  it("break in for await exits the loop and leaves the channel usable", async () => {
+    // Arrange
+    const ch = Channel.bounded(4);
+    await ch.send(1);
+    await ch.send(2);
+    const seen = [];
+
+    // Act
+    for await (const v of ch.receive()) {
+      seen.push(v);
+      break;
+    }
+    await ch.send(3);
+
+    // Assert
+    expect(seen).toEqual([1]);
+    expect(ch.size()).toBe(2);
+  });
+});
+
 // =============================================================================
 // 8. Env
 // =============================================================================
@@ -2188,6 +2265,81 @@ describe("Pool", () => {
     expect(created).toBe(2);
     r2.value.release();
     await pool.drain();
+  });
+
+  it("never exceeds maxSize when concurrent acquires race a create", async () => {
+    // Arrange
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        await Promise.resolve();
+        return { id: created };
+      },
+      maxSize: 1,
+    });
+
+    // Act
+    const p1 = pool.acquire().run();
+    const p2 = pool.acquire().run();
+    const p3 = pool.acquire().run();
+    const r1 = await p1;
+    r1.value.release();
+    const r2 = await p2;
+    r2.value.release();
+    const r3 = await p3;
+    r3.value.release();
+
+    // Assert
+    expect(created).toBe(1);
+    await pool.drain();
+  });
+
+  it("never exceeds maxSize while an idle resource is being validated", async () => {
+    // Arrange
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => ({ id: ++created }),
+      validate: async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        return true;
+      },
+      maxSize: 1,
+    });
+    const first = await pool.acquire().run();
+    first.value.release();
+
+    // Act
+    const pa = pool.acquire().run();
+    const pb = pool.acquire().run();
+    const ra = await pa;
+    ra.value.release();
+    const rb = await pb;
+    rb.value.release();
+
+    // Assert
+    expect(created).toBe(1);
+    await pool.drain();
+  });
+
+  it("rejects waiters pending at drain with a PoolError", async () => {
+    // Arrange
+    const pool = Pool.create({ create: async () => ({}), maxSize: 1 });
+    const held = await pool.acquire().run();
+    const waiter = pool.acquire().run();
+    await sleep(0);
+
+    // Act
+    const drained = pool.drain();
+    const outcome = await Promise.race([waiter, sleep(50).then(() => "hung")]);
+    held.value.release();
+    await drained;
+
+    // Assert
+    expect(outcome === "hung").toBe(false);
+    expect(outcome.isErr).toBe(true);
+    expect(outcome.error.tag).toBe("PoolError");
   });
 
   it("PoolError has correct tag", () => {

@@ -73,7 +73,13 @@ const createBoundedChannel = <T>(capacity: number): Channel<T> => {
   };
 
   const tryReceiveFromBuffer = (): Option<T> => {
-    if (buffer.length === 0) return None;
+    if (buffer.length === 0) {
+      // Capacity 0 rendezvous: take the value straight from a blocked sender
+      const direct = sendWaiters.shift();
+      if (direct === undefined) return None;
+      direct.resolve(true);
+      return Some(direct.value);
+    }
     const value = buffer.shift()!;
     // If senders are waiting, move one into the buffer
     const sender = sendWaiters.shift();
@@ -105,8 +111,12 @@ const createBoundedChannel = <T>(capacity: number): Channel<T> => {
 
     receive: (): AsyncIterable<T> => ({
       [Symbol.asyncIterator](): AsyncIterator<T> {
+        let finished = false;
+        const pending = new Set<{ resolve: (result: IteratorResult<T>) => void }>();
         return {
           next(): Promise<IteratorResult<T>> {
+            if (finished) return Promise.resolve({ done: true, value: undefined });
+
             // Try to read from buffer
             const buffered = tryReceiveFromBuffer();
             if (buffered.isSome) {
@@ -120,8 +130,26 @@ const createBoundedChannel = <T>(capacity: number): Channel<T> => {
 
             // Wait for a value
             return new Promise<IteratorResult<T>>(resolve => {
-              receiveWaiters.push({ resolve });
+              const waiter = {
+                resolve: (result: IteratorResult<T>): void => {
+                  pending.delete(waiter);
+                  resolve(result);
+                },
+              };
+              pending.add(waiter);
+              receiveWaiters.push(waiter);
             });
+          },
+
+          // Called by `break` in for-await: detach so no stale receiver swallows later sends
+          return(): Promise<IteratorResult<T>> {
+            finished = true;
+            for (const waiter of pending) {
+              const idx = receiveWaiters.indexOf(waiter);
+              if (idx !== -1) receiveWaiters.splice(idx, 1);
+              waiter.resolve({ done: true, value: undefined });
+            }
+            return Promise.resolve({ done: true, value: undefined });
           },
         };
       },
