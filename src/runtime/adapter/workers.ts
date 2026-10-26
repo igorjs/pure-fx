@@ -111,13 +111,21 @@ const limitBody = (request: Request, maxBodyBytes: number, limit: BodyLimit): Re
     },
     cancel: reason => reader.cancel(reason),
   });
-  const init: RequestInit & { duplex: "half" } = {
+  const cf = (request as Request & { cf?: unknown }).cf;
+  const init: RequestInit & { duplex: "half"; cf?: unknown } = {
     method: request.method,
     headers: request.headers,
+    signal: request.signal,
     body: counted,
     duplex: "half",
+    ...(cf === undefined ? {} : { cf }),
   };
-  return new Request(request.url, init);
+  const rebuilt = new Request(request.url, init) as Request & { cf?: unknown };
+  // workerd takes cf from the init and makes it read-only; other runtimes ignore it.
+  if (cf !== undefined && rebuilt.cf === undefined) {
+    Object.defineProperty(rebuilt, "cf", { value: cf, enumerable: true });
+  }
+  return rebuilt;
 };
 
 const plain = (status: number, message: string): Response =>

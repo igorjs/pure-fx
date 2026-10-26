@@ -170,4 +170,7 @@ export const requireNode = <T>(module: string): (() => T | null) => {
   };
 };
 
+/** True once require initialisation has finished, whether it succeeded or not. */
+export const isRequireSettled = (): boolean => cachedRequire !== undefined;
+
 export { requireReady };

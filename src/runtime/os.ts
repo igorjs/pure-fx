@@ -19,6 +19,7 @@
  */
 
 import { None, type Option, Some } from "../core/option.js";
+import { isRequireSettled } from "./adapters/detect.js";
 import { resolveOsInfo } from "./adapters/os-adapter.js";
 import type { OsInfo } from "./adapters/types.js";
 
@@ -31,7 +32,9 @@ let resolvedAdapter: OsInfo | undefined;
 const getAdapter = (): OsInfo | undefined => {
   if (!resolved) {
     resolvedAdapter = resolveOsInfo();
-    resolved = true;
+    // Runtimes without a synchronous require resolve it asynchronously; keep
+    // retrying until it settles instead of caching the fallback forever.
+    resolved = isRequireSettled();
   }
   return resolvedAdapter;
 };
