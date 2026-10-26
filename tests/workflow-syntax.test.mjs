@@ -121,6 +121,76 @@ function unpinnedUses(text) {
   return hits;
 }
 
+// ── Rolling release helpers ─────────────────────────────────────────────────
+
+const ROLLING_RELEASE = ".github/workflows/rolling-release.yml";
+const VERSION_PATTERN = "^[0-9]+\\.[0-9]+\\.[0-9]+$";
+const IF_THEN = /^\s*if\s+(.*?);\s*then\b/;
+const FI = /^\s*fi\b/;
+const RUN_KEY = /^(\s*)(?:-\s+)?run:\s*(.*)$/;
+
+const expr = name => `${"$"}{{ ${name} }}`;
+
+function readRollingRelease() {
+  return readFileSync(join(projectRoot, ROLLING_RELEASE), "utf8");
+}
+
+/** Lines of every `run:` block, inline or multi-line. */
+function runBlockLines(text) {
+  const out = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const match = RUN_KEY.exec(lines[i]);
+    if (!match) continue;
+    if (match[2] !== "" && !/^[|>]/.test(match[2])) out.push(match[2]);
+    const indent = match[1].length;
+    for (let j = i + 1; j < lines.length; j++) {
+      const body = lines[j];
+      if (body.trim() !== "" && body.search(/\S/) <= indent) break;
+      out.push(body);
+    }
+  }
+  return out;
+}
+
+function runBlocksInterpolatingInputs(text) {
+  return runBlockLines(text).filter(line => /inputs\.(version|dry_run)/.test(line));
+}
+
+function activeLines(text) {
+  return text.split("\n").filter(line => !line.trim().startsWith("#"));
+}
+
+/** Lines holding `flag` that are not inside an `if ...; then` naming `guard`. */
+function ungatedFlagLines(text, flag, guard) {
+  const stack = [];
+  const hits = [];
+  for (const line of text.split("\n")) {
+    const open = IF_THEN.exec(line);
+    if (open) {
+      stack.push(open[1]);
+      continue;
+    }
+    if (FI.test(line)) {
+      stack.pop();
+      continue;
+    }
+    if (line.includes(flag) && !stack.some(cond => cond.includes(guard))) hits.push(line.trim());
+  }
+  return hits;
+}
+
+function uncommentedScheduleLines(text) {
+  return text.split("\n").filter(line => /^\s*schedule:/.test(line));
+}
+
+function validationPrecedesRelease(text) {
+  const lines = text.split("\n");
+  const validate = lines.findIndex(line => line.includes(VERSION_PATTERN));
+  const release = lines.findIndex(line => line.includes("scripts/release.mjs"));
+  return validate !== -1 && release !== -1 && validate < release;
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("workflow syntax", () => {
@@ -274,6 +344,124 @@ describe("workflow syntax", () => {
     const hits = workflows.flatMap(({ path, text }) =>
       unpinnedUses(text).map(hit => `${path}: ${hit}`),
     );
+
+    // Assert
+    expect(hits).toEqual([]);
+  });
+
+  it("an inputs expression inside a run block is reported", () => {
+    // Arrange
+    const bad = [
+      `      - run: echo ${expr("inputs.version")}`,
+      "      - run: |",
+      `          x=${expr("inputs.dry_run")}`,
+    ].join("\n");
+    const good = [
+      "        env:",
+      `          RELEASE_VERSION: ${expr("inputs.version")}`,
+      '        run: echo "$RELEASE_VERSION"',
+    ].join("\n");
+
+    // Act
+    const badHits = runBlocksInterpolatingInputs(bad);
+    const goodHits = runBlocksInterpolatingInputs(good);
+
+    // Assert
+    expect(badHits.length).toBe(2);
+    expect(goodHits).toEqual([]);
+  });
+
+  it("a flag outside its conditional is reported", () => {
+    // Arrange
+    const bad = [
+      "args=(--ci --dry-run)",
+      'if [[ -n "$RELEASE_VERSION" ]]; then',
+      "  args+=(--dry-run)",
+      "fi",
+    ].join("\n");
+    const good = ['if [[ "$DRY_RUN" == "true" ]]; then', "  args+=(--dry-run)", "fi"].join("\n");
+
+    // Act
+    const badHits = ungatedFlagLines(bad, "--dry-run", "DRY_RUN");
+    const goodHits = ungatedFlagLines(good, "--dry-run", "DRY_RUN");
+
+    // Assert
+    expect(badHits.length).toBe(2);
+    expect(goodHits).toEqual([]);
+  });
+
+  it("an uncommented schedule line is reported", () => {
+    // Arrange
+    const bad = "on:\n  schedule:\n    - cron: '0 6 * * 1'";
+    const good = "on:\n  # schedule:\n  #   - cron: '0 6 * * 1'";
+
+    // Act
+    const badHits = uncommentedScheduleLines(bad);
+    const goodHits = uncommentedScheduleLines(good);
+
+    // Assert
+    expect(badHits.length).toBe(1);
+    expect(goodHits).toEqual([]);
+  });
+
+  it("rolling release is dispatchable with dry_run boolean and version string inputs", () => {
+    // Arrange
+    const lines = activeLines(readRollingRelease());
+
+    // Act
+    const text = lines.join("\n");
+
+    // Assert
+    expect(text).toMatch(/^ {2}workflow_dispatch:/m);
+    expect(text).toMatch(/^ {6}dry_run:\n(?: {8}.*\n)*? {8}type: boolean/m);
+    expect(text).toMatch(/^ {6}version:\n(?: {8}.*\n)*? {8}type: string/m);
+  });
+
+  it("rolling release passes inputs only through env, never a run block", () => {
+    // Arrange
+    const text = readRollingRelease();
+
+    // Act
+    const hits = runBlocksInterpolatingInputs(text);
+
+    // Assert
+    expect(hits).toEqual([]);
+    expect(text).toContain(`RELEASE_VERSION: ${expr("inputs.version")}`);
+    expect(text).toContain(`DRY_RUN: ${expr("inputs.dry_run")}`);
+  });
+
+  it("rolling release validates the version before the release step", () => {
+    // Arrange
+    const text = readRollingRelease();
+
+    // Act
+    const ordered = validationPrecedesRelease(text);
+
+    // Assert
+    expect(ordered).toBe(true);
+  });
+
+  it("rolling release gates --dry-run and --version on their inputs", () => {
+    // Arrange
+    const text = activeLines(readRollingRelease()).join("\n");
+
+    // Act
+    const dryRunHits = ungatedFlagLines(text, "--dry-run", "DRY_RUN");
+    const versionHits = ungatedFlagLines(text, "--version", "RELEASE_VERSION");
+
+    // Assert
+    expect(text).toContain("--dry-run");
+    expect(text).toContain("--version");
+    expect(dryRunHits).toEqual([]);
+    expect(versionHits).toEqual([]);
+  });
+
+  it("rolling release schedule stays commented out", () => {
+    // Arrange
+    const text = readRollingRelease();
+
+    // Act
+    const hits = uncommentedScheduleLines(text);
 
     // Assert
     expect(hits).toEqual([]);

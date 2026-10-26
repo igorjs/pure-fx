@@ -6,7 +6,7 @@ The maintainer owns the GitHub and registry settings listed here. Nothing in the
 
 Repository scope.
 
-- `BOT_APP_CLIENT_ID`: client id of the bot GitHub App. Read by `.github/workflows/auto-update-pr.yml` (the check step and `actions/create-github-app-token`), and by the release workflows once they land.
+- `BOT_APP_CLIENT_ID`: client id of the bot GitHub App. Read by `.github/workflows/auto-update-pr.yml` (the check step and `actions/create-github-app-token`), and by `.github/workflows/rolling-release.yml` (the App token for the rolling release), plus the other release workflows once they land.
 - `BOT_APP_PRIVATE_KEY`: private key of the same App. Same consumers.
 - `BOT_APP_ID`: present today and read by no workflow, because the App token action takes the client id.
 
