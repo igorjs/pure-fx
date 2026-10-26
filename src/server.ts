@@ -134,6 +134,8 @@ export interface ServerAdapter {
       readonly port: number;
       readonly hostname?: string | undefined;
       readonly signal: AbortSignal;
+      /** Called when writing a response fails after the handler returned. */
+      readonly onError?: ((error: unknown, request: Request) => void) | undefined;
     },
   ) => Promise<void>;
 }
@@ -621,166 +623,12 @@ const executeHandler = (handler: Handler, ctx: Context): Task<Response, ServerEr
   }
 };
 
-/**
- * Structural typing for the subset of node:http used by the default adapter.
- * Avoids depending on @types/node while keeping the import type-safe.
- */
-interface NodeHttpModule {
-  createServer(listener: (req: NodeRequest, res: NodeResponse) => void): {
-    listen(port: number, hostname: string | undefined, cb: () => void): void;
-    close(cb?: (err?: Error) => void): void;
-  };
-}
-
-/** Structural type for a Node.js IncomingMessage (subset used by default adapter). */
-interface NodeRequest {
-  readonly method?: string | undefined;
-  readonly url?: string | undefined;
-  readonly headers: Record<string, string | readonly string[] | undefined>;
-  on(event: "data", cb: (chunk: Uint8Array) => void): void;
-  on(event: "end", cb: () => void): void;
-  on(event: "error", cb: (err: Error) => void): void;
-}
-
-/** Structural type for a Node.js ServerResponse (subset used by default adapter). */
-interface NodeResponse {
-  writeHead(status: number, headers: Record<string, string>): void;
-  write(chunk: Uint8Array): boolean;
-  end(body?: string | Uint8Array): void;
-}
-
-/** Convert Node.js header record to [key, value] pairs for WHATWG Headers. */
-const convertNodeHeaders = (
-  headers: Record<string, string | readonly string[] | undefined>,
-): [string, string][] => {
-  const pairs: [string, string][] = [];
-  const keys = Object.keys(headers);
-  // biome-ignore lint/style/useForOf: hot-path, indexed loop for header conversion
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i]!;
-    const val = headers[key];
-    if (typeof val === "string") {
-      pairs.push([key, val]);
-    } else if (Array.isArray(val)) {
-      // biome-ignore lint/style/useForOf: hot-path, indexed loop for multi-value headers
-      for (let vi = 0; vi < val.length; vi++) {
-        pairs.push([key, val[vi]!]);
-      }
-    }
-  }
-  return pairs;
-};
-
-/** Build a WHATWG Request from a Node.js IncomingMessage. */
-const buildRequestFromNode = (
-  nodeReq: NodeRequest,
-  hostname: string,
-  port: number,
-  chunks: readonly Uint8Array[],
-): Request => {
-  const method = nodeReq.method ?? "GET";
-  const urlStr = nodeReq.url ?? "/";
-  const fullUrl = `http://${hostname}:${port}${urlStr}`;
-
-  let bodyLength = 0;
-  // biome-ignore lint/style/useForOf: hot-path, sum body chunk lengths
-  for (let ci = 0; ci < chunks.length; ci++) {
-    bodyLength += chunks[ci]!.length;
-  }
-
-  const body =
-    bodyLength > 0
-      ? new ReadableStream<Uint8Array>({
-          start(controller) {
-            // biome-ignore lint/style/useForOf: hot-path, indexed loop for body chunks
-            for (let ci = 0; ci < chunks.length; ci++) {
-              controller.enqueue(chunks[ci]!);
-            }
-            controller.close();
-          },
-        })
-      : undefined;
-
-  return new Request(fullUrl, {
-    method,
-    headers: convertNodeHeaders(nodeReq.headers),
-    body,
-  });
-};
-
-/** Write a WHATWG Response back to a Node.js ServerResponse. */
-const writeResponseToNode = (response: Response, nodeRes: NodeResponse): void => {
-  const resHeaders: Record<string, string> = {};
-  response.headers.forEach((v, k) => {
-    resHeaders[k] = v;
-  });
-  nodeRes.writeHead(response.status, resHeaders);
-
-  if (response.body === null) {
-    nodeRes.end();
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const pump = (): void => {
-    void reader.read().then(({ done, value }) => {
-      if (done) {
-        nodeRes.end();
-        return;
-      }
-      nodeRes.write(value);
-      pump();
-    });
-  };
-  pump();
-};
-
-/** Resolve a ServerAdapter, falling back to the built-in Node.js adapter. */
+/** Resolve a ServerAdapter, falling back to the Node.js adapter loaded on first use. */
 const resolveAdapter = (adapter?: ServerAdapter): ServerAdapter =>
   adapter ?? {
     async serve(handler, opts) {
-      // Dynamic import with structural typing to avoid @types/node dependency
-      const http: NodeHttpModule = await (Function(
-        "return import('node:http')",
-      )() as Promise<NodeHttpModule>);
-
-      await new Promise<void>((resolve, reject) => {
-        const hostname = opts.hostname ?? "localhost";
-
-        const server = http.createServer((nodeReq, nodeRes) => {
-          const chunks: Uint8Array[] = [];
-          nodeReq.on("data", (chunk: Uint8Array) => {
-            chunks.push(chunk);
-          });
-          nodeReq.on("end", () => {
-            const request = buildRequestFromNode(nodeReq, hostname, opts.port, chunks);
-            void handler(request).then(
-              response => writeResponseToNode(response, nodeRes),
-              () => {
-                nodeRes.writeHead(500, { "content-type": "text/plain" });
-                nodeRes.end("Internal Server Error");
-              },
-            );
-          });
-        });
-
-        const onAbort = (): void => {
-          server.close(err => {
-            if (err) reject(err);
-            else resolve();
-          });
-        };
-
-        if (opts.signal.aborted) {
-          resolve();
-          return;
-        }
-
-        opts.signal.addEventListener("abort", onAbort);
-        server.listen(opts.port, opts.hostname, () => {
-          // Server is listening
-        });
-      });
+      const { nodeAdapter } = await import("./runtime/adapter/node.js");
+      return nodeAdapter.serve(handler, opts);
     },
   };
 
@@ -975,6 +823,10 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
             port: serveOpts.port,
             hostname: serveOpts.hostname,
             signal: serveOpts.signal,
+            onError: (thrown: unknown, request: Request): void => {
+              const message = thrown instanceof Error ? thrown.message : String(thrown);
+              state.errorHandler(HandlerError(message), request);
+            },
           });
           return Ok(undefined);
         } catch (thrown: unknown) {

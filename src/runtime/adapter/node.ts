@@ -29,9 +29,13 @@ interface NodeRequest {
 
 /** Subset of node:http ServerResponse used by this adapter. */
 interface NodeResponse {
-  writeHead(status: number, headers: Record<string, string>): void;
+  readonly headersSent: boolean;
+  readonly destroyed?: boolean | undefined;
+  writeHead(status: number, headers: Record<string, string | string[]>): void;
   write(chunk: Uint8Array): boolean;
   end(body?: string | Uint8Array): void;
+  destroy(err?: Error): void;
+  once(event: "drain" | "close", cb: () => void): void;
 }
 
 /** Subset of node:http Server used by this adapter. */
@@ -44,6 +48,8 @@ interface NodeServer {
 interface NodeHttpModule {
   createServer(listener: (req: NodeRequest, res: NodeResponse) => void): NodeServer;
 }
+
+const STATUS_INTERNAL_SERVER_ERROR = 500;
 
 // ── Header conversion ───────────────────────────────────────────────────────
 
@@ -98,37 +104,72 @@ const toRequest = (nodeReq: NodeRequest, hostname: string, port: number): Reques
       })
     : undefined;
 
-  return new Request(fullUrl, {
-    method,
-    headers: convertHeaders(nodeReq.headers),
-    body,
-  });
+  // Node's fetch rejects a streamed body unless duplex is "half".
+  const init: RequestInit & { duplex?: "half" } =
+    body === undefined
+      ? { method, headers: convertHeaders(nodeReq.headers) }
+      : { method, headers: convertHeaders(nodeReq.headers), body, duplex: "half" };
+  return new Request(fullUrl, init);
+};
+
+/** Reply 500 on a response whose headers have not been sent yet. */
+const sendInternalError = (nodeRes: NodeResponse): void => {
+  nodeRes.writeHead(STATUS_INTERNAL_SERVER_ERROR, { "content-type": "text/plain" });
+  nodeRes.end("Internal Server Error");
 };
 
 /**
  * Write a WHATWG Response back to Node.js ServerResponse.
- * When the body is a ReadableStream, chunks are streamed via res.write().
+ * Chunks are streamed via res.write(), pausing for `drain` when the socket
+ * buffer is full. A body read error sends 500 if no header has gone out yet,
+ * otherwise destroys the response, then rethrows for the caller to report.
+ *
+ * @internal
  */
-const writeResponse = async (response: Response, nodeRes: NodeResponse): Promise<void> => {
-  const headers: Record<string, string> = {};
-  response.headers.forEach((v, k) => {
-    headers[k] = v;
-  });
-  nodeRes.writeHead(response.status, headers);
+export const writeResponse = async (response: Response, nodeRes: NodeResponse): Promise<void> => {
+  // Headers are written with the first chunk so a failure before it can still become a 500.
+  const sendHead = (): void => {
+    if (nodeRes.headersSent) return;
+    const headers: Record<string, string> = {};
+    response.headers.forEach((v, k) => {
+      headers[k] = v;
+    });
+    nodeRes.writeHead(response.status, headers);
+  };
 
   if (response.body === null) {
+    sendHead();
     nodeRes.end();
     return;
   }
 
   const reader = response.body.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      nodeRes.end();
-      return;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      sendHead();
+      if (done) {
+        nodeRes.end();
+        return;
+      }
+      if (nodeRes.destroyed === true) {
+        await reader.cancel();
+        return;
+      }
+      if (!nodeRes.write(value)) {
+        await new Promise<void>(resolve => {
+          nodeRes.once("drain", resolve);
+          nodeRes.once("close", resolve);
+        });
+      }
     }
-    nodeRes.write(value);
+  } catch (err: unknown) {
+    if (nodeRes.headersSent) {
+      nodeRes.destroy(err instanceof Error ? err : undefined);
+    } else {
+      sendInternalError(nodeRes);
+    }
+    throw err;
   }
 };
 
@@ -164,13 +205,12 @@ export const nodeAdapter: ServerAdapter = {
 
       const server = http.createServer((nodeReq, nodeRes) => {
         const request = toRequest(nodeReq, hostname, options.port);
-        void handler(request).then(
-          response => writeResponse(response, nodeRes),
-          () => {
-            nodeRes.writeHead(500, { "content-type": "text/plain" });
-            nodeRes.end("Internal Server Error");
-          },
-        );
+        void handler(request)
+          .then(
+            response => writeResponse(response, nodeRes),
+            () => sendInternalError(nodeRes),
+          )
+          .catch((err: unknown) => options.onError?.(err, request));
       });
 
       const onAbort = (): void => {
