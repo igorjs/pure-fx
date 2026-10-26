@@ -3053,3 +3053,48 @@ describe("Task combinators with throwing callbacks", () => {
     });
   }
 });
+
+describe("StateMachine inherited event names", () => {
+  const m = StateMachine({
+    initial: "idle",
+    states: { idle: {}, loading: {} },
+    transitions: { idle: { FETCH: "loading" }, loading: {} },
+  });
+
+  for (const event of ["__proto__", "constructor", "toString"]) {
+    it(`send: rejects inherited name '${event}' like an unknown event`, () => {
+      // Arrange
+      const unknown = m.send("idle", undefined, "NOPE");
+      // Act
+      const result = m.send("idle", undefined, event);
+      // Assert
+      expect(unknown.isErr).toBe(true);
+      expect(result.isErr).toBe(true);
+      expect(m.canTransition("idle", event)).toBe(false);
+    });
+  }
+
+  it("send: rejects inherited name used as a state", () => {
+    // Act
+    const result = m.send("__proto__", undefined, "FETCH");
+    // Assert
+    expect(result.isErr).toBe(true);
+  });
+});
+
+describe("Stream.groupBy prototype keys", () => {
+  it("groups '__proto__' and 'constructor' keys without touching Object.prototype", async () => {
+    // Arrange
+    const stream = Stream.of("a", "b", "c");
+    const keys = { a: "__proto__", b: "constructor", c: "__proto__" };
+    // Act
+    const result = await stream.groupBy(v => keys[v]).run();
+    // Assert
+    const groups = result.unwrap();
+    expect(Object.getOwnPropertyDescriptor(groups, "__proto__").value).toEqual(["a", "c"]);
+    expect(Object.getOwnPropertyDescriptor(groups, "constructor").value).toEqual(["b"]);
+    expect(Object.getPrototypeOf(Object.prototype)).toBe(null);
+    expect({}.a).toBe(undefined);
+    expect({}.length).toBe(undefined);
+  });
+});

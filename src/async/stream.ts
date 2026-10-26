@@ -471,7 +471,7 @@ const createStream = <T, E>(source: () => AsyncIterable<Result<T, E>>): Stream<T
     fn: (value: T) => K,
   ): TaskLike<Readonly<Record<K, readonly T[]>>, E> =>
     makeTask(async () => {
-      const groups: Record<string, T[]> = {};
+      const groups: Record<string, T[]> = Object.create(null);
       for await (const r of source()) {
         if (r.isErr) return castErr(r);
         const key = fn(r.value);

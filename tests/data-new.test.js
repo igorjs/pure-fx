@@ -1166,14 +1166,13 @@ describe("File", () => {
     expect((await File.exists(filePath).run()).value).toBe(false);
   });
 
-  it("line ending normalization: write \\r\\n, read gets \\n", async () => {
+  it("line endings preserved: write \\r\\n, read gets \\r\\n", async () => {
     const filePath = join(tmpDir, "crlf.txt");
     await File.write(filePath, "line1\r\nline2\r\nline3").run();
 
     const r = await File.read(filePath).run();
     expect(r.isOk).toBe(true);
-    expect(r.value).toBe("line1\nline2\nline3");
-    expect(r.value.includes("\r\n")).toBe(false);
+    expect(r.value).toBe("line1\r\nline2\r\nline3");
   });
 
   it("teardown: remove temp directory", async () => {

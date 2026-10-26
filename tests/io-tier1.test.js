@@ -7,6 +7,9 @@
  * Tests the compiled dist/ output, not the source.
  */
 
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
@@ -21,6 +24,7 @@ const {
   Compression,
   CompressionError,
   Timer,
+  File,
   TimeoutError,
   Duration,
   Ok,
@@ -570,5 +574,24 @@ describe("Timer", () => {
       expect(typeof stream.take).toBe("function");
       expect(typeof stream.collect).toBe("function");
     });
+  });
+});
+
+describe("File.read newline fidelity", () => {
+  it("returns CRLF content byte-for-byte", async () => {
+    // Arrange
+    const dir = await mkdtemp(join(tmpdir(), "pure-fx-read-"));
+    const path = join(dir, "crlf.txt");
+    const content = "one\r\ntwo\r\nthree\n";
+    await writeFile(path, content);
+    try {
+      // Act
+      const result = await File.read(path).run();
+      // Assert
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe(content);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
