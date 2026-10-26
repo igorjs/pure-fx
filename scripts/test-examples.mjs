@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Runs each example app on every runtime lane: HTTP apps as child processes on Node and
+ * Runs each example app on every runtime lane: HTTP apps and CLIs as child processes on Node and
  * Bun, and the Workers app inside Miniflare.
  *
  * Usage: node scripts/test-examples.mjs [--ci]
@@ -133,6 +133,44 @@ const restApi = async base => {
 /** HTTP examples: one entry per example, each with its own process and data. */
 const EXAMPLES = [{ name: "rest-api", entry: "examples/rest-api/server.mjs", check: restApi }];
 
+// ── CLI example ─────────────────────────────────────────────────────────────
+
+const CLI_ENTRY = "examples/cli/notes-cli.mjs";
+const USER_ERROR_EXIT_CODE = 2;
+const DEFECT_EXIT_CODE = 1;
+
+const runCli = (lane, args, env = {}) => {
+  const run = spawnSync(lane.command, [CLI_ENTRY, ...args], {
+    cwd: ROOT,
+    encoding: "utf8",
+    timeout: REQUEST_TIMEOUT_MS,
+    env: { ...process.env, ...env },
+  });
+  return { code: run.status, stdout: run.stdout, stderr: run.stderr };
+};
+
+const assertIncludes = (text, part, label) => {
+  if (!text.includes(part)) throw new Error(`${label}: expected ${JSON.stringify(text)} to include ${JSON.stringify(part)}`);
+};
+
+const cliChecks = lane => {
+  const ok = runCli(lane, ["add", "buy milk", "--tag", "home"]);
+  assertEqual(ok.code, 0, "success exit code");
+  assertEqual(ok.stdout.trim(), "[home] buy milk", "success stdout");
+
+  const missing = runCli(lane, ["add"]);
+  assertEqual(missing.code, USER_ERROR_EXIT_CODE, "missing title exit code");
+  assertIncludes(missing.stderr, "title: expected string", "missing title stderr");
+
+  const unknown = runCli(lane, ["remove", "x"]);
+  assertEqual(unknown.code, USER_ERROR_EXIT_CODE, "unknown command exit code");
+  assertIncludes(unknown.stderr, 'unknown command "remove"', "unknown command stderr");
+
+  const crash = runCli(lane, ["add", "x"], { NOTES_CLI_CRASH: "1" });
+  assertEqual(crash.code, DEFECT_EXIT_CODE, "unexpected error exit code");
+  assertIncludes(crash.stderr, "unexpected error: crash requested", "unexpected error stderr");
+};
+
 // ── Workers example ─────────────────────────────────────────────────────────
 
 const WORKER_SOURCE = "examples/workers-app/worker.mjs";
@@ -214,6 +252,8 @@ const runLane = async lane => {
     }
     console.log(`ok   ${lane.name} ${example.name}`);
   }
+  cliChecks(lane);
+  console.log(`ok   ${lane.name} cli`);
 };
 
 let passed = 0;
