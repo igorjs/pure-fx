@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Runs each example app as a child process on every runtime lane and checks it over HTTP.
+ * Runs each example app on every runtime lane: HTTP apps as child processes on Node and
+ * Bun, and the Workers app inside Miniflare.
  *
  * Usage: node scripts/test-examples.mjs [--ci]
  * A missing runtime is skipped locally and fails the run in CI (`--ci` or the CI env var).
  */
 
 import { spawn, spawnSync } from "node:child_process";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const STARTUP_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MS = 5_000;
 const ci = process.argv.includes("--ci") || Boolean(process.env.CI);
+
+const MINIFLARE_TIMEOUT_MS = 30_000;
 
 const LANES = [
   { name: "node", command: process.execPath },
@@ -126,8 +130,76 @@ const restApi = async base => {
   assertEqual((await call(base, "GET", "/notes")).body, [], "invalid input stored nothing");
 };
 
-/** Add further example apps here: one entry per example, each with its own process and data. */
+/** HTTP examples: one entry per example, each with its own process and data. */
 const EXAMPLES = [{ name: "rest-api", entry: "examples/rest-api/server.mjs", check: restApi }];
+
+// ── Workers example ─────────────────────────────────────────────────────────
+
+const WORKER_SOURCE = "examples/workers-app/worker.mjs";
+const WORKER_TMP = ".tmp-worker-example.mjs";
+const ENV_GREETING = "hello-from-env";
+
+const workersChecks = async mf => {
+  const get = async (path, init) => {
+    const res = await mf.dispatchFetch(`http://localhost${path}`, init);
+    return { status: res.status, body: await res.json() };
+  };
+  const post = body =>
+    get("/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    });
+
+  assertEqual((await get("/items")).body, [], "empty list");
+  const created = await post({ name: "first" });
+  assertEqual([created.status, created.body], [201, { id: "1", name: "first" }], "create");
+  assertEqual((await get("/items")).body, [created.body], "list one");
+  assertEqual((await get("/items/1")).body, created.body, "get one");
+  expectError(await get("/items/99"), 404, "ItemNotFound", "ITEM_NOT_FOUND", "unknown id");
+  expectError(await post({ name: 5 }), 400, "ValidationFailed", "VALIDATION_FAILED", "wrong type");
+  expectError(await post("{not json"), 400, "ValidationFailed", "VALIDATION_FAILED", "malformed JSON");
+  assertEqual((await get("/greeting")).body, { greeting: ENV_GREETING }, "env binding");
+};
+
+/** Load the worker in a fresh Miniflare instance without nodejs_compat. */
+const runWorkers = async () => {
+  const { Miniflare } = await import("miniflare");
+  const { esModules } = await import("./miniflare-modules.mjs");
+  // Miniflare cannot resolve bare package names, so point them at the built dist/.
+  const source = (await readFile(`${ROOT}${WORKER_SOURCE}`, "utf8"))
+    .replace('"@igorjs/pure-fx/runtime/adapter/workers"', '"./dist/runtime/adapter/workers.js"')
+    .replace('"@igorjs/pure-fx"', '"./dist/index.js"');
+  const tmpPath = `${ROOT}${WORKER_TMP}`;
+  await writeFile(tmpPath, source);
+  let mf;
+  try {
+    mf = new Miniflare({
+      modules: esModules(tmpPath, `${ROOT}dist`),
+      modulesRoot: ROOT,
+      compatibilityDate: "2024-01-01",
+      bindings: { GREETING: ENV_GREETING },
+    });
+    await Promise.race([
+      workersChecks(mf),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`timed out after ${MINIFLARE_TIMEOUT_MS}ms`)), MINIFLARE_TIMEOUT_MS).unref(),
+      ),
+    ]);
+  } finally {
+    await mf?.dispose();
+    await rm(tmpPath, { force: true });
+  }
+};
+
+const hasMiniflare = async () => {
+  try {
+    await import("miniflare");
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 // ── Runner ──────────────────────────────────────────────────────────────────
 
@@ -164,6 +236,21 @@ for (const lane of LANES) {
   } catch (error) {
     failures.push(`${lane.name} lane: ${error.message}`);
   }
+}
+
+if (await hasMiniflare()) {
+  try {
+    await runWorkers();
+    console.log("ok   workers workers-app");
+    passed++;
+  } catch (error) {
+    failures.push(`workers lane: ${error.message}`);
+  }
+} else if (ci) {
+  failures.push('workers lane: package "miniflare" is not installed');
+} else {
+  skipped++;
+  console.log("skip workers: miniflare not installed");
 }
 
 console.log(`lanes: ${passed} passed, ${failures.length} failed, ${skipped} skipped`);
