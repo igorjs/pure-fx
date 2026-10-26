@@ -688,7 +688,11 @@ export const Stream: {
 
     merge: <T, E>(...streams: readonly Stream<T, E>[]): Stream<T, E> =>
       createStream(() => {
-        const q = createAsyncQueue<Result<T, E>>();
+        interface Tagged {
+          readonly source: number;
+          readonly result: Result<T, E>;
+        }
+        const q = createAsyncQueue<Tagged>();
         const iters: AsyncIterator<Result<T, E>>[] = [];
         let remaining = streams.length;
         let stopped = false;
@@ -703,34 +707,36 @@ export const Stream: {
           }
         };
 
-        // Why: consume all source streams concurrently in the background,
-        // pushing results into a shared queue as they arrive.
+        // Why: each source is read at most one value ahead of the consumer, and
+        // is read again only after the consumer takes its buffered value.
+        const pull = (source: number): void => {
+          iters[source]!.next().then(
+            next => {
+              if (stopped) {
+                return;
+              }
+              if (!next.done) {
+                q.push({ source, result: next.value });
+              } else if (--remaining === 0) {
+                q.done();
+              }
+            },
+            (error: unknown) => {
+              stop();
+              q.fail(error);
+            },
+          );
+        };
+
         const start = (): void => {
           if (remaining === 0) {
             q.done();
           }
           for (const stream of streams) {
-            const iter = stream.run()[Symbol.asyncIterator]();
-            iters.push(iter);
-            const onNext = (next: IteratorResult<Result<T, E>>): void => {
-              if (stopped) {
-                return;
-              }
-              if (!next.done) {
-                q.push(next.value);
-                pull();
-              } else if (--remaining === 0) {
-                q.done();
-              }
-            };
-            const onFail = (error: unknown): void => {
-              stop();
-              q.fail(error);
-            };
-            const pull = (): void => {
-              iter.next().then(onNext, onFail);
-            };
-            pull();
+            iters.push(stream.run()[Symbol.asyncIterator]());
+          }
+          for (let source = 0; source < iters.length; source++) {
+            pull(source);
           }
         };
 
@@ -743,7 +749,16 @@ export const Stream: {
               start();
             }
             return {
-              next: () => q.next(),
+              next: async (): Promise<IteratorResult<Result<T, E>>> => {
+                const next = await q.next();
+                if (next.done) {
+                  return { value: undefined as unknown as Result<T, E>, done: true };
+                }
+                if (!stopped) {
+                  pull(next.value.source);
+                }
+                return { value: next.value.result, done: false };
+              },
               return: (): Promise<IteratorResult<Result<T, E>>> => {
                 stop();
                 q.done();

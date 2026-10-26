@@ -618,6 +618,23 @@ const captureUncaught = async fn => {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+const EXIT_POLL_MS = 10;
+const CLOSE_SETTLE_MS = 100;
+
+/** Resolve once the child's pid is gone, then leave time for its stdio to close. */
+const waitForChildGone = async child => {
+  const pid = child.pid.unwrap();
+  for (;;) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      break;
+    }
+    await sleep(EXIT_POLL_MS);
+  }
+  await sleep(CLOSE_SETTLE_MS);
+};
+
 const withTimeout = (promise, ms) =>
   Promise.race([
     promise,
@@ -657,7 +674,7 @@ describe("Command", () => {
     const child = (
       await Command.spawn("node", ["-e", "process.exit(3)"], { capture: true }).run()
     ).unwrap();
-    await sleep(500);
+    await waitForChildGone(child);
     // Act
     const result = await withTimeout(child.wait().run(), 2000);
     // Assert
@@ -669,7 +686,7 @@ describe("Command", () => {
     // Arrange
     const script = 'process.stdout.write("out-data"); process.stderr.write("err-data")';
     const child = (await Command.spawn("node", ["-e", script], { capture: true }).run()).unwrap();
-    await sleep(500);
+    await waitForChildGone(child);
     // Act
     const result = await withTimeout(child.wait().run(), 2000);
     // Assert

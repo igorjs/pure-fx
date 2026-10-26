@@ -228,7 +228,7 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
     Result<PooledResource<T>, ErrType<"PoolError", string>>
   > => {
     if (draining) {
-      return Err(PoolError("Pool is draining"));
+      return Err(drainingError());
     }
 
     // Try to reuse an idle resource
@@ -248,7 +248,7 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
       waiters.push(resolve);
     });
     if (resource === DRAINED) {
-      return Err(PoolError("Pool is draining"));
+      return Err(drainingError());
     }
     if (resource === RETRY) {
       return acquireImpl();

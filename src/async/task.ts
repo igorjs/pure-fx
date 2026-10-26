@@ -21,6 +21,9 @@
 import type { Result } from "../core/result.js";
 import { castErr, castOk, collectResults, Err, Ok } from "../core/result.js";
 
+/** Turn a value thrown by a user callback into an Err. */
+const thrown = <E>(e: unknown): Result<never, E> => Err(e as E);
+
 /**
  * Composable async computation that produces `Result<T, E>`.
  *
@@ -44,9 +47,6 @@ import { castErr, castOk, collectResults, Err, Ok } from "../core/result.js";
  * const result = await pipeline.run(); // Result<string, string>
  * ```
  */
-/** Turn a value thrown by a user callback into an Err. */
-const thrown = <E>(e: unknown): Result<never, E> => Err(e as E);
-
 class TaskImpl<T, E> {
   constructor(private readonly _run: () => Promise<Result<T, E>>) {}
 
@@ -185,7 +185,15 @@ class TaskImpl<T, E> {
     return new TaskImpl(() =>
       Promise.race([
         this._run(),
-        new Promise<Result<T, E>>(resolve => setTimeout(() => resolve(Err(onTimeout())), ms)),
+        new Promise<Result<T, E>>(resolve =>
+          setTimeout(() => {
+            try {
+              resolve(Err(onTimeout()));
+            } catch (e) {
+              resolve(thrown(e));
+            }
+          }, ms),
+        ),
       ]),
     );
   }
@@ -291,133 +299,143 @@ export const Task: {
   readonly ap: <A, B, E>(fnTask: Task<(a: A) => B, E>, argTask: Task<A, E>) => Task<B, E>;
   /** Type guard: returns true if value is a Task instance. */
   readonly is: (value: unknown) => value is Task<unknown, unknown>;
-} = Object.assign(<T, E>(run: () => Promise<Result<T, E>>): Task<T, E> => new TaskImpl(run), {
-  /**
-   * Create a Task from a plain value. Always succeeds.
-   *
-   * @example
-   * ```ts
-   * const task = Task.of(42); // Task<number, never>
-   * ```
-   */
-  of: <T>(value: T): Task<T, never> => new TaskImpl(async () => Ok(value)),
-
-  /**
-   * Create a Task from an existing Result.
-   *
-   * @example
-   * ```ts
-   * Task.fromResult(Ok(42)).run(); // Promise<Ok(42)>
-   * ```
-   */
-  fromResult: <T, E>(result: Result<T, E>): Task<T, E> => new TaskImpl(async () => result),
-
-  /**
-   * Create a Task from a Promise, catching rejections.
-   *
-   * Provide `onError` to map the rejection to a typed error.
-   *
-   * @example
-   * ```ts
-   * Task.fromPromise(() => fetch('/api'), e => String(e));
-   * ```
-   */
-  fromPromise: <T, E = unknown>(
-    promise: () => Promise<T>,
-    onError?: (e: unknown) => E,
-  ): Task<T, E> =>
-    new TaskImpl(async () => {
+} = Object.assign(
+  <T, E>(run: () => Promise<Result<T, E>>): Task<T, E> =>
+    new TaskImpl(() => {
       try {
-        return Ok(await promise());
+        return run();
       } catch (e) {
+        return Promise.resolve(thrown<E>(e));
+      }
+    }),
+  {
+    /**
+     * Create a Task from a plain value. Always succeeds.
+     *
+     * @example
+     * ```ts
+     * const task = Task.of(42); // Task<number, never>
+     * ```
+     */
+    of: <T>(value: T): Task<T, never> => new TaskImpl(async () => Ok(value)),
+
+    /**
+     * Create a Task from an existing Result.
+     *
+     * @example
+     * ```ts
+     * Task.fromResult(Ok(42)).run(); // Promise<Ok(42)>
+     * ```
+     */
+    fromResult: <T, E>(result: Result<T, E>): Task<T, E> => new TaskImpl(async () => result),
+
+    /**
+     * Create a Task from a Promise, catching rejections.
+     *
+     * Provide `onError` to map the rejection to a typed error.
+     *
+     * @example
+     * ```ts
+     * Task.fromPromise(() => fetch('/api'), e => String(e));
+     * ```
+     */
+    fromPromise: <T, E = unknown>(
+      promise: () => Promise<T>,
+      onError?: (e: unknown) => E,
+    ): Task<T, E> =>
+      new TaskImpl(async () => {
         try {
-          return Err(onError ? onError(e) : (e as E));
-        } catch (handlerError) {
-          return thrown(handlerError);
+          return Ok(await promise());
+        } catch (e) {
+          try {
+            return Err(onError ? onError(e) : (e as E));
+          } catch (handlerError) {
+            return thrown(handlerError);
+          }
         }
-      }
-    }),
+      }),
 
-  /**
-   * Run all tasks in parallel, collect results. Short-circuits on first error.
-   *
-   * @example
-   * ```ts
-   * const result = await Task.all([Task.of(1), Task.of(2)]).run();
-   * result.unwrap(); // [1, 2]
-   * ```
-   */
-  all: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> =>
-    new TaskImpl(async () => {
-      const results = await Promise.all(tasks.map(t => t.run()));
-      return collectResults(results);
-    }),
-
-  /**
-   * Race all tasks. The first to settle wins.
-   *
-   * @example
-   * ```ts
-   * Task.race([fetchFromCache, fetchFromApi]).run();
-   * ```
-   */
-  race: <T, E>(tasks: readonly Task<T, E>[]): Task<T, E> =>
-    new TaskImpl(() => Promise.race(tasks.map(t => t.run()))),
-
-  /**
-   * Run all tasks in parallel and collect every Result (never short-circuits).
-   *
-   * @example
-   * ```ts
-   * Task.allSettled([task1, task2]).run();
-   * // -> Ok([Ok(1), Err('x')])
-   * ```
-   */
-  allSettled: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly Result<T, E>[], never> =>
-    new TaskImpl(async () => Ok(await Promise.all(tasks.map(t => t.run())))),
-
-  /**
-   * Map each element through an async fallible function, collecting in parallel.
-   * Short-circuits on the first Err.
-   */
-  traverse: <A, T, E>(items: readonly A[], fn: (item: A) => Task<T, E>): Task<readonly T[], E> =>
-    new TaskImpl(async () => {
-      try {
-        const results = await Promise.all(items.map(item => fn(item).run()));
+    /**
+     * Run all tasks in parallel, collect results. Short-circuits on first error.
+     *
+     * @example
+     * ```ts
+     * const result = await Task.all([Task.of(1), Task.of(2)]).run();
+     * result.unwrap(); // [1, 2]
+     * ```
+     */
+    all: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> =>
+      new TaskImpl(async () => {
+        const results = await Promise.all(tasks.map(t => t.run()));
         return collectResults(results);
-      } catch (e) {
-        return thrown(e);
-      }
-    }),
+      }),
 
-  /** Alias for `Task.all`. Runs all tasks in parallel and collects results. */
-  sequence: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> =>
-    new TaskImpl(async () => {
-      const results = await Promise.all(tasks.map(t => t.run()));
-      return collectResults(results);
-    }),
+    /**
+     * Race all tasks. The first to settle wins.
+     *
+     * @example
+     * ```ts
+     * Task.race([fetchFromCache, fetchFromApi]).run();
+     * ```
+     */
+    race: <T, E>(tasks: readonly Task<T, E>[]): Task<T, E> =>
+      new TaskImpl(() => Promise.race(tasks.map(t => t.run()))),
 
-  /**
-   * Applicative apply: run both tasks in parallel, apply the function result to the value.
-   *
-   * @example
-   * ```ts
-   * Task.ap(Task.of((n: number) => n * 2), Task.of(21)).run();
-   * // Ok(42)
-   * ```
-   */
-  ap: <A, B, E>(fnTask: Task<(a: A) => B, E>, argTask: Task<A, E>): Task<B, E> =>
-    new TaskImpl(async () => {
-      const [fnResult, argResult] = await Promise.all([fnTask.run(), argTask.run()]);
-      if (fnResult.isErr) return castErr(fnResult);
-      if (argResult.isErr) return castErr(argResult);
-      try {
-        return Ok(fnResult.value(argResult.value));
-      } catch (e) {
-        return thrown(e);
-      }
-    }),
+    /**
+     * Run all tasks in parallel and collect every Result (never short-circuits).
+     *
+     * @example
+     * ```ts
+     * Task.allSettled([task1, task2]).run();
+     * // -> Ok([Ok(1), Err('x')])
+     * ```
+     */
+    allSettled: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly Result<T, E>[], never> =>
+      new TaskImpl(async () => Ok(await Promise.all(tasks.map(t => t.run())))),
 
-  /** Type guard: returns true if `value` is a Task instance. */
-  is: (value: unknown): value is Task<unknown, unknown> => value instanceof TaskImpl,
-});
+    /**
+     * Map each element through an async fallible function, collecting in parallel.
+     * Short-circuits on the first Err.
+     */
+    traverse: <A, T, E>(items: readonly A[], fn: (item: A) => Task<T, E>): Task<readonly T[], E> =>
+      new TaskImpl(async () => {
+        try {
+          const results = await Promise.all(items.map(item => fn(item).run()));
+          return collectResults(results);
+        } catch (e) {
+          return thrown(e);
+        }
+      }),
+
+    /** Alias for `Task.all`. Runs all tasks in parallel and collects results. */
+    sequence: <T, E>(tasks: readonly Task<T, E>[]): Task<readonly T[], E> =>
+      new TaskImpl(async () => {
+        const results = await Promise.all(tasks.map(t => t.run()));
+        return collectResults(results);
+      }),
+
+    /**
+     * Applicative apply: run both tasks in parallel, apply the function result to the value.
+     *
+     * @example
+     * ```ts
+     * Task.ap(Task.of((n: number) => n * 2), Task.of(21)).run();
+     * // Ok(42)
+     * ```
+     */
+    ap: <A, B, E>(fnTask: Task<(a: A) => B, E>, argTask: Task<A, E>): Task<B, E> =>
+      new TaskImpl(async () => {
+        const [fnResult, argResult] = await Promise.all([fnTask.run(), argTask.run()]);
+        if (fnResult.isErr) return castErr(fnResult);
+        if (argResult.isErr) return castErr(argResult);
+        try {
+          return Ok(fnResult.value(argResult.value));
+        } catch (e) {
+          return thrown(e);
+        }
+      }),
+
+    /** Type guard: returns true if `value` is a Task instance. */
+    is: (value: unknown): value is Task<unknown, unknown> => value instanceof TaskImpl,
+  },
+);
