@@ -8,7 +8,7 @@
  */
 
 import { EventEmitter } from "node:events";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "@igorjs/pure-test";
@@ -691,5 +691,54 @@ describe("Command", () => {
     // Assert
     expect(result.isErr).toBe(true);
     expect(seen.length).toBe(0);
+  });
+
+  it("spawn without capture leaves stdout and stderr to the parent", async () => {
+    // Arrange
+    const script = 'process.stdout.write("o"); process.stderr.write("e")';
+    const child = (await Command.spawn("node", ["-e", script]).run()).unwrap();
+    // Act
+    const result = await withTimeout(child.wait().run(), 5000);
+    // Assert
+    expect(result.unwrap().stdout).toBe("");
+    expect(result.unwrap().stderr).toBe("");
+  });
+
+  it("exec with a stdin failure kills a child that is still running", async () => {
+    // Arrange
+    const dir = await mkdtemp(join(tmpdir(), "pure-fx-stdin-"));
+    const pidFile = join(dir, "pid");
+    const script =
+      'const fs=require("fs");fs.writeFileSync(process.argv[1],String(process.pid));' +
+      "fs.closeSync(0);setTimeout(()=>{},30000)";
+    const payload = "x".repeat(8 * 1024 * 1024);
+    let pid;
+    try {
+      // Act
+      const result = await withTimeout(
+        Command.exec("node", ["-e", script, pidFile], { stdin: payload, timeout: 20000 }).run(),
+        10000,
+      );
+      pid = Number((await readFile(pidFile, "utf8")).trim());
+      await sleep(300);
+      let alive = true;
+      try {
+        process.kill(pid, 0);
+      } catch {
+        alive = false;
+      }
+      // Assert
+      expect(result.isErr).toBe(true);
+      expect(alive).toBe(false);
+    } finally {
+      if (pid !== undefined) {
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          /* already gone */
+        }
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

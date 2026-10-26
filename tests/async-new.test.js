@@ -2056,6 +2056,35 @@ describe("EventEmitter", () => {
 // =============================================================================
 
 describe("Pool", () => {
+  it("a failed create hands the freed slot to a queued waiter", async () => {
+    // Arrange
+    let calls = 0;
+    const pool = Pool.create({
+      create: async () => {
+        calls++;
+        if (calls === 1) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          throw new Error("create failed");
+        }
+        return { id: calls };
+      },
+      maxSize: 1,
+    });
+    // Act
+    const first = pool.acquire().run();
+    const second = pool.acquire().run();
+    const results = await Promise.race([
+      Promise.all([first, second]),
+      new Promise(resolve => setTimeout(() => resolve("hung"), 1000)),
+    ]);
+    // Assert
+    expect(results).not.toBe("hung");
+    expect(results[0].isErr).toBe(true);
+    expect(results[1].isOk).toBe(true);
+    results[1].value.release();
+    await pool.drain();
+  });
+
   it("acquire returns a resource", async () => {
     const pool = Pool.create({
       create: async () => ({ id: 1 }),

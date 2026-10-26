@@ -76,6 +76,9 @@ interface IdleEntry<T> {
 /** Sentinel handed to waiters that are still queued when the pool drains. */
 const DRAINED: unique symbol = Symbol("pool.drained");
 
+/** Sentinel telling a queued waiter that a slot was freed without a resource, so it should retry. */
+const RETRY: unique symbol = Symbol("pool.retry");
+
 // ── Implementation ──────────────────────────────────────────────────────────
 
 const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
@@ -86,7 +89,7 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
   let draining = false;
 
   // Waiters queue: resolve functions for callers blocked on acquire
-  const waiters: Array<(resource: T | typeof DRAINED) => void> = [];
+  const waiters: Array<(resource: T | typeof DRAINED | typeof RETRY) => void> = [];
 
   // Drain completion tracking
   let drainResolve: (() => void) | undefined;
@@ -205,6 +208,22 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
     return Err(drainingError());
   };
 
+  const createReserved = async (): Promise<
+    Result<PooledResource<T>, ErrType<"PoolError", string>>
+  > => {
+    // Reserve the slot before awaiting create so concurrent acquires see it
+    activeCount++;
+    try {
+      return checkout(await create());
+    } catch (e) {
+      activeCount--;
+      // No release will come for this slot, so let a parked waiter try its own create.
+      waiters.shift()?.(RETRY);
+      checkDrainComplete();
+      return Err(PoolError(e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   const acquireImpl = async (): Promise<
     Result<PooledResource<T>, ErrType<"PoolError", string>>
   > => {
@@ -221,24 +240,18 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
     // Create a new resource if under maxSize
     const totalSize = idleResources.length + activeCount;
     if (totalSize < maxSize) {
-      // Reserve the slot before awaiting create so concurrent acquires see it
-      activeCount++;
-      try {
-        const resource = await create();
-        return checkout(resource);
-      } catch (e) {
-        activeCount--;
-        checkDrainComplete();
-        return Err(PoolError(e instanceof Error ? e.message : String(e)));
-      }
+      return createReserved();
     }
 
     // At maxSize: wait for a resource to be released
-    const resource = await new Promise<T | typeof DRAINED>(resolve => {
+    const resource = await new Promise<T | typeof DRAINED | typeof RETRY>(resolve => {
       waiters.push(resolve);
     });
     if (resource === DRAINED) {
       return Err(PoolError("Pool is draining"));
+    }
+    if (resource === RETRY) {
+      return acquireImpl();
     }
     return Ok(makePooledResource(resource));
   };

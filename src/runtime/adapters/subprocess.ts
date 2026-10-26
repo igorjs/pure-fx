@@ -36,7 +36,13 @@ interface BunGlobal {
   ): BunSpawnSyncResult;
   spawn(
     cmd: readonly string[],
-    opts?: { cwd?: string; env?: Record<string, string>; stdin?: "pipe"; stderr?: "pipe" },
+    opts?: {
+      cwd?: string;
+      env?: Record<string, string>;
+      stdin?: "pipe";
+      stdout?: "pipe" | "inherit";
+      stderr?: "pipe" | "inherit";
+    },
   ): BunChild;
 }
 
@@ -150,6 +156,7 @@ const createBunSubprocess = (): Subprocess | undefined => {
             () => output,
             err => {
               output.catch(() => undefined);
+              child.kill();
               throw err;
             },
           ),
@@ -174,14 +181,18 @@ const createBunSubprocess = (): Subprocess | undefined => {
     },
 
     spawn: async (cmd, args, options) => {
-      // Bun inherits stderr by default, which leaves child.stderr empty.
-      const spawnOpts = { ...buildOpts(options), stderr: "pipe" as const };
+      const capture = options.capture === true;
+      const spawnOpts = capture
+        ? { ...buildOpts(options), stdout: "pipe" as const, stderr: "pipe" as const }
+        : { ...buildOpts(options), stdout: "inherit" as const, stderr: "inherit" as const };
       const child = bun.spawn([cmd, ...args], spawnOpts);
       // Output is read from spawn time so a late wait() still sees it.
+      const readStream = (stream: unknown): Promise<string> =>
+        capture ? new Response(stream as BodyInit).text() : Promise.resolve("");
       const result = Promise.all([
         child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
+        readStream(child.stdout),
+        readStream(child.stderr),
       ]).then(([exitCode, stdout, stderr]) => ({ exitCode, stdout, stderr }));
       result.catch(() => undefined);
       return {
@@ -242,6 +253,8 @@ const createNodeSubprocess = (): Subprocess => ({
           // A child that exits without reading stdin makes the write fail with EPIPE.
           child.stdin.on("error", err => {
             stdinError = err;
+            // The timeout is cleared below, so kill here or the child outlives exec.
+            child.kill();
             if (timer !== undefined) clearTimeout(timer);
             reject(err);
           });
