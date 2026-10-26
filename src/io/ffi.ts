@@ -41,6 +41,7 @@
 
 import type { Result } from "../core/result.js";
 import { Err, Ok } from "../core/result.js";
+import { getRequire } from "../runtime/adapters/detect.js";
 import { ErrType, type ErrTypeConstructor } from "../types/error.js";
 
 // ── Error type ──────────────────────────────────────────────────────────────
@@ -94,6 +95,13 @@ export interface FfiLibrary<S extends FfiSymbols> {
 }
 
 // ── Runtime detection ───────────────────────────────────────────────────────
+
+/** Load a runtime-only built-in (bun:ffi, node:ffi) synchronously, throwing where require is missing. */
+const loadBuiltin = (id: string): unknown => {
+  const req = getRequire();
+  if (req === null) throw new Error(`No such built-in module: ${id}`);
+  return req(id);
+};
 
 const isBun = (): boolean => typeof globalThis !== "undefined" && "Bun" in globalThis;
 
@@ -151,7 +159,7 @@ const openBun = <S extends FfiSymbols>(
 ): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
   try {
     // Dynamic require to avoid TS errors in non-Bun environments
-    const bunFfi = Function('return require("bun:ffi")')() as {
+    const bunFfi = loadBuiltin("bun:ffi") as {
       dlopen(
         path: string,
         symbols: Record<string, FfiSymbolDefinition>,
@@ -175,7 +183,7 @@ const openNode = <S extends FfiSymbols>(
   symbols: S,
 ): Result<FfiLibrary<S>, ErrType<"FFIError">> => {
   try {
-    const nodeFfi = Function('return require("node:ffi")')() as {
+    const nodeFfi = loadBuiltin("node:ffi") as {
       dlopen(
         path: string,
         definitions: Record<string, { parameters: readonly string[]; result: string }>,
@@ -317,7 +325,7 @@ export const FFI: {
   isAvailable: (): boolean => {
     if (isBun()) return true;
     try {
-      Function('return require("node:ffi")')();
+      loadBuiltin("node:ffi");
       return true;
     } catch {
       return false;

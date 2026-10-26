@@ -11,6 +11,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
+import { esModules } from "../../scripts/miniflare-modules.mjs";
 
 const ROOT = resolve(new URL("../../", import.meta.url).pathname);
 
@@ -39,9 +40,8 @@ await writeFile(tmpWorkerPath, workerSrc);
 
 try {
   const mf = new Miniflare({
-    modules: true,
-    modulesRules: [{ type: "ESModule", include: ["**/*.js"] }],
-    scriptPath: tmpWorkerPath,
+    modules: esModules(tmpWorkerPath, resolve(ROOT, "dist")),
+    modulesRoot: ROOT,
     compatibilityDate: "2024-01-01",
   });
 

@@ -13,6 +13,7 @@
  * body, chunks are piped to `res.write()` incrementally rather than buffered.
  */
 
+import { importNodeBuiltin } from "../adapters/detect.js";
 import { toListenError } from "./listen-error.js";
 import { DEFAULT_MAX_BODY_BYTES, type ServerAdapter } from "./types.js";
 
@@ -274,9 +275,7 @@ export const writeResponse = async (response: Response, nodeRes: NodeResponse): 
  */
 export const nodeAdapter: ServerAdapter = {
   async serve(handler, options) {
-    const http: NodeHttpModule = await (Function(
-      "return import('node:http')",
-    )() as Promise<NodeHttpModule>);
+    const http: NodeHttpModule = await importNodeBuiltin<NodeHttpModule>("http");
 
     await new Promise<void>((resolve, reject) => {
       const hostname = options.hostname ?? "localhost";

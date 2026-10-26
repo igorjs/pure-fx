@@ -70,19 +70,34 @@ export interface NodeProcess {
 export const getNodeProcess = (): NodeProcess | undefined =>
   (globalThis as unknown as { process?: NodeProcess }).process;
 
+/** Node built-ins the runtime adapters load on demand. */
+export type NodeBuiltinName =
+  | "child_process"
+  | "dns/promises"
+  | "fs/promises"
+  | "http"
+  | "module"
+  | "net"
+  | "readline";
+
+/**
+ * Loads a Node built-in by name. The specifier is computed so Workers and
+ * browser bundlers never resolve it at load time; callers guard by runtime detection.
+ */
+export const importNodeBuiltin = <T>(name: NodeBuiltinName): Promise<T> =>
+  import(/* @vite-ignore */ `node:${name}`) as Promise<T>;
+
 /**
  * Import a Node built-in module with caching.
  *
- * Uses Function constructor to avoid static analysis picking up
- * the import as a dependency. Caches the result to avoid repeated
- * dynamic imports.
+ * Resolves to null when the module is unavailable on this runtime.
  */
-export const importNode = <T>(module: string): (() => Promise<T | null>) => {
+export const importNode = <T>(specifier: `node:${NodeBuiltinName}`): (() => Promise<T | null>) => {
   let cached: T | null | undefined;
   return async (): Promise<T | null> => {
     if (cached !== undefined) return cached;
     try {
-      cached = await (Function(`return import("${module}")`)() as Promise<T>);
+      cached = await importNodeBuiltin<T>(specifier.slice("node:".length) as NodeBuiltinName);
       return cached;
     } catch {
       cached = null;
@@ -91,53 +106,62 @@ export const importNode = <T>(module: string): (() => Promise<T | null>) => {
   };
 };
 
-/**
- * Require a Node built-in module synchronously with caching.
- *
- * Uses Function constructor to avoid static analysis. Works in
- * Node and Bun where require is available. Returns null in
- * browsers.
- */
-/**
- * Get a working require function in any context (CJS or ESM).
- * In CJS, Function('return require')() works.
- * In ESM, we use dynamic import('node:module').createRequire.
- */
-let cachedRequire: ((id: string) => unknown) | null | undefined;
+type RequireFn = (id: string) => unknown;
+interface ModuleBuiltin {
+  createRequire(url: string): RequireFn;
+}
 
-const initRequire = async (): Promise<(id: string) => unknown> => {
-  if (cachedRequire !== undefined) return cachedRequire!;
-  try {
-    cachedRequire = Function("return require")() as (id: string) => unknown;
-    return cachedRequire;
-  } catch {
-    // ESM context
+let cachedRequire: RequireFn | null | undefined;
+
+/**
+ * Build a require function without code generation. process.getBuiltinModule
+ * is synchronous; runtimes without it fall back to the async import, which
+ * requireReady awaits.
+ */
+const initRequire = async (): Promise<void> => {
+  if (cachedRequire !== undefined) return;
+  const proc = getNodeProcess() as
+    | (NodeProcess & { getBuiltinModule?: (id: string) => unknown })
+    | undefined;
+  if (proc === undefined) {
+    cachedRequire = null;
+    return;
   }
   try {
-    const mod = (await Function('return import("node:module")')()) as {
-      createRequire(url: string): (id: string) => unknown;
-    };
-    cachedRequire = mod.createRequire("file:///");
-    return cachedRequire;
+    const mod =
+      (proc.getBuiltinModule?.("node:module") as ModuleBuiltin | undefined) ??
+      (await importNodeBuiltin<ModuleBuiltin>("module"));
+    cachedRequire = mod.createRequire(import.meta.url);
   } catch {
     cachedRequire = null;
   }
-  return cachedRequire!;
 };
 
-// Eagerly initialise (the promise settles before any adapter runs)
-const requireReady = initRequire();
+/** Resolves once the require function is ready. Started lazily, never at import time. */
+let requireReadyPromise: Promise<void> | undefined;
+const requireReady = (): Promise<void> => {
+  requireReadyPromise ??= initRequire();
+  return requireReadyPromise;
+};
+
+/**
+ * The shared synchronous require function, or null when unavailable.
+ * Starts initialisation on first use; where only the async path exists, call
+ * and wait on requireReady first.
+ */
+export const getRequire = (): RequireFn | null => {
+  void requireReady();
+  return cachedRequire ?? null;
+};
 
 export const requireNode = <T>(module: string): (() => T | null) => {
   let cached: T | null | undefined;
   return (): T | null => {
     if (cached !== undefined) return cached;
-    if (cachedRequire === null || cachedRequire === undefined) {
-      cached = null;
-      return null;
-    }
+    const req = getRequire();
+    if (req === null) return null;
     try {
-      cached = cachedRequire(module) as T;
+      cached = req(module) as T;
       return cached;
     } catch {
       cached = null;
@@ -146,5 +170,4 @@ export const requireNode = <T>(module: string): (() => T | null) => {
   };
 };
 
-/** Ensure requireNode is ready (call at module init time via top-level await). */
 export { requireReady };

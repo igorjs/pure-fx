@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import { esModules } from "./miniflare-modules.mjs";
 
 const PACKAGE_NAME = "@igorjs/pure-fx";
 const REGISTRY_URL = "https://registry.npmjs.org";
@@ -112,10 +113,8 @@ export default {
 `,
   );
   const mf = new Miniflare({
-    modules: true,
-    modulesRules: [{ type: "ESModule", include: ["**/*.js"] }],
+    modules: esModules(entry, join(dirname(entry), "dist")),
     modulesRoot: dirname(entry),
-    scriptPath: entry,
     compatibilityDate: "2024-01-01",
   });
   let timer;
