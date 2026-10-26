@@ -1,9 +1,4 @@
 # SPDX-License-Identifier: Apache-2.0
-# Managed by github.com/igorjs-iac/repo-config
-#
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_coverage_badge). Direct edits in the consuming repo are
-# overwritten on the next `terraform apply` against repo-config.
 #
 # Triggered by the CI workflow completing on main: downloads the
 # coverage-summary artifact that lint-and-test uploads, builds a
@@ -11,7 +6,7 @@
 # re-run; reuses the run that CI already paid for.
 #
 # Prerequisites (per consuming repo):
-#   1. CI workflow (ci.yml) is managed by repo-config -- it uploads the
+#   1. CI workflow (ci.yml) uploads the
 #      coverage-summary artifact automatically from the lint-and-test job.
 #   2. coverage/coverage-summary.json is produced by the test suite in
 #      Istanbul json-summary format (Vitest: reporter: ['json-summary']).

@@ -1,15 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_dependency_review). Direct edits in the consuming repo
-# are overwritten on the next `terraform apply` against repo-config.
-#
 # Checks every PR for new dependencies that carry known CVEs in the GitHub
 # Advisory Database. Complements osv-scan (which runs on push to main) by
 # blocking vulnerable dependencies BEFORE they are merged.
 #
 # Free for public repos. Not available on private repos on the free tier
-# (returns 403); set manage_workflow_dependency_review = false there.
+# (returns 403).
 
 name: Dependency Review
 

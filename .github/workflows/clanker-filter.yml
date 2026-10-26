@@ -1,9 +1,4 @@
 # SPDX-License-Identifier: Apache-2.0
-# Managed by github.com/igorjs-iac/repo-config
-#
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_clanker_filter). Direct edits in the consuming repo are
-# overwritten on the next `terraform apply` against repo-config.
 #
 # Rejects three classes of PRs that carry insufficient signal:
 #   1. AI-generated PRs -- identified by bot authors (not on the allow-list)

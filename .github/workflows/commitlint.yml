@@ -1,9 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Templated by repo-config/modules/hardened-repo/main.tf (variable
-# manage_workflow_commitlint). Direct edits in the consuming repo are
-# overwritten on the next `terraform apply` against repo-config.
-#
 # Validates that the PR title follows Conventional Commits format.
 # This matters because squash-merge uses the PR title as the commit
 # message on main, which feeds the changelog generation in release.yml.

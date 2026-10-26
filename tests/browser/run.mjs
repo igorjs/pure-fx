@@ -69,9 +69,8 @@ const server = createServer(async (req, res) => {
 await new Promise(r => server.listen(0, r));
 const port = server.address().port;
 
-// CI runs this inside the official Playwright container as root (see
-// repo-config's ci.javascript.yml.tftpl for why: corepack/pnpm are broken
-// as a non-root user on that image). Chromium refuses its own sandbox as
+// CI runs this inside the official Playwright container as root (corepack and pnpm
+// fail as a non-root user on that image). Chromium refuses its own sandbox as
 // root in a container, so disable it only when actually running as root;
 // local/non-root runs keep the sandbox on.
 const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
