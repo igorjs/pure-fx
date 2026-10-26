@@ -3,7 +3,8 @@
  * jsr-exports.test.mjs - Keeps jsr.json exports in step with package.json.
  *
  * Every public package.json export (except ./package.json) must exist in
- * jsr.json and point at the source file that builds to the npm import target.
+ * jsr.json and point at the source file that builds to the npm import target,
+ * and jsr.json must not export any key package.json lacks.
  *
  * Run: pnpm test
  */
@@ -32,6 +33,9 @@ function findProblems(npmExports, jsrExports, fileExists) {
     else if (jsrExports[key] !== want)
       problems.push(`mismatch ${key}: ${jsrExports[key]} != ${want}`);
     else if (!fileExists(want)) problems.push(`no file ${want}`);
+  }
+  for (const key of Object.keys(jsrExports)) {
+    if (!(key in npmExports)) problems.push(`extra ${key}`);
   }
   return problems;
 }
@@ -69,6 +73,30 @@ describe("jsr.json exports", () => {
     const problems = findProblems(npm, jsr, () => true);
 
     // Assert
-    expect(problems.length).toBe(1);
+    expect(problems).toEqual(["mismatch ./a: ./src/b/index.ts != ./src/a/index.ts"]);
+  });
+
+  it("reports a missing source file", () => {
+    // Arrange
+    const npm = { "./a": { import: "./dist/a/index.js" } };
+    const jsr = { "./a": "./src/a/index.ts" };
+
+    // Act
+    const problems = findProblems(npm, jsr, () => false);
+
+    // Assert
+    expect(problems).toEqual(["no file ./src/a/index.ts"]);
+  });
+
+  it("reports a jsr key that package.json lacks", () => {
+    // Arrange
+    const npm = { "./a": { import: "./dist/a/index.js" }, "./package.json": "./package.json" };
+    const jsr = { "./a": "./src/a/index.ts", "./internal": "./src/internal.ts" };
+
+    // Act
+    const problems = findProblems(npm, jsr, () => true);
+
+    // Assert
+    expect(problems).toEqual(["extra ./internal"]);
   });
 });
