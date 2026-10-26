@@ -25,7 +25,7 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: block
           # Allowlist: GitHub API + git transport, npm registry,
@@ -111,7 +111,7 @@ jobs:
         run: pnpm run coverage
 
       - name: Upload coverage summary
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-summary
           path: coverage/coverage-summary.json
@@ -122,7 +122,7 @@ jobs:
         run: pnpm run test:types
 
       - name: Upload build artefact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
           path: dist/
@@ -139,7 +139,7 @@ jobs:
         node-version: ["22","24","26"]
     name: "integration / node-${{ matrix.node-version }}"
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: block
           allowed-endpoints: >
@@ -162,7 +162,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
@@ -180,7 +180,7 @@ jobs:
         deno-version: ["2.x","canary"]
     name: "integration / deno-${{ matrix.deno-version }}"
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: block
           allowed-endpoints: >
@@ -205,11 +205,11 @@ jobs:
         with:
           node-version: '26'
           cache: pnpm
-      - uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: ${{ matrix.deno-version }}
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
@@ -229,7 +229,7 @@ jobs:
         bun-version: ["canary","latest"]
     name: "integration / bun-${{ matrix.bun-version }}"
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: block
           allowed-endpoints: >
@@ -256,7 +256,7 @@ jobs:
         with:
           bun-version: ${{ matrix.bun-version }}
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
@@ -272,7 +272,7 @@ jobs:
     runs-on: ubuntu-latest
     name: "integration / cf-workers"
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: block
           allowed-endpoints: >
@@ -296,7 +296,7 @@ jobs:
           node-version: '26'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
@@ -321,7 +321,7 @@ jobs:
           node-version: '26'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
