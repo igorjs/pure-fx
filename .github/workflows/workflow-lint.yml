@@ -10,11 +10,13 @@ on:
   pull_request:
     paths:
       - ".github/workflows/**"
+      - ".github/zizmor.yml"
       - "tests/workflow-fixtures/**"
   push:
     branches: [main]
     paths:
       - ".github/workflows/**"
+      - ".github/zizmor.yml"
       - "tests/workflow-fixtures/**"
 
 permissions: {}

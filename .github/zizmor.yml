@@ -7,5 +7,6 @@ rules:
       - cla-dco.yml
       # Needs write access on fork PRs; never checks out the PR head.
       - clanker-filter.yml
-      # Runs after CI completes to publish the badge; never checks out untrusted code.
+      # Runs after CI completes to publish the badge; never checks out code; the job only
+      # runs for push runs of this repository, so the coverage artifact is trusted.
       - coverage-badge.yml
