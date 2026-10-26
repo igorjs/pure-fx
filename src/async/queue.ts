@@ -137,7 +137,14 @@ const createQueue = <T>(options: QueueOptions<T>): QueueInstance<T> => {
   /** Process a single job, then try to dequeue the next one. */
   const processJob = (job: Job<T>): void => {
     activeCount++;
-    handler(job).then(
+    let running: Promise<void>;
+    try {
+      running = handler(job);
+    } catch (error) {
+      // A handler that throws before returning a promise fails like a rejection.
+      running = Promise.reject(error);
+    }
+    running.then(
       () => {
         activeCount--;
         processedCount++;

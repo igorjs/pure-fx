@@ -2774,3 +2774,282 @@ describe("CronRunner", () => {
     expect(Object.isFrozen(runner)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Queue: synchronous handler throws
+// ---------------------------------------------------------------------------
+
+describe("Queue with a synchronously throwing handler", () => {
+  it("reports the error, keeps running later jobs and restores the active count", async () => {
+    // Arrange
+    const seen = [];
+    const errors = [];
+    const queue = Queue.create({
+      concurrency: 2,
+      handler: job => {
+        if (job.data === "bad") throw new Error("sync-boom");
+        seen.push(job.data);
+        return Promise.resolve();
+      },
+      onError: (error, job) => errors.push([error.message, job.data]),
+    });
+
+    // Act
+    let pushThrew = false;
+    try {
+      queue.push("bad");
+      queue.push("ok-1");
+      queue.push("ok-2");
+    } catch {
+      pushThrew = true;
+    }
+    await queue.drain();
+
+    // Assert
+    expect(pushThrew).toBe(false);
+    expect(errors).toEqual([["sync-boom", "bad"]]);
+    expect(seen).toEqual(["ok-1", "ok-2"]);
+    expect(queue.active()).toBe(0);
+    expect(queue.size()).toBe(0);
+    expect(queue.processed()).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stream.merge and debounce: error and early-exit cleanup
+// ---------------------------------------------------------------------------
+
+/** Async iterable that records next/return calls; next() is scripted. */
+const trackedSource = nextImpl => {
+  const state = { returned: 0, nexts: 0 };
+  const stream = Stream(() => ({
+    [Symbol.asyncIterator]: () => ({
+      next: () => {
+        state.nexts++;
+        return nextImpl(state.nexts);
+      },
+      return: () => {
+        state.returned++;
+        return Promise.resolve({ value: undefined, done: true });
+      },
+    }),
+  }));
+  return { state, stream };
+};
+
+const neverSettles = () =>
+  new Promise(() => {
+    /* intentionally never settles */
+  });
+
+/** Yields a value per macrotask so an unbounded pump cannot starve the loop. */
+const slowValue = n =>
+  new Promise(resolve => setImmediate(() => resolve({ value: Ok(n), done: false })));
+
+/** Count timers that were created but neither fired nor cleared. */
+const trackTimers = () => {
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  const live = new Set();
+  globalThis.setTimeout = (fn, ms, ...args) => {
+    const handle = realSet(
+      (...a) => {
+        live.delete(handle);
+        fn(...a);
+      },
+      ms,
+      ...args,
+    );
+    live.add(handle);
+    return handle;
+  };
+  globalThis.clearTimeout = handle => {
+    live.delete(handle);
+    realClear(handle);
+  };
+  return {
+    live: () => live.size,
+    restore: () => {
+      for (const h of live) realClear(h);
+      globalThis.setTimeout = realSet;
+      globalThis.clearTimeout = realClear;
+    },
+  };
+};
+
+/** Drain a stream; a consumer that never settles reports a hang error. */
+const collectUntilError = stream => {
+  const values = [];
+  const drained = (async () => {
+    try {
+      for await (const r of stream.run()) values.push(r);
+    } catch (error) {
+      return { values, error };
+    }
+    return { values, error: undefined };
+  })();
+  let hangTimer;
+  const hang = new Promise(resolve => {
+    hangTimer = setTimeout(() => resolve({ values, error: new Error("consumer hung") }), 200);
+  });
+  return Promise.race([drained, hang]).finally(() => clearTimeout(hangTimer));
+};
+
+describe("Stream.merge and debounce cleanup", () => {
+  it("positive control: the listener sees a deliberate unhandled rejection", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+
+    // Act
+    void Promise.reject(new Error("deliberate"));
+    await new Promise(resolve => setImmediate(resolve));
+    process.off("unhandledRejection", listener);
+
+    // Assert
+    expect(events.length).toBe(1);
+  });
+
+  it("merge: a failing source rejects the consumer, stops other sources, no unhandled rejection", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+    const good = trackedSource(slowValue);
+    const bad = trackedSource(n =>
+      n === 1
+        ? Promise.resolve({ value: Ok("x"), done: false })
+        : Promise.reject(new Error("src-fail")),
+    );
+
+    // Act
+    const outcome = await collectUntilError(Stream.merge(good.stream, bad.stream));
+    await new Promise(resolve => setImmediate(resolve));
+    process.off("unhandledRejection", listener);
+
+    // Assert
+    expect(outcome.error?.message).toBe("src-fail");
+    expect(good.state.returned).toBe(1);
+    expect(events.length).toBe(0);
+  });
+
+  it("merge: stopping early returns every source iterator", async () => {
+    // Arrange
+    const a = trackedSource(slowValue);
+    const b = trackedSource(neverSettles);
+
+    // Act
+    for await (const _ of Stream.merge(a.stream, b.stream).run()) break;
+
+    // Assert
+    expect(a.state.returned).toBe(1);
+    expect(b.state.returned).toBe(1);
+  });
+
+  it("debounce: a failing source rejects the consumer, clears the timer, no unhandled rejection", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+    const timers = trackTimers();
+    const src = trackedSource(n =>
+      n === 1
+        ? Promise.resolve({ value: Ok(1), done: false })
+        : Promise.reject(new Error("src-fail")),
+    );
+
+    // Act
+    let outcome;
+    try {
+      outcome = await collectUntilError(src.stream.debounce(10_000));
+      await new Promise(resolve => setImmediate(resolve));
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+    const liveTimers = timers.live();
+    timers.restore();
+
+    // Assert
+    expect(outcome.error?.message).toBe("src-fail");
+    expect(liveTimers).toBe(0);
+    expect(events.length).toBe(0);
+  });
+
+  it("debounce: stopping early clears the pending timer and returns the source", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+    const timers = trackTimers();
+    const src = trackedSource(n =>
+      n === 1 ? Promise.resolve({ value: Ok(1), done: false }) : neverSettles(),
+    );
+    const iter = src.stream.debounce(10_000).run()[Symbol.asyncIterator]();
+
+    // Act
+    const pending = iter.next();
+    await new Promise(resolve => setImmediate(resolve));
+    const timersBefore = timers.live();
+    await iter.return?.();
+    await new Promise(resolve => setImmediate(resolve));
+    const timersAfter = timers.live();
+    timers.restore();
+    process.off("unhandledRejection", listener);
+    void pending;
+
+    // Assert
+    expect(timersBefore).toBe(1);
+    expect(timersAfter).toBe(0);
+    expect(src.state.returned).toBe(1);
+    expect(events.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task combinators: user callbacks that throw yield Err
+// ---------------------------------------------------------------------------
+
+describe("Task combinators with throwing callbacks", () => {
+  const boom = () => {
+    throw new Error("cb-throw");
+  };
+  const cases = [
+    ["map", () => Task.of(1).map(boom)],
+    ["mapErr", () => Task(async () => Err("e")).mapErr(boom)],
+    ["flatMap (callback throws)", () => Task.of(1).flatMap(boom)],
+    ["tap", () => Task.of(1).tap(boom)],
+    ["tapErr", () => Task(async () => Err("e")).tapErr(boom)],
+    ["traverse", () => Task.traverse([1], boom)],
+    ["ap", () => Task.ap(Task.of(boom), Task.of(1))],
+    ["fromPromise onError", () => Task.fromPromise(() => Promise.reject(new Error("x")), boom)],
+  ];
+
+  for (const [name, build] of cases) {
+    it(`${name} resolves to Err instead of throwing or rejecting`, async () => {
+      // Arrange
+      let task;
+      let buildThrew = false;
+      try {
+        task = build();
+      } catch {
+        buildThrew = true;
+      }
+
+      // Act
+      let result;
+      let rejected = false;
+      try {
+        result = await task.run();
+      } catch {
+        rejected = true;
+      }
+
+      // Assert
+      expect(buildThrew).toBe(false);
+      expect(rejected).toBe(false);
+      expect(result.isErr).toBe(true);
+      expect(result.error.message).toBe("cb-throw");
+    });
+  }
+});

@@ -128,93 +128,148 @@ async function* zipIterators<T, U, E>(
 interface AsyncQueue<T> {
   push(value: T): void;
   done(): void;
+  /** Reject the consumer with `error` once buffered items are consumed. */
+  fail(error: unknown): void;
   next(): Promise<IteratorResult<T>>;
+}
+
+interface Waiter<T> {
+  readonly resolve: (result: IteratorResult<T>) => void;
+  readonly reject: (error: unknown) => void;
 }
 
 const createAsyncQueue = <T>(): AsyncQueue<T> => {
   const items: T[] = [];
   let finished = false;
-  let notify: (() => void) | null = null;
+  let failure: { readonly error: unknown } | null = null;
+  let waiter: Waiter<T> | null = null;
 
-  const wake = (): void => {
-    if (notify !== null) {
-      notify();
-      notify = null;
+  const settle = (): void => {
+    if (waiter === null) {
+      return;
+    }
+    const w = waiter;
+    if (items.length > 0) {
+      waiter = null;
+      w.resolve({ value: items.shift()!, done: false });
+    } else if (failure !== null) {
+      waiter = null;
+      w.reject(failure.error);
+    } else if (finished) {
+      waiter = null;
+      w.resolve({ value: undefined as T, done: true });
     }
   };
 
   return {
     push(value: T): void {
       items.push(value);
-      wake();
+      settle();
     },
     done(): void {
       finished = true;
-      wake();
+      settle();
+    },
+    fail(error: unknown): void {
+      failure ??= { error };
+      settle();
     },
     next(): Promise<IteratorResult<T>> {
-      if (items.length > 0) {
-        return Promise.resolve({ value: items.shift()!, done: false });
-      }
-      if (finished) {
-        return Promise.resolve({ value: undefined as T, done: true });
-      }
-      return new Promise<IteratorResult<T>>(r => {
-        notify = () => {
-          if (items.length > 0) {
-            r({ value: items.shift()!, done: false });
-          } else if (finished) {
-            r({ value: undefined as T, done: true });
-          }
-        };
+      return new Promise<IteratorResult<T>>((resolve, reject) => {
+        waiter = { resolve, reject };
+        settle();
       });
     },
   };
 };
 
+/** Best-effort close of a source iterator; its failures are not the consumer's concern. */
+const closeIterator = (iter: AsyncIterator<unknown>): void => {
+  try {
+    Promise.resolve(iter.return?.()).catch(() => undefined);
+  } catch {
+    // A synchronously throwing return() is ignored for the same reason.
+  }
+};
+
 // ── Debounce pump (extracted for complexity) ────────────────────────────────
 
-/** Eagerly consume an async iterator, debouncing Ok values into a queue. */
+/**
+ * Eagerly consume an async iterator, debouncing Ok values into a queue.
+ * Returns a cancel function that clears the timer and closes the source.
+ */
 const pumpDebounce = <T, E>(
   iter: AsyncIterator<Result<T, E>>,
   ms: number,
   q: AsyncQueue<Result<T, E>>,
-): void => {
+): (() => void) => {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let sourceExhausted = false;
-  const pull = (): void => {
-    iter.next().then(next => {
-      if (next.done) {
-        sourceExhausted = true;
-        // If no debounce timer is pending, mark the queue as done immediately.
-        // Otherwise the timer callback will call q.done() after flushing.
-        if (timer === null) {
-          q.done();
-        }
-        return;
-      }
-      if (next.value.isErr) {
-        q.push(next.value);
-        pull();
-        return;
-      }
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
-      const latest = next.value;
-      timer = setTimeout(() => {
-        timer = null;
-        q.push(latest);
-        // Why: if the source finished while we were debouncing,
-        // signal completion now that the final value has been flushed.
-        if (sourceExhausted) {
-          q.done();
-        }
-      }, ms);
-      pull();
-    });
+  let stopped = false;
+
+  const clearTimer = (): void => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
   };
+
+  const onNext = (next: IteratorResult<Result<T, E>>): void => {
+    if (stopped) {
+      return;
+    }
+    if (next.done) {
+      sourceExhausted = true;
+      // If no debounce timer is pending, mark the queue as done immediately.
+      // Otherwise the timer callback will call q.done() after flushing.
+      if (timer === null) {
+        q.done();
+      }
+      return;
+    }
+    if (next.value.isErr) {
+      q.push(next.value);
+      pull();
+      return;
+    }
+    clearTimer();
+    const latest = next.value;
+    timer = setTimeout(() => {
+      timer = null;
+      q.push(latest);
+      // Why: if the source finished while we were debouncing,
+      // signal completion now that the final value has been flushed.
+      if (sourceExhausted) {
+        q.done();
+      }
+    }, ms);
+    pull();
+  };
+
+  const onFail = (error: unknown): void => {
+    if (stopped) {
+      return;
+    }
+    stopped = true;
+    clearTimer();
+    q.fail(error);
+  };
+
+  const pull = (): void => {
+    iter.next().then(onNext, onFail);
+  };
+
   pull();
+
+  return () => {
+    if (stopped) {
+      return;
+    }
+    stopped = true;
+    clearTimer();
+    closeIterator(iter);
+    q.done();
+  };
 };
 
 // ── Implementation ──────────────────────────────────────────────────────────
@@ -451,19 +506,20 @@ const createStream = <T, E>(source: () => AsyncIterable<Result<T, E>>): Stream<T
   debounce: (ms: number): Stream<T, E> =>
     createStream(() => {
       const q = createAsyncQueue<Result<T, E>>();
-      let started = false;
-
-      const start = (): void => {
-        pumpDebounce(source()[Symbol.asyncIterator](), ms, q);
-      };
+      let cancel: (() => void) | null = null;
 
       return {
         [Symbol.asyncIterator]() {
-          if (!started) {
-            started = true;
-            start();
+          if (cancel === null) {
+            cancel = pumpDebounce(source()[Symbol.asyncIterator](), ms, q);
           }
-          return { next: () => q.next() };
+          return {
+            next: () => q.next(),
+            return: (): Promise<IteratorResult<Result<T, E>>> => {
+              cancel?.();
+              return Promise.resolve({ value: undefined as unknown as Result<T, E>, done: true });
+            },
+          };
         },
       };
     }),
@@ -632,43 +688,47 @@ export const Stream: {
 
     merge: <T, E>(...streams: readonly Stream<T, E>[]): Stream<T, E> =>
       createStream(() => {
-        const queue: Result<T, E>[] = [];
-        let resolve: ((v: IteratorResult<Result<T, E>>) => void) | null = null;
+        const q = createAsyncQueue<Result<T, E>>();
+        const iters: AsyncIterator<Result<T, E>>[] = [];
         let remaining = streams.length;
+        let stopped = false;
 
-        const wake = (): void => {
-          if (resolve === null) {
+        const stop = (): void => {
+          if (stopped) {
             return;
           }
-          if (queue.length > 0) {
-            const r = resolve;
-            resolve = null;
-            r({ value: queue.shift()!, done: false });
-          } else if (remaining === 0) {
-            const r = resolve;
-            resolve = null;
-            r({ value: undefined as unknown as Result<T, E>, done: true });
+          stopped = true;
+          for (const iter of iters) {
+            closeIterator(iter);
           }
-          // Why: if neither condition is met (queue empty, sources still active),
-          // leave resolve in place so the next wake() call can try again.
         };
 
         // Why: consume all source streams concurrently in the background,
         // pushing results into a shared queue as they arrive.
         const start = (): void => {
+          if (remaining === 0) {
+            q.done();
+          }
           for (const stream of streams) {
             const iter = stream.run()[Symbol.asyncIterator]();
-            const pull = (): void => {
-              iter.next().then(next => {
-                if (next.done) {
-                  remaining--;
-                  wake();
-                  return;
-                }
-                queue.push(next.value);
-                wake();
+            iters.push(iter);
+            const onNext = (next: IteratorResult<Result<T, E>>): void => {
+              if (stopped) {
+                return;
+              }
+              if (!next.done) {
+                q.push(next.value);
                 pull();
-              });
+              } else if (--remaining === 0) {
+                q.done();
+              }
+            };
+            const onFail = (error: unknown): void => {
+              stop();
+              q.fail(error);
+            };
+            const pull = (): void => {
+              iter.next().then(onNext, onFail);
             };
             pull();
           }
@@ -683,19 +743,11 @@ export const Stream: {
               start();
             }
             return {
-              next(): Promise<IteratorResult<Result<T, E>>> {
-                if (queue.length > 0) {
-                  return Promise.resolve({ value: queue.shift()!, done: false });
-                }
-                if (remaining === 0 && queue.length === 0) {
-                  return Promise.resolve({
-                    value: undefined as unknown as Result<T, E>,
-                    done: true,
-                  });
-                }
-                return new Promise<IteratorResult<Result<T, E>>>(r => {
-                  resolve = r;
-                });
+              next: () => q.next(),
+              return: (): Promise<IteratorResult<Result<T, E>>> => {
+                stop();
+                q.done();
+                return Promise.resolve({ value: undefined as unknown as Result<T, E>, done: true });
               },
             };
           },
