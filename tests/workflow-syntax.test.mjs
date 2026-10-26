@@ -544,4 +544,15 @@ describe("workflow syntax", () => {
     expect(/^ {4}if:.*!github\.event\.release\.prerelease/m.test(npm)).toBe(true);
     expect(/^ {4}if:.*!github\.event\.release\.prerelease/m.test(jsr)).toBe(true);
   });
+
+  it("publish smoke job waits for npm publish and has a timeout", () => {
+    // Arrange
+    const job = jobBlock(readWorkflow("publish.yml"), "smoke");
+
+    // Act and Assert
+    expect(job).not.toBe("");
+    expect(job).toMatch(/^ {4}needs:\s*\[[^\]]*\bpublish-npm\b[^\]]*\]/m);
+    expect(job).toMatch(/^ {4}timeout-minutes:\s*\d+/m);
+    expect(job).toContain("scripts/smoke-install.mjs");
+  });
 });
