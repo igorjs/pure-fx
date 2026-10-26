@@ -151,4 +151,66 @@ describe("bunAdapter request bridge", () => {
     // Assert
     expect(cancelled).toBe(true);
   });
+
+  it("brackets an IPv6 hostname in the default origin", async () => {
+    // Arrange
+    const request = new Request("http://x/v6");
+    // Act
+    const res = await withFakeBun(echoUrl, { hostname: "::1" }, fetch => fetch(request));
+    // Assert
+    expect(await res.text()).toBe("http://[::1]:3000/v6");
+  });
+
+  it("answers 500 instead of rejecting when the rebuilt request cannot be constructed", async () => {
+    // Arrange
+    const request = new Request("http://x/o");
+    // Act
+    const res = await withFakeBun(echoUrl, { publicOrigin: "not an origin" }, fetch =>
+      fetch(request),
+    );
+    // Assert
+    expect(res.status).toBe(STATUS_SERVER_ERROR);
+  });
+
+  it("aborts the handler's request signal when the client's signal aborts", async () => {
+    // Arrange
+    const client = new AbortController();
+    const request = new Request("http://x/s", { signal: client.signal });
+    const handler = async req => new Response(String(req.signal.aborted));
+    // Act
+    client.abort();
+    const res = await withFakeBun(handler, {}, fetch => fetch(request));
+    // Assert
+    expect(await res.text()).toBe("true");
+  });
+
+  it("stops gracefully on abort, then forces after drainTimeoutMs", async () => {
+    // Arrange
+    const calls = [];
+    globalThis.Bun = {
+      serve: () => ({
+        stop: force => {
+          calls.push(force === true);
+          return new Promise(() => undefined);
+        },
+        port: 3000,
+        hostname: "localhost",
+      }),
+    };
+    const controller = new AbortController();
+    const served = bunAdapter.serve(echoUrl, {
+      port: 3000,
+      signal: controller.signal,
+      drainTimeoutMs: 30,
+    });
+    // Act
+    controller.abort();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    const immediate = [...calls];
+    await served;
+    globalThis.Bun = undefined;
+    // Assert
+    expect(immediate).toEqual([false]);
+    expect(calls).toEqual([false, true]);
+  });
 });
