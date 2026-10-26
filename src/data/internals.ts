@@ -233,7 +233,7 @@ export interface Mutation {
 /** Sentinel value for draft reads: distinguishes "no mutation recorded" from `undefined`. */
 const DRAFT_UNSET: unique symbol = Symbol("unset");
 
-/** Array methods that mutate in-place. These corrupt produce() because setByPath cannot replay them. */
+/** Array methods that mutate in-place. The draft runs them on a copy and records the result as one mutation. */
 const MUTATING_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "push",
   "pop",
@@ -394,11 +394,18 @@ const deepEqualMaps = (
   return true;
 };
 
-/** Set equality: same size, every member of `a` present in `b`. */
+/**
+ * Set equality: same size, and members pair up one to one by reference or deep
+ * equality. The pairing is O(n^2), which is fine for the small sets held in records.
+ */
 const deepEqualSets = (a: ReadonlySet<unknown>, b: ReadonlySet<unknown>): boolean => {
   if (a.size !== b.size) return false;
+  const unmatched = [...b].filter(v => !a.has(v));
   for (const v of a) {
-    if (!b.has(v)) return false;
+    if (b.has(v)) continue;
+    const idx = unmatched.findIndex(candidate => deepEqual(v, candidate));
+    if (idx === -1) return false;
+    unmatched.splice(idx, 1);
   }
   return true;
 };
