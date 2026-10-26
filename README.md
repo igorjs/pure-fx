@@ -139,7 +139,7 @@ import { File, Command, FFI } from '@igorjs/pure-fx/io'
 | **Bundle size** | Small, tree-shakeable subpaths | Large (full runtime) | Medium |
 | **Error handling** | `Result<T, E>` and `Task<T, E>` | Typed errors via `Effect<A, E, R>` | `Either<E, A>`, `TaskEither` |
 | **Async** | `Task` (lazy Promise wrapper) | Fiber-based with structured concurrency | `TaskEither`, `ReaderTaskEither` |
-| **Runtime support** | Node, Bun, Workers, Browser | Node (primary), limited Bun | Node (primary) |
+| **Runtime support** | Node, Bun, Workers, Browser | Node (primary), limited Deno/Bun | Node (primary) |
 | **IO** | Built-in File, Command, Server, Crypto, FFI | Via services and layers | BYO (no IO primitives) |
 
 **Choose Pure FX when** you want typed errors and immutable data without adopting a framework. It adds `Result`, `Task`, `Schema`, and IO adapters on top of plain TypeScript: no generators, no layers, no HKT. If your code already uses `pipe` and explicit error returns, Pure FX fits in without reshaping your architecture.

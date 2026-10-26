@@ -82,7 +82,7 @@ The repository has git hooks that run automatically:
 - Unit tests use `node:test` and live in `tests/`
 - Integration tests are runtime-agnostic `.mjs` files that run on Node, Bun, Workers, and Browser
 - New features need both unit tests and integration test coverage
-- Run `node tests/integration-web.mjs` and `bun tests/integration-web.mjs` to verify cross-runtime compatibility
+- Run `node tests/smoke-all.mjs` and `bun tests/smoke-all.mjs` to verify cross-runtime compatibility
 
 ### Commits
 
