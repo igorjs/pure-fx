@@ -12,6 +12,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { esModules } from "../../scripts/miniflare-modules.mjs";
+import { runServerCases } from "./server.mjs";
 
 const ROOT = resolve(new URL("../../", import.meta.url).pathname);
 
@@ -59,6 +60,12 @@ try {
     process.exit(1);
   }
   console.log(`\nMiniflare: all ${passed} tests passed`);
+
+  const serverFailures = await runServerCases();
+  if (serverFailures > 0) {
+    console.log(`\nMiniflare server cases: ${serverFailures} failed`);
+    process.exit(1);
+  }
 } finally {
   await rm(tmpWorkerPath, { force: true });
 }

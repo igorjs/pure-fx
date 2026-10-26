@@ -27,6 +27,23 @@ await app.listen({ port: 3000 }, nodeAdapter).run();
 
 Adapters: `nodeAdapter`, `bunAdapter`. For AWS Lambda, use `toLambdaHandler` and `toLambdaStreamHandler` from `@igorjs/pure-fx/runtime/adapter/lambda`.
 
+### Cloudflare Workers
+
+`toWorkersHandler` wraps a server as the default export of a Worker module. It enforces `maxBodyBytes` (default 1 MiB) and turns unexpected errors into a plain 500.
+
+```ts
+import { Server, json } from '@igorjs/pure-fx'
+import { toWorkersHandler, workersEnv } from '@igorjs/pure-fx/runtime/adapter/workers'
+
+const app = Server('api').get('/hello', ctx =>
+  json({ greeting: workersEnv<{ GREETING: string }>(ctx.req).GREETING }),
+)
+
+export default toWorkersHandler(app)
+```
+
+Read bindings with `workersEnv(ctx.req)` and the execution context (`waitUntil`) with `workersContext(ctx.req)`.
+
 ## Program
 
 Process lifecycle wrapper for Task-based CLI programs with signal handling and graceful shutdown.
