@@ -422,7 +422,7 @@ export { json } from "./server.js";
 /** The server could not start listening, for example because the port is in use. */
 export { ListenError } from "./server.js";
 /** Options for starting the server (port, hostname, teardown and drain timeouts). */
-export type { ListenOptions } from "./server.js";
+export type { ListenAddress, ListenOptions, ServeOptions } from "./server.js";
 /** Route path matched but method is not registered for it. */
 export { MethodNotAllowed } from "./server.js";
 /** Middleware wrapping the next handler for cross-cutting concerns. */

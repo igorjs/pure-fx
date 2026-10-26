@@ -12,9 +12,12 @@ import { connect, createServer } from "node:net";
 import { describe, expect, it } from "@igorjs/pure-test";
 
 const { Server, Task, Ok, json } = await import("../dist/index.js");
-const { nodeAdapter, writeResponse } = await import("../dist/runtime/adapter/node.js");
+const { nodeAdapter } = await import("../dist/runtime/adapter/node.js");
+const { writeResponse } = await import("../dist/runtime/adapter/node-response.js");
+const { toWorkersHandler } = await import("../dist/runtime/adapter/workers.js");
 
 const HOST = "127.0.0.1";
+const IPV6_HOST = "::1";
 const CLIENT_TIMEOUT_MS = 3000;
 const SETTLE_MS = 150;
 
@@ -41,26 +44,12 @@ const bytesOf = chunks => Buffer.concat(chunks.map(c => Buffer.from(c)));
 
 /** Run `fn(baseUrl)` against a started server and always shut it down. */
 const withServer = async (app, adapter, fn, extra = {}) => {
-  const port = await freePort();
-  const controller = new AbortController();
-  const served = app
-    .serve({ port, hostname: HOST, signal: controller.signal, ...extra }, adapter)
-    .run();
-  const baseUrl = `http://${HOST}:${port}`;
+  const server = await startServer(app, adapter, extra);
   try {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await fetch(`${baseUrl}/ready`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
-        break;
-      } catch (err) {
-        if (attempt > 50) throw err;
-        await sleep(40);
-      }
-    }
-    return await fn(baseUrl, port);
+    return await fn(server.baseUrl, server.port);
   } finally {
-    controller.abort();
-    await Promise.race([served, sleep(CLIENT_TIMEOUT_MS)]);
+    server.abort();
+    await Promise.race([server.served, sleep(CLIENT_TIMEOUT_MS)]);
   }
 };
 
@@ -306,23 +295,28 @@ const deferred = () => {
 };
 
 /** Start `app.serve` on a free port and wait until it accepts connections. */
-const startServer = async (app, adapter, extra = {}) => {
+const startServer = async (app, adapter, extra = {}, urlHost = HOST) => {
   const port = await freePort();
   const controller = new AbortController();
   const served = app
     .serve({ port, hostname: HOST, signal: controller.signal, ...extra }, adapter)
     .run();
-  const baseUrl = `http://${HOST}:${port}`;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await fetch(`${baseUrl}/ready`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
-      break;
-    } catch (err) {
-      if (attempt > 50) throw err;
-      await sleep(40);
+  const baseUrl = `http://${urlHost}:${port}`;
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await fetch(`${baseUrl}/ready`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) });
+        break;
+      } catch (err) {
+        if (attempt > 50) throw err;
+        await sleep(40);
+      }
     }
+  } catch (err) {
+    controller.abort();
+    throw err;
   }
-  return { baseUrl, served, abort: () => controller.abort() };
+  return { baseUrl, port, served, abort: () => controller.abort() };
 };
 
 describe("listen errors", () => {
@@ -812,4 +806,130 @@ describe("review fixes", () => {
     expect(nodeRes.listenerCount("close")).toBe(0);
     expect(nodeRes.listenerCount("drain")).toBe(0);
   });
+});
+
+describe("request origin", () => {
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`brackets an IPv6 hostname in request.url on the ${adapterName}`, async () => {
+      // Arrange
+      const app = Server("origin")
+        .get("/ready", () => json({ ok: true }))
+        .get("/url", ctx => json({ url: ctx.req.url }));
+      const server = await startServer(app, adapter, { hostname: IPV6_HOST }, `[${IPV6_HOST}]`);
+
+      // Act
+      const res = await fetch(`${server.baseUrl}/url`, {
+        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+      });
+      const { url } = await res.json();
+      server.abort();
+      await server.served;
+
+      // Assert
+      expect(url).toBe(`http://[${IPV6_HOST}]:${server.port}/url`);
+    });
+  }
+});
+
+describe("onListen", () => {
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`reports the real port for port 0 and builds request.url from it on the ${adapterName}`, async () => {
+      // Arrange
+      const app = Server("listen").get("/url", ctx => json({ url: ctx.req.url }));
+      const controller = new AbortController();
+      const listening = deferred();
+
+      // Act
+      const served = app
+        .serve(
+          { port: 0, hostname: HOST, signal: controller.signal, onListen: listening.resolve },
+          adapter,
+        )
+        .run();
+      const address = await within(listening.promise, BOUND_MS, "onListen");
+      const res = await fetch(`http://${HOST}:${address.port}/url`, {
+        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+      });
+      const { url } = await res.json();
+      controller.abort();
+      await served;
+
+      // Assert
+      expect(address.hostname).toBe(HOST);
+      expect(address.port > 0).toBe(true);
+      expect(url).toBe(`http://${HOST}:${address.port}/url`);
+    });
+  }
+
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`keeps serving and settles Ok when onListen throws on the ${adapterName}`, async () => {
+      // Arrange
+      const app = Server("listen-throws").get("/ok", () => json({ ok: true }));
+      const controller = new AbortController();
+      const listening = deferred();
+      const onListen = address => {
+        listening.resolve(address);
+        throw new Error("reporter failed");
+      };
+
+      // Act
+      const served = app
+        .serve({ port: 0, hostname: HOST, signal: controller.signal, onListen }, adapter)
+        .run();
+      const address = await within(listening.promise, BOUND_MS, "onListen");
+      const res = await fetch(`http://${HOST}:${address.port}/ok`, {
+        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+      });
+      controller.abort();
+      const result = await served;
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(result.isOk).toBe(true);
+    });
+  }
+
+  it("is passed from listen() to the adapter", async () => {
+    // Arrange
+    const onListen = () => undefined;
+    let received;
+    const adapter = {
+      serve: async (_handler, options) => {
+        received = options.onListen;
+      },
+    };
+
+    // Act
+    await Server("listen-opts").listen({ port: 0, onListen }, adapter).execute();
+
+    // Assert
+    expect(received).toBe(onListen);
+  });
+});
+
+describe("toWorkersHandler request metadata", () => {
+  for (const redirect of ["manual", "error"]) {
+    it(`keeps redirect ${redirect} on a request with a body`, async () => {
+      // Arrange
+      let seen;
+      const handler = toWorkersHandler({
+        fetch: async req => {
+          seen = req.redirect;
+          await req.text();
+          return new Response("ok");
+        },
+      });
+      const request = new Request("http://example.test/x", {
+        method: "POST",
+        body: "hello",
+        redirect,
+      });
+
+      // Act
+      await handler.fetch(request, {}, { waitUntil: () => undefined });
+
+      // Assert
+      expect(seen).toBe(redirect);
+    });
+  }
 });

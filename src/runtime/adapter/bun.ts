@@ -15,7 +15,9 @@
  * 2. **Direct**: `Bun.serve({ fetch: app.fetch })` when Program is not needed.
  */
 
+import { type BodyLimit, limitBodyStream, payloadTooLarge, plain } from "./body-limit.js";
 import { toListenError } from "./listen-error.js";
+import { buildOrigin } from "./origin.js";
 import { DEFAULT_MAX_BODY_BYTES, type ServerAdapter } from "./types.js";
 
 // ── Structural types for Bun.serve (avoids @types/bun) ──────────────────────
@@ -47,42 +49,8 @@ type BunServeFn = (options: BunServeOptions) => BunServer;
 // ── Request bridge ──────────────────────────────────────────────────────────
 
 const STATUS_BAD_REQUEST = 400;
-const STATUS_PAYLOAD_TOO_LARGE = 413;
 const STATUS_INTERNAL_SERVER_ERROR = 500;
 const DEFAULT_DRAIN_TIMEOUT_MS = 10_000;
-
-/** Tracks whether a request body went over the size limit while streaming. */
-interface BodyLimit {
-  exceeded: boolean;
-}
-
-/** Pass chunks through, erroring the stream once more than `maxBodyBytes` have arrived. */
-const limitBody = (
-  body: ReadableStream<Uint8Array>,
-  maxBodyBytes: number,
-  limit: BodyLimit,
-): ReadableStream<Uint8Array> => {
-  const reader = body.getReader();
-  let received = 0;
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) {
-        controller.close();
-        return;
-      }
-      received += value.byteLength;
-      if (received > maxBodyBytes) {
-        limit.exceeded = true;
-        controller.error(new Error(`Request body exceeds ${maxBodyBytes} bytes`));
-        await reader.cancel();
-        return;
-      }
-      controller.enqueue(value);
-    },
-    cancel: reason => reader.cancel(reason),
-  });
-};
 
 /**
  * Rebuild the request on the configured origin, so the Host header never decides
@@ -111,18 +79,11 @@ const toRequest = (
           method,
           headers,
           signal,
-          body: limitBody(request.body, maxBodyBytes, limit),
+          body: limitBodyStream(request.body, maxBodyBytes, limit),
           duplex: "half",
         };
   return new Request(target, init);
 };
-
-/** Wrap an IPv6 literal in brackets so it forms a valid URL authority. */
-const toUrlHost = (hostname: string): string =>
-  hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
-
-const plain = (status: number, message: string): Response =>
-  new Response(message, { status, headers: { "content-type": "text/plain" } });
 
 // ── Adapter ─────────────────────────────────────────────────────────────────
 
@@ -163,14 +124,13 @@ export const bunAdapter: ServerAdapter = {
     if (bunGlobal.Bun?.serve === undefined) {
       throw new Error(
         "Bun.serve is not available. The bunAdapter requires Bun. " +
-          "For Node.js, use nodeAdapter or the default .listen() behavior. ",
+          "For Node.js, use nodeAdapter or the default .listen() behavior.",
       );
     }
 
     const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
-    const origin =
-      options.publicOrigin ??
-      `http://${toUrlHost(options.hostname ?? "localhost")}:${options.port}`;
+    // Replaced with the bound port once serving, since port 0 is only resolved then.
+    let origin = options.publicOrigin ?? buildOrigin(options.hostname ?? "localhost", options.port);
 
     // Bun's own cap does not stop a chunked body, so the stream is counted here too.
     const serveOptions: BunServeOptions = {
@@ -183,9 +143,9 @@ export const bunAdapter: ServerAdapter = {
           request = toRequest(bunRequest, origin, maxBodyBytes, limit);
           if (request === undefined) return plain(STATUS_BAD_REQUEST, "Bad Request");
           const response = await handler(request);
-          return limit.exceeded ? plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large") : response;
+          return limit.exceeded ? payloadTooLarge() : response;
         } catch (err: unknown) {
-          if (limit.exceeded) return plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large");
+          if (limit.exceeded) return payloadTooLarge();
           options.onError?.(err, request ?? bunRequest);
           return plain(STATUS_INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
@@ -202,6 +162,15 @@ export const bunAdapter: ServerAdapter = {
       server = bunGlobal.Bun.serve(serveOptions);
     } catch (err: unknown) {
       throw toListenError(options.port, err);
+    }
+
+    if (options.publicOrigin === undefined) {
+      origin = buildOrigin(options.hostname ?? "localhost", server.port);
+    }
+    try {
+      options.onListen?.({ hostname: server.hostname, port: server.port });
+    } catch {
+      // A throwing callback must not leave the server bound while serve reports failure.
     }
 
     const drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
