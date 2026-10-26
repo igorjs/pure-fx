@@ -27,6 +27,7 @@ interface NodeRequest {
   on(event: "end", cb: () => void): void;
   on(event: "error", cb: (err: Error) => void): void;
   pause(): void;
+  resume(): void;
 }
 
 /** Subset of node:http ServerResponse used by this adapter. */
@@ -38,6 +39,7 @@ interface NodeResponse {
   end(body?: string | Uint8Array): void;
   destroy(err?: Error): void;
   once(event: "drain" | "close", cb: () => void): void;
+  removeListener(event: "drain" | "close", cb: () => void): void;
 }
 
 /** Subset of node:http Server used by this adapter. */
@@ -125,13 +127,14 @@ const toRequest = (
   const fullUrl = `${origin}${nodeReq.url ?? "/"}`;
 
   const hasBody = method !== "GET" && method !== "HEAD";
+  let cancelled = false;
 
   const body = hasBody
     ? new ReadableStream<Uint8Array>({
         start(controller) {
           let received = 0;
           nodeReq.on("data", (chunk: Uint8Array) => {
-            if (limit.exceeded) return;
+            if (limit.exceeded || cancelled) return;
             received += chunk.byteLength;
             if (received > maxBodyBytes) {
               limit.exceeded = true;
@@ -142,11 +145,16 @@ const toRequest = (
             controller.enqueue(chunk);
           });
           nodeReq.on("end", () => {
-            if (!limit.exceeded) controller.close();
+            if (!limit.exceeded && !cancelled) controller.close();
           });
           nodeReq.on("error", (err: Error) => {
-            controller.error(err);
+            if (!cancelled) controller.error(err);
           });
+        },
+        cancel() {
+          // The controller is closed now, so late chunks must not reach it; keep reading to discard them.
+          cancelled = true;
+          nodeReq.resume();
         },
       })
     : undefined;
@@ -223,8 +231,13 @@ export const writeResponse = async (response: Response, nodeRes: NodeResponse): 
       }
       if (!nodeRes.write(value)) {
         await new Promise<void>(resolve => {
-          nodeRes.once("drain", resolve);
-          nodeRes.once("close", resolve);
+          const settle = (): void => {
+            nodeRes.removeListener("drain", settle);
+            nodeRes.removeListener("close", settle);
+            resolve();
+          };
+          nodeRes.once("drain", settle);
+          nodeRes.once("close", settle);
         });
       }
     }
@@ -295,7 +308,13 @@ export const nodeAdapter: ServerAdapter = {
               limit.exceeded ? sendPayloadTooLarge(nodeRes) : writeResponse(response, nodeRes),
             () => (limit.exceeded ? sendPayloadTooLarge(nodeRes) : sendInternalError(nodeRes)),
           )
-          .catch((err: unknown) => options.onError?.(err, request));
+          .catch((err: unknown) => {
+            try {
+              options.onError?.(err, request);
+            } catch {
+              // A throwing reporter must not become an unhandled rejection that stops the process.
+            }
+          });
       });
 
       server.on("connection", socket => {

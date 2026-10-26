@@ -7,6 +7,7 @@
  * ephemeral ports.
  */
 
+import { EventEmitter } from "node:events";
 import { connect, createServer } from "node:net";
 import { describe, expect, it } from "@igorjs/pure-test";
 
@@ -262,6 +263,9 @@ describe("response backpressure", () => {
       },
       once(event, cb) {
         if (event === "drain") drainListeners.push(cb);
+        return this;
+      },
+      removeListener() {
         return this;
       },
     };
@@ -689,4 +693,123 @@ describe("request URL origin", () => {
       expect(urlOf(res.body)).toBe("https://api.example.com/url");
     });
   }
+});
+
+describe("review fixes", () => {
+  const collectUncaught = () => {
+    const seen = [];
+    const listener = err => seen.push(err);
+    process.on("uncaughtException", listener);
+    return { seen, stop: () => process.off("uncaughtException", listener) };
+  };
+
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`a handler cancelling the request body does not crash on later chunks on the ${adapterName}`, async () => {
+      // Arrange
+      const uncaught = collectUncaught();
+      const app = Server("cancel")
+        .get("/ready", () => json({ ok: true }))
+        .post("/cancel", ctx =>
+          Task(async () => {
+            const reader = ctx.req.body.getReader();
+            await reader.read();
+            await reader.cancel();
+            return Ok(new Response("done"));
+          }),
+        );
+      const head = "POST /cancel HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\n\r\n";
+
+      try {
+        // Act
+        const status = await withServer(
+          app,
+          adapter,
+          (_b, port) =>
+            new Promise(resolve => {
+              const socket = connect(port, HOST);
+              socket.on("error", () => socket.destroy());
+              socket.on("close", () => resolve(0));
+              socket.write(`${head}5\r\nhello\r\n`);
+              void sleep(SETTLE_MS)
+                .then(() => socket.write("5\r\nworld\r\n0\r\n\r\n"))
+                .then(() => sleep(SETTLE_MS))
+                .then(() => socket.destroy());
+            }),
+        );
+        await sleep(SETTLE_MS);
+
+        // Assert
+        expect(status).toBe(0);
+        expect(uncaught.seen.length).toBe(0);
+      } finally {
+        uncaught.stop();
+      }
+    });
+
+    it(`an errorHandler that throws on a late body stream error is not an unhandled rejection on the ${adapterName}`, async () => {
+      // Arrange
+      const seen = [];
+      const listener = reason => seen.push(reason);
+      process.on("unhandledRejection", listener);
+      const stream = new ReadableStream({
+        pull(controller) {
+          controller.error(new Error("boom"));
+        },
+      });
+      const app = Server("throwing")
+        .get("/ready", () => json({ ok: true }))
+        .get("/boom", () => new Response(stream))
+        .onError(() => {
+          throw new Error("handler failed");
+        });
+
+      try {
+        // Act
+        await withServer(app, adapter, baseUrl =>
+          fetch(`${baseUrl}/boom`, { signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS) })
+            .then(r => r.text())
+            .catch(() => undefined),
+        );
+        await sleep(SETTLE_MS);
+
+        // Assert
+        expect(seen.length).toBe(0);
+      } finally {
+        process.off("unhandledRejection", listener);
+      }
+    });
+  }
+
+  it("backpressure waits leave no drain or close listeners behind", async () => {
+    // Arrange
+    const nodeRes = Object.assign(new EventEmitter(), {
+      headersSent: false,
+      destroyed: false,
+      writeHead() {
+        this.headersSent = true;
+      },
+      write() {
+        void sleep(1).then(() => this.emit("drain"));
+        return false;
+      },
+      end() {
+        // Nothing to flush on the fake.
+      },
+    });
+    const chunks = Array.from({ length: 25 }, () => new Uint8Array([1]));
+    const body = new ReadableStream({
+      pull(controller) {
+        const next = chunks.shift();
+        if (next === undefined) controller.close();
+        else controller.enqueue(next);
+      },
+    });
+
+    // Act
+    await writeResponse(new Response(body), nodeRes);
+
+    // Assert
+    expect(nodeRes.listenerCount("close")).toBe(0);
+    expect(nodeRes.listenerCount("drain")).toBe(0);
+  });
 });
