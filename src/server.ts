@@ -141,6 +141,10 @@ export interface ServerAdapter {
       readonly signal: AbortSignal;
       /** Max ms to let in-flight requests finish on shutdown before cutting them off. */
       readonly drainTimeoutMs?: number | undefined;
+      /** Max request body bytes before the request fails with 413. */
+      readonly maxBodyBytes?: number | undefined;
+      /** Origin used for `request.url`, replacing the one built from hostname and port. */
+      readonly publicOrigin?: string | undefined;
       /** Called when writing a response fails after the handler returned. */
       readonly onError?: ((error: unknown, request: Request) => void) | undefined;
     },
@@ -157,6 +161,10 @@ export interface ListenOptions {
   readonly teardownTimeoutMs?: number | undefined;
   /** Max ms to let in-flight requests finish on shutdown before cutting them off. */
   readonly drainTimeoutMs?: number | undefined;
+  /** Max request body bytes before the request fails with 413 (default 1 MiB). */
+  readonly maxBodyBytes?: number | undefined;
+  /** Origin used for `request.url`, for example `https://api.example.com`. The Host header is never trusted. */
+  readonly publicOrigin?: string | undefined;
 }
 
 /** A single route definition stored in the builder. */
@@ -171,21 +179,21 @@ export interface RouteDefinition<P extends string = string> {
 
 // ── Response helpers ────────────────────────────────────────────────────────
 
+const SET_COOKIE = "set-cookie";
+
 /**
- * Merge user-supplied headers with defaults without mutating either.
- * Iterates the user Headers to build a plain object, then spreads defaults underneath.
+ * Merge user-supplied headers over defaults without mutating either.
+ * Each Set-Cookie value stays its own header line, since joining them corrupts the cookies.
  */
-const mergeHeaders = (
-  defaults: Record<string, string>,
-  init?: ResponseInit,
-): Record<string, string> => {
-  if (init?.headers === undefined) return defaults;
-  const userHeaders: Record<string, string> = {};
-  const h = new Headers(init.headers);
-  h.forEach((value, key) => {
-    userHeaders[key] = value;
+const mergeHeaders = (defaults: Record<string, string>, init?: ResponseInit): Headers => {
+  const merged = new Headers(defaults);
+  if (init?.headers === undefined) return merged;
+  const user = new Headers(init.headers);
+  user.forEach((value, key) => {
+    if (key !== SET_COOKIE) merged.set(key, value);
   });
-  return { ...defaults, ...userHeaders };
+  for (const cookie of user.getSetCookie()) merged.append(SET_COOKIE, cookie);
+  return merged;
 };
 
 /**
@@ -196,9 +204,9 @@ const mergeHeaders = (
 const buildResponseInit = (
   status: number,
   statusText: string | undefined,
-  headers: Record<string, string>,
+  headers: Headers,
 ): ResponseInit => {
-  const init: { status: number; statusText?: string; headers: Record<string, string> } = {
+  const init: { status: number; statusText?: string; headers: Headers } = {
     status,
     headers,
   };
@@ -543,6 +551,8 @@ export interface ServerBuilder<Ctx extends Record<string, unknown> = Record<stri
       readonly hostname?: string;
       readonly signal: AbortSignal;
       readonly drainTimeoutMs?: number;
+      readonly maxBodyBytes?: number;
+      readonly publicOrigin?: string;
     },
     adapter?: ServerAdapter,
   ): Task<void, ServerError>;
@@ -826,6 +836,8 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
         readonly hostname?: string;
         readonly signal: AbortSignal;
         readonly drainTimeoutMs?: number;
+        readonly maxBodyBytes?: number;
+        readonly publicOrigin?: string;
       },
       adapter?: ServerAdapter,
     ): Task<void, ServerError> {
@@ -839,6 +851,8 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
             hostname: serveOpts.hostname,
             signal: serveOpts.signal,
             drainTimeoutMs: serveOpts.drainTimeoutMs,
+            maxBodyBytes: serveOpts.maxBodyBytes,
+            publicOrigin: serveOpts.publicOrigin,
             onError: (thrown: unknown, request: Request): void => {
               const message = thrown instanceof Error ? thrown.message : String(thrown);
               state.errorHandler(HandlerError(message), request);
@@ -869,12 +883,20 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
             readonly hostname?: string;
             readonly signal: AbortSignal;
             readonly drainTimeoutMs?: number;
+            readonly maxBodyBytes?: number;
+            readonly publicOrigin?: string;
           } = { port: options.port, signal };
           if (options.hostname !== undefined) {
             (serveOpts as { hostname: string }).hostname = options.hostname;
           }
           if (options.drainTimeoutMs !== undefined) {
             (serveOpts as { drainTimeoutMs: number }).drainTimeoutMs = options.drainTimeoutMs;
+          }
+          if (options.maxBodyBytes !== undefined) {
+            (serveOpts as { maxBodyBytes: number }).maxBodyBytes = options.maxBodyBytes;
+          }
+          if (options.publicOrigin !== undefined) {
+            (serveOpts as { publicOrigin: string }).publicOrigin = options.publicOrigin;
           }
           return builder.serve(serveOpts, adapter);
         },

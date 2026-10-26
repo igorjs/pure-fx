@@ -9,3 +9,6 @@
  */
 
 export type { ListenOptions, ServerAdapter } from "../../server.js";
+
+/** Default cap on a request body: 1 MiB. */
+export const DEFAULT_MAX_BODY_BYTES = 1_048_576;

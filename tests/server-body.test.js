@@ -7,7 +7,7 @@
  * ephemeral ports.
  */
 
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
 import { describe, expect, it } from "@igorjs/pure-test";
 
 const { Server, Task, Ok, json } = await import("../dist/index.js");
@@ -39,10 +39,12 @@ const freePort = () =>
 const bytesOf = chunks => Buffer.concat(chunks.map(c => Buffer.from(c)));
 
 /** Run `fn(baseUrl)` against a started server and always shut it down. */
-const withServer = async (app, adapter, fn) => {
+const withServer = async (app, adapter, fn, extra = {}) => {
   const port = await freePort();
   const controller = new AbortController();
-  const served = app.serve({ port, hostname: HOST, signal: controller.signal }, adapter).run();
+  const served = app
+    .serve({ port, hostname: HOST, signal: controller.signal, ...extra }, adapter)
+    .run();
   const baseUrl = `http://${HOST}:${port}`;
   try {
     for (let attempt = 0; ; attempt++) {
@@ -54,12 +56,32 @@ const withServer = async (app, adapter, fn) => {
         await sleep(40);
       }
     }
-    return await fn(baseUrl);
+    return await fn(baseUrl, port);
   } finally {
     controller.abort();
     await Promise.race([served, sleep(CLIENT_TIMEOUT_MS)]);
   }
 };
+
+/** Send raw bytes over a socket (fetch normalizes what these tests forge) and parse the reply. */
+const rawRequest = (port, raw) =>
+  new Promise((resolve, reject) => {
+    const socket = connect(port, HOST);
+    const received = [];
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("raw request timed out"));
+    }, CLIENT_TIMEOUT_MS);
+    socket.on("data", chunk => received.push(chunk));
+    socket.on("error", () => socket.destroy());
+    socket.on("close", () => {
+      clearTimeout(timer);
+      const reply = Buffer.concat(received).toString("utf8");
+      const [head = "", ...rest] = reply.split("\r\n\r\n");
+      resolve({ status: Number(head.split(" ")[1]), body: rest.join("\r\n\r\n") });
+    });
+    socket.write(raw);
+  });
 
 const echoApp = () => {
   const handle = ctx =>
@@ -475,4 +497,196 @@ describe("shutdown drain", () => {
       abort();
     }
   });
+});
+
+describe("Set-Cookie", () => {
+  const cookieApp = () =>
+    Server("cookies")
+      .get("/ready", () => json({ ok: true }))
+      .get("/raw", () => {
+        const headers = new Headers();
+        headers.append("set-cookie", "a=1; Path=/");
+        headers.append("set-cookie", "b=2; Path=/");
+        return new Response("ok", { headers });
+      })
+      .get("/helper", () => {
+        const headers = new Headers();
+        headers.append("set-cookie", "a=1; Path=/");
+        headers.append("set-cookie", "b=2; Path=/");
+        return json({ ok: true }, { headers });
+      });
+
+  for (const [adapterName, adapter] of ADAPTERS) {
+    for (const route of ["raw", "helper"]) {
+      it(`keeps both Set-Cookie values from the ${route} route on the ${adapterName}`, async () => {
+        // Arrange
+        const app = cookieApp();
+
+        // Act
+        const cookies = await withServer(app, adapter, async baseUrl => {
+          const res = await fetch(`${baseUrl}/${route}`, {
+            signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+          });
+          await res.text();
+          return res.headers.getSetCookie();
+        });
+
+        // Assert
+        expect(cookies).toEqual(["a=1; Path=/", "b=2; Path=/"]);
+      });
+    }
+  }
+});
+
+describe("maxBodyBytes", () => {
+  const LIMIT = 16;
+  const STATUS_PAYLOAD_TOO_LARGE = 413;
+  const post = (baseUrl, size) =>
+    fetch(`${baseUrl}/echo`, {
+      method: "POST",
+      body: "x".repeat(size),
+      signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+    }).then(async r => ({ status: r.status, text: await r.text() }));
+
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`accepts a body of exactly the limit on the ${adapterName}`, async () => {
+      // Arrange
+      const size = LIMIT;
+
+      // Act
+      const res = await withServer(echoApp(), adapter, baseUrl => post(baseUrl, size), {
+        maxBodyBytes: LIMIT,
+      });
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(res.text.length).toBe(LIMIT);
+    });
+
+    it(`rejects a Content-Length one byte over the limit with 413 on the ${adapterName}`, async () => {
+      // Arrange
+      const size = LIMIT + 1;
+
+      // Act
+      const res = await withServer(echoApp(), adapter, baseUrl => post(baseUrl, size), {
+        maxBodyBytes: LIMIT,
+      });
+
+      // Assert
+      expect(res.status).toBe(STATUS_PAYLOAD_TOO_LARGE);
+    });
+
+    it(`rejects a chunked body over the limit with 413 on the ${adapterName}`, async () => {
+      // Arrange
+      const chunk = "x".repeat(LIMIT);
+      const raw =
+        "POST /echo HTTP/1.1\r\nHost: x\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n" +
+        `${LIMIT.toString(16)}\r\n${chunk}\r\n${LIMIT.toString(16)}\r\n${chunk}\r\n0\r\n\r\n`;
+
+      // Act
+      const res = await withServer(echoApp(), adapter, (_baseUrl, port) => rawRequest(port, raw), {
+        maxBodyBytes: LIMIT,
+      });
+
+      // Assert
+      expect(res.status).toBe(STATUS_PAYLOAD_TOO_LARGE);
+    });
+  }
+});
+
+describe("request URL origin", () => {
+  const urlOf = body => JSON.parse(body.match(/\{.*\}/)[0]).url;
+  const BAD_REQUEST = 400;
+  const urlApp = () =>
+    Server("host")
+      .get("/ready", () => json({ ok: true }))
+      .get("/url", ctx => json({ url: ctx.req.url }));
+  const get = (port, target, ...headerLines) =>
+    rawRequest(
+      port,
+      [`GET ${target} HTTP/1.1`, ...headerLines, "Connection: close", "", ""].join("\r\n"),
+    );
+
+  for (const [adapterName, adapter] of ADAPTERS) {
+    it(`ignores a forged Host header on the ${adapterName}`, async () => {
+      // Arrange
+      const forged = "Host: evil.example";
+
+      // Act
+      const res = await withServer(urlApp(), adapter, (_b, port) =>
+        get(port, "/url", forged).then(r => ({ ...r, port })),
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(urlOf(res.body)).toBe(`http://${HOST}:${res.port}/url`);
+    });
+
+    it(`ignores a malformed Host header on the ${adapterName}`, async () => {
+      // Arrange
+      const malformed = "Host: not a host<>/\\@";
+
+      // Act
+      const res = await withServer(urlApp(), adapter, (_b, port) =>
+        get(port, "/url", malformed).then(r => ({ ...r, port })),
+      );
+
+      // Assert
+      expect(res.status).toBe(200);
+      expect(urlOf(res.body)).toBe(`http://${HOST}:${res.port}/url`);
+    });
+
+    it(`never lets a duplicate Host header change the origin on the ${adapterName}`, async () => {
+      // Arrange
+      const headers = ["Host: a.example", "Host: b.example"];
+
+      // Act
+      const res = await withServer(urlApp(), adapter, (_b, port) =>
+        get(port, "/url", ...headers).then(r => ({ ...r, port })),
+      );
+
+      // Assert
+      const origin = res.status === 200 ? urlOf(res.body) : "";
+      expect([BAD_REQUEST, 200]).toContain(res.status);
+      expect(origin === "" || origin === `http://${HOST}:${res.port}/url`).toBe(true);
+    });
+
+    it(`answers 400 to an absolute-form request target on the ${adapterName}`, async () => {
+      // Arrange
+      const target = "http://evil.example/url";
+
+      // Act
+      const res = await withServer(urlApp(), adapter, (_b, port) => get(port, target, "Host: x"));
+
+      // Assert
+      expect(res.status).toBe(BAD_REQUEST);
+    });
+
+    it(`answers 400 to a request target starting with // on the ${adapterName}`, async () => {
+      // Arrange
+      const target = "//evil.example/url";
+
+      // Act
+      const res = await withServer(urlApp(), adapter, (_b, port) => get(port, target, "Host: x"));
+
+      // Assert
+      expect(res.status).toBe(BAD_REQUEST);
+    });
+
+    it(`builds the origin from publicOrigin when configured on the ${adapterName}`, async () => {
+      // Arrange
+      const publicOrigin = "https://api.example.com";
+
+      // Act
+      const res = await withServer(
+        urlApp(),
+        adapter,
+        (_b, port) => get(port, "/url", "Host: evil.example"),
+        { publicOrigin },
+      );
+
+      // Assert
+      expect(urlOf(res.body)).toBe("https://api.example.com/url");
+    });
+  }
 });
