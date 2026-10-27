@@ -155,7 +155,7 @@ async function main(argv) {
     if (!existsSync(spec)) throw new Error(`tarball not found: ${spec}`);
   } else {
     spec = `${PACKAGE_NAME}@${values.version}`;
-    const url = `${REGISTRY_URL}/${PACKAGE_NAME.replace("/", "%2f")}`;
+    const url = `${REGISTRY_URL}/${PACKAGE_NAME.replaceAll("/", "%2f")}`;
     await waitForVersion({ fetch, url, version: values.version });
   }
 

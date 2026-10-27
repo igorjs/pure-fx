@@ -41,6 +41,7 @@ jobs:
             registry.npmjs.org:443
             registry.yarnpkg.com:443
             nodejs.org:443
+            bun.sh:443
             raw.githubusercontent.com:443
             ghcr.io:443
             pkg-containers.githubusercontent.com:443
@@ -55,6 +56,11 @@ jobs:
         with:
           node-version: '26'
           cache: pnpm
+
+      # The smoke-install tests run their Bun lane here and fail under CI without Bun.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
 
       - run: pnpm install --frozen-lockfile
 
