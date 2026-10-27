@@ -188,6 +188,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Conformance suite (node)
+        run: node scripts/test-conformance.mjs --lane node-current
+
   # ── Bun integration matrix ─────────────────────────────────────────
   integration-bun:
     needs: [lint-and-test]
@@ -238,6 +241,8 @@ jobs:
         run: bun tests/smoke-platform.mjs
       - name: Core smoke test
         run: bun tests/smoke-core.mjs
+      - name: Conformance suite (bun)
+        run: node scripts/test-conformance.mjs --lane bun
 
   # ── Cloudflare Workers integration (miniflare) ─────────────────────
   integration-workers:
@@ -280,6 +285,8 @@ jobs:
 
       - name: Workers smoke test (miniflare)
         run: node tests/workers/run.mjs
+      - name: Conformance suite (workers)
+        run: node scripts/test-conformance.mjs --lane workers
 
   # ── Browser integration (Playwright + Chromium) ────────────────────
   integration-browser:

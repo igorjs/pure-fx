@@ -1,0 +1,16 @@
+{
+  "lanes": [
+    {
+      "name": "fixture-failing",
+      "bin": "node",
+      "args": ["tests/fixtures/conformance-lane-fail.mjs"]
+    },
+    {
+      "name": "fixture-unusable",
+      "bin": "node",
+      "args": ["tests/fixtures/conformance-lane-ok.mjs"],
+      "probeArgs": ["--no-such-node-flag"]
+    },
+    { "name": "fixture-silent", "bin": "node", "args": ["-e", "0"] }
+  ]
+}
