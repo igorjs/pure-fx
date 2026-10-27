@@ -141,6 +141,18 @@ const toNodeDefinitions = (
   return result;
 };
 
+/** bun:ffi names the fields args and returns; the type names already match. */
+const toBunDefinitions = (
+  symbols: FfiSymbols,
+): Record<string, { args: readonly FfiType[]; returns: FfiType }> => {
+  const result: Record<string, { args: readonly FfiType[]; returns: FfiType }> = {};
+  for (const key of Object.keys(symbols)) {
+    const sym = symbols[key]!;
+    result[key] = { args: sym.parameters, returns: sym.result };
+  }
+  return result;
+};
+
 // ── Platform suffix ─────────────────────────────────────────────────────────
 
 const detectSuffix = (): string => {
@@ -162,13 +174,13 @@ const openBun = <S extends FfiSymbols>(
     const bunFfi = loadBuiltin("bun:ffi") as {
       dlopen(
         path: string,
-        symbols: Record<string, FfiSymbolDefinition>,
+        symbols: Record<string, { args: readonly FfiType[]; returns: FfiType }>,
       ): {
         symbols: Record<string, (...args: readonly unknown[]) => unknown>;
         close(): void;
       };
     };
-    const lib = bunFfi.dlopen(path, symbols);
+    const lib = bunFfi.dlopen(path, toBunDefinitions(symbols));
     return Ok({
       symbols: lib.symbols as FfiLibrary<S>["symbols"],
       close: () => lib.close(),
