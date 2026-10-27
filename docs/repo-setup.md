@@ -61,3 +61,14 @@ The check is a `terraform plan` for this repository that shows zero `github_repo
 - Removing state alone is not enough. The file resources overwrite on create and their manage flags default to true. The next plan recreates the files. `.npmrc` has no flag.
 - The publish flag also owns the `npm-publish` and `jsr-publish` environments.
 - Deleting the module block can destroy the rulesets.
+
+## Release signing check
+
+The rolling release (`node scripts/release.mjs --ci`) creates the release commit and tag through the Git Data API, so GitHub signs them for the App. Confirm that works before turning it on:
+
+1. In a scratch repository, add a branch ruleset with `required_signatures` and the App as a bypass actor. Mint an installation token with `contents: write`.
+2. Create a commit with `POST /repos/{owner}/{repo}/git/blobs`, `/git/trees` and `/git/commits` (send no `signature` field), then `PATCH /git/refs/heads/main`.
+3. Call `GET /repos/{owner}/{repo}/commits/{sha}`. `commit.verification.verified` must be `true`.
+4. Create an annotated tag with `POST /git/tags`, then `POST /git/refs` for `refs/tags/vX`. Call `GET /git/tags/{sha}`. `verification.verified` must be `true`.
+
+If either check is `false`, do not enable the rolling release. Switch to a release PR with auto-merge instead. The rolling release stays off until both checks pass.

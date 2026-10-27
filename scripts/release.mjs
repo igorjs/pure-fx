@@ -28,15 +28,21 @@
  * Requires: gh CLI (authenticated), git signing configured.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import {
+  CHANGELOG_HEADER,
+  describeCommit,
+  groupChangelog,
+  insertChangelogSection,
+  readCommitsSince,
+  renderChangelogSection,
+  run,
+} from "./release-lib.mjs";
+import { createGitHubApi, runCiRelease } from "./release-ci.mjs";
 
 // -- Helpers ------------------------------------------------------------------
 
-const run = (cmd, opts) => {
-  const result = execSync(cmd, { encoding: "utf-8", stdio: "pipe", ...opts });
-  return result ? result.trim() : "";
-};
 const log = (msg) => process.stdout.write(`${msg}\n`);
 const die = (msg) => {
   process.stderr.write(`Error: ${msg}\n`);
@@ -55,6 +61,29 @@ const skipTestCi = args.includes("--skip-test-ci") || dryRun;
 const bump = args.find((a) => !a.startsWith("-") && a.length > 0);
 // bump is undefined when no positional arg is passed → release the version
 // currently in package.json without a bump.
+
+if (args.includes("--ci")) {
+  const token = process.env.GITHUB_TOKEN;
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!token || !repository) {
+    die("--ci needs GITHUB_TOKEN (the App installation token) and GITHUB_REPOSITORY (owner/repo) in the environment.");
+  }
+  const git = (gitArgs) => execFileSync("git", gitArgs, { encoding: "utf-8", stdio: "pipe" }).trim();
+  const code = await runCiRelease(args, {
+    api: createGitHubApi({ token, repository, fetch }),
+    git: {
+      status: () => git(["status", "--porcelain"]),
+      tags: () => git(["tag", "--list"]).split("\n").filter(Boolean),
+      logSince: (tag) => readCommitsSince(tag),
+    },
+    fs: { readFile: (path) => readFileSync(path, "utf8") },
+    now: () => new Date(),
+    log,
+    repository,
+  });
+  process.exitCode = code;
+  process.exit(code);
+}
 
 if (dryRun) {
   log("[DRY-RUN] No files will be written and no commits/tags/pushes/releases");
@@ -272,79 +301,16 @@ if (lastTag) {
 
 // -- Generate changelog -------------------------------------------------------
 
-const CATEGORIES = [
-  { prefix: "feat", label: "Features" },
-  { prefix: "fix", label: "Bug Fixes" },
-  { prefix: "perf", label: "Performance" },
-  { prefix: "refactor", label: "Refactoring" },
-  { prefix: "test", label: "Tests" },
-  { prefix: "docs", label: "Documentation" },
-  { prefix: "ci", label: "CI" },
-  { prefix: "build", label: "Build" },
-  { prefix: "chore", label: "Chores" },
-];
-
-// Keep a Changelog categories (user-facing only)
-const CHANGELOG_CATEGORIES = [
-  { prefixes: ["feat"], label: "Added" },
-  { prefixes: ["fix"], label: "Fixed" },
-  { prefixes: ["perf"], label: "Changed" },
-];
-
-const range = hasLastTag ? `${lastTag}..${releaseSha}` : releaseSha;
-const rawLog = run(`git log --oneline ${range}`);
-const commits = rawLog
-  .split("\n")
-  .filter((line) => line.length > 0)
+const commits = readCommitsSince(hasLastTag ? lastTag : "", { to: releaseSha })
   // Skip version bump commits
-  .filter((line) => !line.includes("bump to ") && !line.includes("bump version"));
-
-const sections = [];
-const uncategorized = [];
-
-for (const cat of CATEGORIES) {
-  const matching = commits.filter((c) => {
-    const msg = c.slice(c.indexOf(" ") + 1);
-    return msg.startsWith(`${cat.prefix}:`) || msg.startsWith(`${cat.prefix}(`);
-  });
-  if (matching.length > 0) {
-    sections.push({
-      label: cat.label,
-      items: matching.map((c) => {
-        const hash = c.slice(0, c.indexOf(" "));
-        const msg = c.slice(c.indexOf(" ") + 1);
-        // Strip the type prefix for cleaner display
-        const clean = msg.replace(/^\w+(\([^)]*\))?:\s*/, "");
-        return `- ${clean} (${hash})`;
-      }),
-    });
-  }
-}
-
-// Commits that don't match any conventional prefix
-for (const c of commits) {
-  const msg = c.slice(c.indexOf(" ") + 1);
-  const matched = CATEGORIES.some(
-    (cat) => msg.startsWith(`${cat.prefix}:`) || msg.startsWith(`${cat.prefix}(`),
-  );
-  if (!matched) {
-    const hash = c.slice(0, c.indexOf(" "));
-    uncategorized.push(`- ${msg} (${hash})`);
-  }
-}
+  .filter((c) => !c.description.includes("bump to ") && !c.description.includes("bump version"));
+const groups = groupChangelog(commits);
 
 let changelog = `## What's Changed\n\n`;
-for (const section of sections) {
-  changelog += `### ${section.label}\n`;
-  for (const item of section.items) {
-    changelog += `${item}\n`;
-  }
-  changelog += "\n";
-}
-if (uncategorized.length > 0) {
-  changelog += `### Other\n`;
-  for (const item of uncategorized) {
-    changelog += `${item}\n`;
+for (const group of groups) {
+  changelog += `### ${group.label}\n`;
+  for (const c of group.commits) {
+    changelog += `- ${describeCommit(c)} (${c.hash})\n`;
   }
   changelog += "\n";
 }
@@ -358,25 +324,7 @@ changelog += hasLastTag
 // -- Generate CHANGELOG.md section (Keep a Changelog format) ------------------
 
 const today = new Date().toISOString().slice(0, 10);
-const keepSections = [];
-
-for (const cat of CHANGELOG_CATEGORIES) {
-  const matching = commits.filter((c) => {
-    const msg = c.slice(c.indexOf(" ") + 1);
-    return cat.prefixes.some((p) => msg.startsWith(`${p}:`) || msg.startsWith(`${p}(`));
-  });
-  if (matching.length === 0) continue;
-  const entries = matching.map((c) => {
-    const msg = c.slice(c.indexOf(" ") + 1);
-    const clean = msg.replace(/^\w+(\([^)]*\))?:\s*/, "");
-    return `- ${clean.charAt(0).toUpperCase()}${clean.slice(1)}`;
-  });
-  keepSections.push(`### ${cat.label}\n${entries.join("\n")}`);
-}
-
-let changelogEntry = keepSections.length > 0
-  ? `## [${newVersion}] - ${today}\n\n${keepSections.join("\n\n")}`
-  : null;
+const changelogEntry = renderChangelogSection({ version: newVersion, date: today, groups });
 
 log("\n--- GitHub Release Notes ---");
 log(changelog);
@@ -458,41 +406,17 @@ if (changelogEntry) {
   try {
     content = readFileSync(changelogPath, "utf8");
   } catch {
-    content = [
-      "# Changelog",
-      "",
-      "All notable changes to this project will be documented in this file.",
-      "",
-      "The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).",
-      "",
-    ].join("\n");
+    content = CHANGELOG_HEADER;
   }
 
   // Skip if this version already has an entry (e.g. hand-written for initial release)
   if (content.includes(`## [${newVersion}]`)) {
     log("CHANGELOG.md already has an entry for this version, skipping.");
   } else {
-    // Insert new section after header, before first version entry
-    const firstVersion = content.indexOf("\n## [");
-    if (firstVersion !== -1) {
-      content = `${content.slice(0, firstVersion)}\n${changelogEntry}\n${content.slice(firstVersion)}`;
-    } else {
-      content = `${content.trimEnd()}\n\n${changelogEntry}\n`;
-    }
-
-    // Add comparison link at the top of the links block
     const versionLink = hasLastTag
       ? `[${newVersion}]: ${repoUrl}/compare/v${currentVersion}...v${newVersion}`
       : `[${newVersion}]: ${repoUrl}/releases/tag/v${newVersion}`;
-
-    if (!content.includes(`[${newVersion}]:`)) {
-      const firstLink = content.search(/\n\[[^\]]+\]: https?:\/\//);
-      if (firstLink !== -1) {
-        content = `${content.slice(0, firstLink + 1)}${versionLink}\n${content.slice(firstLink + 1)}`;
-      } else {
-        content = `${content.trimEnd()}\n\n${versionLink}\n`;
-      }
-    }
+    content = insertChangelogSection(content, changelogEntry, newVersion, versionLink);
 
     writeMut(changelogPath, content);
     log("Updated CHANGELOG.md");
