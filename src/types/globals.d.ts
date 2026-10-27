@@ -118,6 +118,7 @@ declare class Headers {
   set(name: string, value: string): void;
   append(name: string, value: string): void;
   delete(name: string): void;
+  getSetCookie(): string[];
   forEach(callback: (value: string, key: string) => void): void;
   entries(): IterableIterator<[string, string]>;
   keys(): IterableIterator<string>;

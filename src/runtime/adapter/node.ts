@@ -13,7 +13,8 @@
  * body, chunks are piped to `res.write()` incrementally rather than buffered.
  */
 
-import type { ServerAdapter } from "./types.js";
+import { toListenError } from "./listen-error.js";
+import { DEFAULT_MAX_BODY_BYTES, type ServerAdapter } from "./types.js";
 
 // ── Structural types for node:http (avoids @types/node) ─────────────────────
 
@@ -25,25 +26,50 @@ interface NodeRequest {
   on(event: "data", cb: (chunk: Uint8Array) => void): void;
   on(event: "end", cb: () => void): void;
   on(event: "error", cb: (err: Error) => void): void;
+  pause(): void;
+  resume(): void;
 }
 
 /** Subset of node:http ServerResponse used by this adapter. */
 interface NodeResponse {
-  writeHead(status: number, headers: Record<string, string>): void;
+  readonly headersSent: boolean;
+  readonly destroyed?: boolean | undefined;
+  writeHead(status: number, headers: Record<string, string | string[]>): void;
   write(chunk: Uint8Array): boolean;
   end(body?: string | Uint8Array): void;
+  destroy(err?: Error): void;
+  once(event: "drain" | "close", cb: () => void): void;
+  removeListener(event: "drain" | "close", cb: () => void): void;
 }
 
 /** Subset of node:http Server used by this adapter. */
 interface NodeServer {
   listen(port: number, hostname: string | undefined, cb: () => void): void;
   close(cb?: (err?: Error) => void): void;
+  on(event: "error", cb: (err: Error) => void): void;
+  on(event: "connection", cb: (socket: NodeSocket) => void): void;
+  closeAllConnections?(): void;
+  closeIdleConnections?(): void;
+}
+
+/** Subset of net.Socket used to force-close connections. */
+interface NodeSocket {
+  destroy(): void;
+  once(event: "close", cb: () => void): void;
 }
 
 /** Structural type for the `node:http` module. */
 interface NodeHttpModule {
   createServer(listener: (req: NodeRequest, res: NodeResponse) => void): NodeServer;
 }
+
+const STATUS_BAD_REQUEST = 400;
+const STATUS_PAYLOAD_TOO_LARGE = 413;
+const STATUS_INTERNAL_SERVER_ERROR = 500;
+const SET_COOKIE = "set-cookie";
+
+/** Default ms in-flight requests get to finish after shutdown starts. */
+const DEFAULT_DRAIN_TIMEOUT_MS = 10_000;
 
 // ── Header conversion ───────────────────────────────────────────────────────
 
@@ -71,64 +97,157 @@ const convertHeaders = (
 
 // ── Request / Response bridges ──────────────────────────────────────────────
 
+/** Tracks whether a request body went over the size limit while streaming. */
+interface BodyLimit {
+  exceeded: boolean;
+}
+
+/** True when the request target is origin-form (`/path`) and not protocol-relative (`//host`). */
+const isOriginForm = (target: string): boolean =>
+  target.startsWith("/") && !target.startsWith("//");
+
+/** True when a declared Content-Length is already over the limit. */
+const declaresOversizeBody = (nodeReq: NodeRequest, maxBodyBytes: number): boolean => {
+  const declared = nodeReq.headers["content-length"];
+  return typeof declared === "string" && Number(declared) > maxBodyBytes;
+};
+
 /**
  * Build a WHATWG Request from Node.js IncomingMessage data.
- * Body chunks are streamed via ReadableStream to avoid buffering.
+ * Body chunks are streamed via ReadableStream to avoid buffering. Once more than
+ * `maxBodyBytes` have arrived the stream errors, reading stops and `limit.exceeded` is set.
  */
-const toRequest = (nodeReq: NodeRequest, hostname: string, port: number): Request => {
+const toRequest = (
+  nodeReq: NodeRequest,
+  origin: string,
+  maxBodyBytes: number,
+  limit: BodyLimit,
+): Request => {
   const method = nodeReq.method ?? "GET";
-  const urlStr = nodeReq.url ?? "/";
-  const fullUrl = `http://${hostname}:${port}${urlStr}`;
+  const fullUrl = `${origin}${nodeReq.url ?? "/"}`;
 
   const hasBody = method !== "GET" && method !== "HEAD";
+  let cancelled = false;
 
   const body = hasBody
     ? new ReadableStream<Uint8Array>({
         start(controller) {
+          let received = 0;
           nodeReq.on("data", (chunk: Uint8Array) => {
+            if (limit.exceeded || cancelled) return;
+            received += chunk.byteLength;
+            if (received > maxBodyBytes) {
+              limit.exceeded = true;
+              nodeReq.pause();
+              controller.error(new Error(`Request body exceeds ${maxBodyBytes} bytes`));
+              return;
+            }
             controller.enqueue(chunk);
           });
           nodeReq.on("end", () => {
-            controller.close();
+            if (!limit.exceeded && !cancelled) controller.close();
           });
           nodeReq.on("error", (err: Error) => {
-            controller.error(err);
+            if (!cancelled) controller.error(err);
           });
+        },
+        cancel() {
+          // The controller is closed now, so late chunks must not reach it; keep reading to discard them.
+          cancelled = true;
+          nodeReq.resume();
         },
       })
     : undefined;
 
-  return new Request(fullUrl, {
-    method,
-    headers: convertHeaders(nodeReq.headers),
-    body,
-  });
+  // Node's fetch rejects a streamed body unless duplex is "half".
+  const init: RequestInit & { duplex?: "half" } =
+    body === undefined
+      ? { method, headers: convertHeaders(nodeReq.headers) }
+      : { method, headers: convertHeaders(nodeReq.headers), body, duplex: "half" };
+  return new Request(fullUrl, init);
+};
+
+/** Reply with a plain-text status on a response whose headers have not been sent yet. */
+const sendPlain = (nodeRes: NodeResponse, status: number, message: string): void => {
+  // Closing the connection also drops any unread request body.
+  nodeRes.writeHead(status, { "content-type": "text/plain", connection: "close" });
+  nodeRes.end(message);
+};
+
+/** Reply 500 on a response whose headers have not been sent yet. */
+const sendInternalError = (nodeRes: NodeResponse): void => {
+  sendPlain(nodeRes, STATUS_INTERNAL_SERVER_ERROR, "Internal Server Error");
+};
+
+/** Reply 413 unless the handler already started its response. */
+const sendPayloadTooLarge = (nodeRes: NodeResponse): void => {
+  if (nodeRes.headersSent) {
+    nodeRes.destroy();
+    return;
+  }
+  sendPlain(nodeRes, STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large");
 };
 
 /**
  * Write a WHATWG Response back to Node.js ServerResponse.
- * When the body is a ReadableStream, chunks are streamed via res.write().
+ * Chunks are streamed via res.write(), pausing for `drain` when the socket
+ * buffer is full. A body read error sends 500 if no header has gone out yet,
+ * otherwise destroys the response, then rethrows for the caller to report.
+ *
+ * @internal
  */
-const writeResponse = async (response: Response, nodeRes: NodeResponse): Promise<void> => {
-  const headers: Record<string, string> = {};
-  response.headers.forEach((v, k) => {
-    headers[k] = v;
-  });
-  nodeRes.writeHead(response.status, headers);
+export const writeResponse = async (response: Response, nodeRes: NodeResponse): Promise<void> => {
+  // Headers are written with the first chunk so a failure before it can still become a 500.
+  const sendHead = (): void => {
+    if (nodeRes.headersSent) return;
+    const headers: Record<string, string | string[]> = {};
+    response.headers.forEach((v, k) => {
+      if (k !== SET_COOKIE) headers[k] = v;
+    });
+    // forEach joins Set-Cookie values into one line, which breaks the cookies.
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) headers[SET_COOKIE] = cookies;
+    nodeRes.writeHead(response.status, headers);
+  };
 
   if (response.body === null) {
+    sendHead();
     nodeRes.end();
     return;
   }
 
   const reader = response.body.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      nodeRes.end();
-      return;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      sendHead();
+      if (done) {
+        nodeRes.end();
+        return;
+      }
+      if (nodeRes.destroyed === true) {
+        await reader.cancel();
+        return;
+      }
+      if (!nodeRes.write(value)) {
+        await new Promise<void>(resolve => {
+          const settle = (): void => {
+            nodeRes.removeListener("drain", settle);
+            nodeRes.removeListener("close", settle);
+            resolve();
+          };
+          nodeRes.once("drain", settle);
+          nodeRes.once("close", settle);
+        });
+      }
     }
-    nodeRes.write(value);
+  } catch (err: unknown) {
+    if (nodeRes.headersSent) {
+      nodeRes.destroy(err instanceof Error ? err : undefined);
+    } else {
+      sendInternalError(nodeRes);
+    }
+    throw err;
   }
 };
 
@@ -161,27 +280,76 @@ export const nodeAdapter: ServerAdapter = {
 
     await new Promise<void>((resolve, reject) => {
       const hostname = options.hostname ?? "localhost";
+      const origin = options.publicOrigin ?? `http://${hostname}:${options.port}`;
+      const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+      const drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
+      const sockets = new Set<NodeSocket>();
+      let draining = false;
 
       const server = http.createServer((nodeReq, nodeRes) => {
-        const request = toRequest(nodeReq, hostname, options.port);
-        void handler(request).then(
-          response => writeResponse(response, nodeRes),
-          () => {
-            nodeRes.writeHead(500, { "content-type": "text/plain" });
-            nodeRes.end("Internal Server Error");
-          },
-        );
+        nodeRes.once("close", () => {
+          // A keep-alive connection that just finished its request would otherwise hold close() open.
+          if (draining) server.closeIdleConnections?.();
+        });
+        // The Host header is never used, so a request target that could redirect the origin is refused.
+        if (!isOriginForm(nodeReq.url ?? "/")) {
+          sendPlain(nodeRes, STATUS_BAD_REQUEST, "Bad Request");
+          return;
+        }
+        if (declaresOversizeBody(nodeReq, maxBodyBytes)) {
+          sendPayloadTooLarge(nodeRes);
+          return;
+        }
+        const limit: BodyLimit = { exceeded: false };
+        const request = toRequest(nodeReq, origin, maxBodyBytes, limit);
+        void handler(request)
+          .then(
+            response =>
+              limit.exceeded ? sendPayloadTooLarge(nodeRes) : writeResponse(response, nodeRes),
+            () => (limit.exceeded ? sendPayloadTooLarge(nodeRes) : sendInternalError(nodeRes)),
+          )
+          .catch((err: unknown) => {
+            try {
+              options.onError?.(err, request);
+            } catch {
+              // A throwing reporter must not become an unhandled rejection that stops the process.
+            }
+          });
       });
 
-      const onAbort = (): void => {
+      server.on("connection", socket => {
+        sockets.add(socket);
+        socket.once("close", () => sockets.delete(socket));
+      });
+
+      // Without a listener, a bind failure such as EADDRINUSE crashes the process.
+      server.on("error", err => {
+        options.signal.removeEventListener("abort", onAbort);
+        reject(toListenError(options.port, err));
+      });
+
+      const forceCloseConnections = (): void => {
+        if (server.closeAllConnections !== undefined) {
+          server.closeAllConnections();
+          return;
+        }
+        for (const socket of sockets) socket.destroy();
+      };
+
+      // close() stops accepting and resolves once every connection has ended;
+      // connections still open after the drain timeout are cut off.
+      function onAbort(): void {
+        draining = true;
+        const timer = setTimeout(forceCloseConnections, drainTimeoutMs);
         server.close(err => {
+          clearTimeout(timer);
           if (err !== undefined) {
             reject(err);
           } else {
             resolve();
           }
         });
-      };
+      }
 
       if (options.signal.aborted) {
         resolve();
