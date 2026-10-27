@@ -70,6 +70,7 @@
     "test": "pure-test tests/",
     "test:workers": "node tests/workers/run.mjs",
     "test:conformance": "node scripts/test-conformance.mjs",
+    "test:examples": "node scripts/test-examples.mjs",
     "test:types": "tsgo -p tsconfig.test.json",
     "test:ci": "node scripts/test-ci.mjs",
     "coverage": "c8 --reporter=text --reporter=json-summary -o coverage pure-test tests/",

@@ -59,6 +59,12 @@ validateName('').zip(validateAge(-1)); // Invalid(['name required', 'must be pos
 const content = await File.read('./config.json').run();
 ```
 
+## Examples
+
+- [REST API](examples/rest-api): Server, Schema and typed errors on Node and Bun.
+- [Workers app](examples/workers-app): a web-standard Worker, tested in Miniflare.
+- [CLI](examples/cli): Program with explicit exit codes, tested on Node and Bun.
+
 ## Modules
 
 | Layer | Primitives | Docs |
