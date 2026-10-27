@@ -44,6 +44,9 @@ import { castErr, castOk, collectResults, Err, Ok } from "../core/result.js";
  * const result = await pipeline.run(); // Result<string, string>
  * ```
  */
+/** Turn a value thrown by a user callback into an Err. */
+const thrown = <E>(e: unknown): Result<never, E> => Err(e as E);
+
 class TaskImpl<T, E> {
   constructor(private readonly _run: () => Promise<Result<T, E>>) {}
 
@@ -56,7 +59,12 @@ class TaskImpl<T, E> {
   map<U>(fn: (value: T) => U): Task<U, E> {
     return new TaskImpl(async () => {
       const r = await this._run();
-      return r.isOk ? Ok(fn(r.value)) : castErr(r);
+      if (r.isErr) return castErr(r);
+      try {
+        return Ok(fn(r.value));
+      } catch (e) {
+        return thrown(e);
+      }
     });
   }
 
@@ -64,7 +72,12 @@ class TaskImpl<T, E> {
   mapErr<F>(fn: (error: E) => F): Task<T, F> {
     return new TaskImpl(async () => {
       const r = await this._run();
-      return r.isErr ? Err(fn(r.error)) : castOk(r);
+      if (r.isOk) return castOk(r);
+      try {
+        return Err(fn(r.error));
+      } catch (e) {
+        return thrown(e);
+      }
     });
   }
 
@@ -73,7 +86,11 @@ class TaskImpl<T, E> {
     return new TaskImpl(async () => {
       const r = await this._run();
       if (r.isErr) return castErr(r);
-      return fn(r.value).run();
+      try {
+        return await fn(r.value).run();
+      } catch (e) {
+        return thrown(e);
+      }
     });
   }
 
@@ -81,7 +98,13 @@ class TaskImpl<T, E> {
   tap(fn: (value: T) => void): Task<T, E> {
     return new TaskImpl(async () => {
       const r = await this._run();
-      if (r.isOk) fn(r.value);
+      if (r.isOk) {
+        try {
+          fn(r.value);
+        } catch (e) {
+          return thrown(e);
+        }
+      }
       return r;
     });
   }
@@ -90,7 +113,13 @@ class TaskImpl<T, E> {
   tapErr(fn: (error: E) => void): Task<T, E> {
     return new TaskImpl(async () => {
       const r = await this._run();
-      if (r.isErr) fn(r.error);
+      if (r.isErr) {
+        try {
+          fn(r.error);
+        } catch (e) {
+          return thrown(e);
+        }
+      }
       return r;
     });
   }
@@ -301,7 +330,11 @@ export const Task: {
       try {
         return Ok(await promise());
       } catch (e) {
-        return Err(onError ? onError(e) : (e as E));
+        try {
+          return Err(onError ? onError(e) : (e as E));
+        } catch (handlerError) {
+          return thrown(handlerError);
+        }
       }
     }),
 
@@ -349,8 +382,12 @@ export const Task: {
    */
   traverse: <A, T, E>(items: readonly A[], fn: (item: A) => Task<T, E>): Task<readonly T[], E> =>
     new TaskImpl(async () => {
-      const results = await Promise.all(items.map(item => fn(item).run()));
-      return collectResults(results);
+      try {
+        const results = await Promise.all(items.map(item => fn(item).run()));
+        return collectResults(results);
+      } catch (e) {
+        return thrown(e);
+      }
     }),
 
   /** Alias for `Task.all`. Runs all tasks in parallel and collects results. */
@@ -374,7 +411,11 @@ export const Task: {
       const [fnResult, argResult] = await Promise.all([fnTask.run(), argTask.run()]);
       if (fnResult.isErr) return castErr(fnResult);
       if (argResult.isErr) return castErr(argResult);
-      return Ok(fnResult.value(argResult.value));
+      try {
+        return Ok(fnResult.value(argResult.value));
+      } catch (e) {
+        return thrown(e);
+      }
     }),
 
   /** Type guard: returns true if `value` is a Task instance. */

@@ -1287,6 +1287,83 @@ describe("Channel", () => {
   });
 });
 
+describe("Channel rendezvous and iterator return", () => {
+  it("capacity 0 send resolves only when a receiver takes the value", async () => {
+    // Arrange
+    const ch = Channel.bounded(0);
+    let sent = false;
+    const sendP = ch.send(1).then(ok => {
+      sent = true;
+      return ok;
+    });
+    await sleep(0);
+    const it = ch.receive()[Symbol.asyncIterator]();
+
+    // Act
+    const sentBefore = sent;
+    const got = await Promise.race([it.next(), sleep(50).then(() => "hung")]);
+
+    // Assert
+    expect(sentBefore).toBe(false);
+    expect(got === "hung").toBe(false);
+    expect(got.value).toBe(1);
+    expect(await sendP).toBe(true);
+  });
+
+  it("capacity 0 receive waits for a sender", async () => {
+    // Arrange
+    const ch = Channel.bounded(0);
+    const it = ch.receive()[Symbol.asyncIterator]();
+    const nextP = it.next();
+
+    // Act
+    const ok = await ch.send(7);
+    const got = await nextP;
+
+    // Assert
+    expect(ok).toBe(true);
+    expect(got.value).toBe(7);
+    expect(ch.size()).toBe(0);
+  });
+
+  it("iterator return() detaches a pending receiver", async () => {
+    // Arrange
+    const ch = Channel.bounded(4);
+    const it = ch.receive()[Symbol.asyncIterator]();
+    const pending = it.next();
+
+    // Act
+    const ret = await it.return();
+    const pendingResult = await Promise.race([pending, sleep(50).then(() => "hung")]);
+    await ch.send(5);
+
+    // Assert
+    expect(ret.done).toBe(true);
+    expect(pendingResult === "hung").toBe(false);
+    expect(pendingResult.done).toBe(true);
+    expect(ch.size()).toBe(1);
+  });
+
+  it("break in for await exits the loop and leaves the channel usable", async () => {
+    // Arrange
+    const ch = Channel.bounded(4);
+    await ch.send(1);
+    await ch.send(2);
+    const seen = [];
+
+    // Act
+    for await (const v of ch.receive()) {
+      seen.push(v);
+      break;
+    }
+    await ch.send(3);
+
+    // Assert
+    expect(seen).toEqual([1]);
+    expect(ch.size()).toBe(2);
+  });
+});
+
 // =============================================================================
 // 8. Env
 // =============================================================================
@@ -1979,6 +2056,35 @@ describe("EventEmitter", () => {
 // =============================================================================
 
 describe("Pool", () => {
+  it("a failed create hands the freed slot to a queued waiter", async () => {
+    // Arrange
+    let calls = 0;
+    const pool = Pool.create({
+      create: async () => {
+        calls++;
+        if (calls === 1) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          throw new Error("create failed");
+        }
+        return { id: calls };
+      },
+      maxSize: 1,
+    });
+    // Act
+    const first = pool.acquire().run();
+    const second = pool.acquire().run();
+    const results = await Promise.race([
+      Promise.all([first, second]),
+      new Promise(resolve => setTimeout(() => resolve("hung"), 1000)),
+    ]);
+    // Assert
+    expect(results).not.toBe("hung");
+    expect(results[0].isErr).toBe(true);
+    expect(results[1].isOk).toBe(true);
+    results[1].value.release();
+    await pool.drain();
+  });
+
   it("acquire returns a resource", async () => {
     const pool = Pool.create({
       create: async () => ({ id: 1 }),
@@ -2188,6 +2294,81 @@ describe("Pool", () => {
     expect(created).toBe(2);
     r2.value.release();
     await pool.drain();
+  });
+
+  it("never exceeds maxSize when concurrent acquires race a create", async () => {
+    // Arrange
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => {
+        created++;
+        await Promise.resolve();
+        return { id: created };
+      },
+      maxSize: 1,
+    });
+
+    // Act
+    const p1 = pool.acquire().run();
+    const p2 = pool.acquire().run();
+    const p3 = pool.acquire().run();
+    const r1 = await p1;
+    r1.value.release();
+    const r2 = await p2;
+    r2.value.release();
+    const r3 = await p3;
+    r3.value.release();
+
+    // Assert
+    expect(created).toBe(1);
+    await pool.drain();
+  });
+
+  it("never exceeds maxSize while an idle resource is being validated", async () => {
+    // Arrange
+    let created = 0;
+    const pool = Pool.create({
+      create: async () => ({ id: ++created }),
+      validate: async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        return true;
+      },
+      maxSize: 1,
+    });
+    const first = await pool.acquire().run();
+    first.value.release();
+
+    // Act
+    const pa = pool.acquire().run();
+    const pb = pool.acquire().run();
+    const ra = await pa;
+    ra.value.release();
+    const rb = await pb;
+    rb.value.release();
+
+    // Assert
+    expect(created).toBe(1);
+    await pool.drain();
+  });
+
+  it("rejects waiters pending at drain with a PoolError", async () => {
+    // Arrange
+    const pool = Pool.create({ create: async () => ({}), maxSize: 1 });
+    const held = await pool.acquire().run();
+    const waiter = pool.acquire().run();
+    await sleep(0);
+
+    // Act
+    const drained = pool.drain();
+    const outcome = await Promise.race([waiter, sleep(50).then(() => "hung")]);
+    held.value.release();
+    await drained;
+
+    // Assert
+    expect(outcome === "hung").toBe(false);
+    expect(outcome.isErr).toBe(true);
+    expect(outcome.error.tag).toBe("PoolError");
   });
 
   it("PoolError has correct tag", () => {
@@ -2620,5 +2801,329 @@ describe("CronRunner", () => {
     });
 
     expect(Object.isFrozen(runner)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Queue: synchronous handler throws
+// ---------------------------------------------------------------------------
+
+describe("Queue with a synchronously throwing handler", () => {
+  it("reports the error, keeps running later jobs and restores the active count", async () => {
+    // Arrange
+    const seen = [];
+    const errors = [];
+    const queue = Queue.create({
+      concurrency: 2,
+      handler: job => {
+        if (job.data === "bad") throw new Error("sync-boom");
+        seen.push(job.data);
+        return Promise.resolve();
+      },
+      onError: (error, job) => errors.push([error.message, job.data]),
+    });
+
+    // Act
+    let pushThrew = false;
+    try {
+      queue.push("bad");
+      queue.push("ok-1");
+      queue.push("ok-2");
+    } catch {
+      pushThrew = true;
+    }
+    await queue.drain();
+
+    // Assert
+    expect(pushThrew).toBe(false);
+    expect(errors).toEqual([["sync-boom", "bad"]]);
+    expect(seen).toEqual(["ok-1", "ok-2"]);
+    expect(queue.active()).toBe(0);
+    expect(queue.size()).toBe(0);
+    expect(queue.processed()).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stream.merge and debounce: error and early-exit cleanup
+// ---------------------------------------------------------------------------
+
+/** Async iterable that records next/return calls; next() is scripted. */
+const trackedSource = nextImpl => {
+  const state = { returned: 0, nexts: 0 };
+  const stream = Stream(() => ({
+    [Symbol.asyncIterator]: () => ({
+      next: () => {
+        state.nexts++;
+        return nextImpl(state.nexts);
+      },
+      return: () => {
+        state.returned++;
+        return Promise.resolve({ value: undefined, done: true });
+      },
+    }),
+  }));
+  return { state, stream };
+};
+
+const neverSettles = () =>
+  new Promise(() => {
+    /* intentionally never settles */
+  });
+
+/** Yields a value per macrotask so an unbounded pump cannot starve the loop. */
+const slowValue = n =>
+  new Promise(resolve => setImmediate(() => resolve({ value: Ok(n), done: false })));
+
+/** Count timers that were created but neither fired nor cleared. */
+const trackTimers = () => {
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  const live = new Set();
+  globalThis.setTimeout = (fn, ms, ...args) => {
+    const handle = realSet(
+      (...a) => {
+        live.delete(handle);
+        fn(...a);
+      },
+      ms,
+      ...args,
+    );
+    live.add(handle);
+    return handle;
+  };
+  globalThis.clearTimeout = handle => {
+    live.delete(handle);
+    realClear(handle);
+  };
+  return {
+    live: () => live.size,
+    restore: () => {
+      for (const h of live) realClear(h);
+      globalThis.setTimeout = realSet;
+      globalThis.clearTimeout = realClear;
+    },
+  };
+};
+
+/** Drain a stream; a consumer that never settles reports a hang error. */
+const collectUntilError = stream => {
+  const values = [];
+  const drained = (async () => {
+    try {
+      for await (const r of stream.run()) values.push(r);
+    } catch (error) {
+      return { values, error };
+    }
+    return { values, error: undefined };
+  })();
+  let hangTimer;
+  const hang = new Promise(resolve => {
+    hangTimer = setTimeout(() => resolve({ values, error: new Error("consumer hung") }), 200);
+  });
+  return Promise.race([drained, hang]).finally(() => clearTimeout(hangTimer));
+};
+
+describe("Stream.merge and debounce cleanup", () => {
+  it("positive control: the listener sees a deliberate unhandled rejection", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+
+    // Act
+    void Promise.reject(new Error("deliberate"));
+    await new Promise(resolve => setImmediate(resolve));
+    process.off("unhandledRejection", listener);
+
+    // Assert
+    expect(events.length).toBe(1);
+  });
+
+  it("merge: a failing source rejects the consumer, stops other sources, no unhandled rejection", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+    const good = trackedSource(slowValue);
+    const bad = trackedSource(n =>
+      n === 1
+        ? Promise.resolve({ value: Ok("x"), done: false })
+        : Promise.reject(new Error("src-fail")),
+    );
+
+    // Act
+    const outcome = await collectUntilError(Stream.merge(good.stream, bad.stream));
+    await new Promise(resolve => setImmediate(resolve));
+    process.off("unhandledRejection", listener);
+
+    // Assert
+    expect(outcome.error?.message).toBe("src-fail");
+    expect(good.state.returned).toBe(1);
+    expect(events.length).toBe(0);
+  });
+
+  it("merge: stopping early returns every source iterator", async () => {
+    // Arrange
+    const a = trackedSource(slowValue);
+    const b = trackedSource(neverSettles);
+
+    // Act
+    for await (const _ of Stream.merge(a.stream, b.stream).run()) break;
+
+    // Assert
+    expect(a.state.returned).toBe(1);
+    expect(b.state.returned).toBe(1);
+  });
+
+  it("debounce: a failing source rejects the consumer, clears the timer, no unhandled rejection", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+    const timers = trackTimers();
+    const src = trackedSource(n =>
+      n === 1
+        ? Promise.resolve({ value: Ok(1), done: false })
+        : Promise.reject(new Error("src-fail")),
+    );
+
+    // Act
+    let outcome;
+    try {
+      outcome = await collectUntilError(src.stream.debounce(10_000));
+      await new Promise(resolve => setImmediate(resolve));
+    } finally {
+      process.off("unhandledRejection", listener);
+    }
+    const liveTimers = timers.live();
+    timers.restore();
+
+    // Assert
+    expect(outcome.error?.message).toBe("src-fail");
+    expect(liveTimers).toBe(0);
+    expect(events.length).toBe(0);
+  });
+
+  it("debounce: stopping early clears the pending timer and returns the source", async () => {
+    // Arrange
+    const events = [];
+    const listener = reason => events.push(reason);
+    process.on("unhandledRejection", listener);
+    const timers = trackTimers();
+    const src = trackedSource(n =>
+      n === 1 ? Promise.resolve({ value: Ok(1), done: false }) : neverSettles(),
+    );
+    const iter = src.stream.debounce(10_000).run()[Symbol.asyncIterator]();
+
+    // Act
+    const pending = iter.next();
+    await new Promise(resolve => setImmediate(resolve));
+    const timersBefore = timers.live();
+    await iter.return?.();
+    await new Promise(resolve => setImmediate(resolve));
+    const timersAfter = timers.live();
+    timers.restore();
+    process.off("unhandledRejection", listener);
+    void pending;
+
+    // Assert
+    expect(timersBefore).toBe(1);
+    expect(timersAfter).toBe(0);
+    expect(src.state.returned).toBe(1);
+    expect(events.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task combinators: user callbacks that throw yield Err
+// ---------------------------------------------------------------------------
+
+describe("Task combinators with throwing callbacks", () => {
+  const boom = () => {
+    throw new Error("cb-throw");
+  };
+  const cases = [
+    ["map", () => Task.of(1).map(boom)],
+    ["mapErr", () => Task(async () => Err("e")).mapErr(boom)],
+    ["flatMap (callback throws)", () => Task.of(1).flatMap(boom)],
+    ["tap", () => Task.of(1).tap(boom)],
+    ["tapErr", () => Task(async () => Err("e")).tapErr(boom)],
+    ["traverse", () => Task.traverse([1], boom)],
+    ["ap", () => Task.ap(Task.of(boom), Task.of(1))],
+    ["fromPromise onError", () => Task.fromPromise(() => Promise.reject(new Error("x")), boom)],
+  ];
+
+  for (const [name, build] of cases) {
+    it(`${name} resolves to Err instead of throwing or rejecting`, async () => {
+      // Arrange
+      let task;
+      let buildThrew = false;
+      try {
+        task = build();
+      } catch {
+        buildThrew = true;
+      }
+
+      // Act
+      let result;
+      let rejected = false;
+      try {
+        result = await task.run();
+      } catch {
+        rejected = true;
+      }
+
+      // Assert
+      expect(buildThrew).toBe(false);
+      expect(rejected).toBe(false);
+      expect(result.isErr).toBe(true);
+      expect(result.error.message).toBe("cb-throw");
+    });
+  }
+});
+
+describe("StateMachine inherited event names", () => {
+  const m = StateMachine({
+    initial: "idle",
+    states: { idle: {}, loading: {} },
+    transitions: { idle: { FETCH: "loading" }, loading: {} },
+  });
+
+  for (const event of ["__proto__", "constructor", "toString"]) {
+    it(`send: rejects inherited name '${event}' like an unknown event`, () => {
+      // Arrange
+      const unknown = m.send("idle", undefined, "NOPE");
+      // Act
+      const result = m.send("idle", undefined, event);
+      // Assert
+      expect(unknown.isErr).toBe(true);
+      expect(result.isErr).toBe(true);
+      expect(m.canTransition("idle", event)).toBe(false);
+    });
+  }
+
+  it("send: rejects inherited name used as a state", () => {
+    // Act
+    const result = m.send("__proto__", undefined, "FETCH");
+    // Assert
+    expect(result.isErr).toBe(true);
+  });
+});
+
+describe("Stream.groupBy prototype keys", () => {
+  it("groups '__proto__' and 'constructor' keys without touching Object.prototype", async () => {
+    // Arrange
+    const stream = Stream.of("a", "b", "c");
+    const keys = { a: "__proto__", b: "constructor", c: "__proto__" };
+    // Act
+    const result = await stream.groupBy(v => keys[v]).run();
+    // Assert
+    const groups = result.unwrap();
+    expect(Object.getOwnPropertyDescriptor(groups, "__proto__").value).toEqual(["a", "c"]);
+    expect(Object.getOwnPropertyDescriptor(groups, "constructor").value).toEqual(["b"]);
+    expect(Object.getPrototypeOf(Object.prototype)).toBe(null);
+    expect({}.a).toBe(undefined);
+    expect({}.length).toBe(undefined);
   });
 });

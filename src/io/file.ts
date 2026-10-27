@@ -18,7 +18,6 @@ import { makeTask, type TaskLike } from "../async/task-like.js";
 import { Err, Ok } from "../core/result.js";
 import { resolveFs } from "../runtime/adapters/fs.js";
 import type { Fs } from "../runtime/adapters/types.js";
-import { Eol } from "../runtime/platform.js";
 import { ErrType, type ErrTypeConstructor } from "../types/error.js";
 
 // ── Error types ─────────────────────────────────────────────────────────────
@@ -131,7 +130,7 @@ export const File: {
   /** Like stat but does not follow symlinks. */
   readonly lstat: (path: string) => TaskLike<FileStat, ErrType<"FileError">>;
 } = {
-  read: path => withFs(fs => fs.readFile(path).then(Eol.normalize), { path }),
+  read: path => withFs(fs => fs.readFile(path), { path }),
   write: (path, content) => withFs(fs => fs.writeFile(path, content), { path }),
   append: (path, content) => withFs(fs => fs.appendFile(path, content), { path }),
   exists: path =>

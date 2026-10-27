@@ -7,6 +7,10 @@
  * Tests the compiled dist/ output, not the source.
  */
 
+import { EventEmitter } from "node:events";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "@igorjs/pure-test";
 
 const {
@@ -21,6 +25,8 @@ const {
   Compression,
   CompressionError,
   Timer,
+  Command,
+  File,
   TimeoutError,
   Duration,
   Ok,
@@ -570,5 +576,169 @@ describe("Timer", () => {
       expect(typeof stream.take).toBe("function");
       expect(typeof stream.collect).toBe("function");
     });
+  });
+});
+
+describe("File.read newline fidelity", () => {
+  it("returns CRLF content byte-for-byte", async () => {
+    // Arrange
+    const dir = await mkdtemp(join(tmpdir(), "pure-fx-read-"));
+    const path = join(dir, "crlf.txt");
+    const content = "one\r\ntwo\r\nthree\n";
+    await writeFile(path, content);
+    try {
+      // Act
+      const result = await File.read(path).run();
+      // Assert
+      expect(result.isOk).toBe(true);
+      expect(result.unwrap()).toBe(content);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// =============================================================================
+// Command
+// =============================================================================
+
+/** Collect uncaught exceptions raised while `fn` runs, then restore listeners. */
+const captureUncaught = async fn => {
+  const seen = [];
+  const listener = err => seen.push(err);
+  process.on("uncaughtException", listener);
+  try {
+    await fn();
+    await new Promise(resolve => setTimeout(resolve, 50));
+  } finally {
+    process.off("uncaughtException", listener);
+  }
+  return seen;
+};
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)),
+  ]);
+
+describe("Command", () => {
+  it("uncaught-exception detector catches an unhandled error event", async () => {
+    // Arrange
+    const emitter = new EventEmitter();
+    // Act
+    const seen = await captureUncaught(async () => {
+      setImmediate(() => emitter.emit("error", new Error("boom")));
+    });
+    // Assert
+    expect(seen.length).toBe(1);
+  });
+
+  it("spawning a missing binary returns Err without an uncaught error event", async () => {
+    // Arrange
+    const missing = `pure-fx-missing-${Math.random().toString(36).slice(2)}`;
+    let result;
+    // Act
+    const seen = await captureUncaught(async () => {
+      result = await Command.spawn(missing, [], { capture: true }).run();
+      await Promise.resolve();
+      await new Promise(resolve => setImmediate(resolve));
+      if (result.isOk) await withTimeout(result.value.wait().run(), 1000).catch(() => undefined);
+    });
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(seen.length).toBe(0);
+  });
+
+  it("wait() after the child already exited resolves with the exit result", async () => {
+    // Arrange
+    const child = (
+      await Command.spawn("node", ["-e", "process.exit(3)"], { capture: true }).run()
+    ).unwrap();
+    await sleep(500);
+    // Act
+    const result = await withTimeout(child.wait().run(), 2000);
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(result.unwrap().exitCode).toBe(3);
+  });
+
+  it("wait() after the child closed still returns stdout and stderr", async () => {
+    // Arrange
+    const script = 'process.stdout.write("out-data"); process.stderr.write("err-data")';
+    const child = (await Command.spawn("node", ["-e", script], { capture: true }).run()).unwrap();
+    await sleep(500);
+    // Act
+    const result = await withTimeout(child.wait().run(), 2000);
+    // Assert
+    expect(result.unwrap().stdout).toBe("out-data");
+    expect(result.unwrap().stderr).toBe("err-data");
+  });
+
+  it("exec with stdin for a child that already exited returns Err without an uncaught EPIPE", async () => {
+    // Arrange
+    const payload = "x".repeat(8 * 1024 * 1024);
+    let result;
+    // Act
+    const seen = await captureUncaught(async () => {
+      result = await withTimeout(
+        Command.exec("node", ["-e", "process.exit(0)"], { stdin: payload }).run(),
+        5000,
+      );
+    });
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(seen.length).toBe(0);
+  });
+
+  it("spawn without capture leaves stdout and stderr to the parent", async () => {
+    // Arrange
+    const script = 'process.stdout.write("o"); process.stderr.write("e")';
+    const child = (await Command.spawn("node", ["-e", script]).run()).unwrap();
+    // Act
+    const result = await withTimeout(child.wait().run(), 5000);
+    // Assert
+    expect(result.unwrap().stdout).toBe("");
+    expect(result.unwrap().stderr).toBe("");
+  });
+
+  it("exec with a stdin failure kills a child that is still running", async () => {
+    // Arrange
+    const dir = await mkdtemp(join(tmpdir(), "pure-fx-stdin-"));
+    const pidFile = join(dir, "pid");
+    const script =
+      'const fs=require("fs");fs.writeFileSync(process.argv[1],String(process.pid));' +
+      "fs.closeSync(0);setTimeout(()=>{},30000)";
+    const payload = "x".repeat(8 * 1024 * 1024);
+    let pid;
+    try {
+      // Act
+      const result = await withTimeout(
+        Command.exec("node", ["-e", script, pidFile], { stdin: payload, timeout: 20000 }).run(),
+        10000,
+      );
+      pid = Number((await readFile(pidFile, "utf8")).trim());
+      await sleep(300);
+      let alive = true;
+      try {
+        process.kill(pid, 0);
+      } catch {
+        alive = false;
+      }
+      // Assert
+      expect(result.isErr).toBe(true);
+      expect(alive).toBe(false);
+    } finally {
+      if (pid !== undefined) {
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          /* already gone */
+        }
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

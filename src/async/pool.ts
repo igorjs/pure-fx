@@ -73,6 +73,12 @@ interface IdleEntry<T> {
   timer: ReturnType<typeof setTimeout> | undefined;
 }
 
+/** Sentinel handed to waiters that are still queued when the pool drains. */
+const DRAINED: unique symbol = Symbol("pool.drained");
+
+/** Sentinel telling a queued waiter that a slot was freed without a resource, so it should retry. */
+const RETRY: unique symbol = Symbol("pool.retry");
+
 // ── Implementation ──────────────────────────────────────────────────────────
 
 const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
@@ -83,7 +89,7 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
   let draining = false;
 
   // Waiters queue: resolve functions for callers blocked on acquire
-  const waiters: Array<(resource: T) => void> = [];
+  const waiters: Array<(resource: T | typeof DRAINED | typeof RETRY) => void> = [];
 
   // Drain completion tracking
   let drainResolve: (() => void) | undefined;
@@ -167,6 +173,8 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
     while (idleResources.length > 0) {
       const entry = idleResources.shift()!;
       clearIdleTimer(entry);
+      // Keep the slot counted while validating so concurrent acquires cannot exceed maxSize
+      activeCount++;
 
       if (validate !== undefined) {
         let healthy: boolean;
@@ -176,6 +184,7 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
           healthy = false;
         }
         if (!healthy) {
+          activeCount--;
           void destroyResource(entry.resource);
           continue;
         }
@@ -184,6 +193,35 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
       return entry.resource;
     }
     return undefined;
+  };
+
+  const drainingError = (): ErrType<"PoolError", string> => PoolError("Pool is draining");
+
+  /** Wrap a counted resource, or discard it when the pool began draining meanwhile. */
+  const checkout = (resource: T): Result<PooledResource<T>, ErrType<"PoolError", string>> => {
+    if (!draining) {
+      return Ok(makePooledResource(resource));
+    }
+    activeCount--;
+    void destroyResource(resource);
+    checkDrainComplete();
+    return Err(drainingError());
+  };
+
+  const createReserved = async (): Promise<
+    Result<PooledResource<T>, ErrType<"PoolError", string>>
+  > => {
+    // Reserve the slot before awaiting create so concurrent acquires see it
+    activeCount++;
+    try {
+      return checkout(await create());
+    } catch (e) {
+      activeCount--;
+      // No release will come for this slot, so let a parked waiter try its own create.
+      waiters.shift()?.(RETRY);
+      checkDrainComplete();
+      return Err(PoolError(e instanceof Error ? e.message : String(e)));
+    }
   };
 
   const acquireImpl = async (): Promise<
@@ -196,26 +234,25 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
     // Try to reuse an idle resource
     const idleResource = await tryAcquireIdle();
     if (idleResource !== undefined) {
-      activeCount++;
-      return Ok(makePooledResource(idleResource));
+      return checkout(idleResource);
     }
 
     // Create a new resource if under maxSize
     const totalSize = idleResources.length + activeCount;
     if (totalSize < maxSize) {
-      try {
-        const resource = await create();
-        activeCount++;
-        return Ok(makePooledResource(resource));
-      } catch (e) {
-        return Err(PoolError(e instanceof Error ? e.message : String(e)));
-      }
+      return createReserved();
     }
 
     // At maxSize: wait for a resource to be released
-    const resource = await new Promise<T>(resolve => {
+    const resource = await new Promise<T | typeof DRAINED | typeof RETRY>(resolve => {
       waiters.push(resolve);
     });
+    if (resource === DRAINED) {
+      return Err(PoolError("Pool is draining"));
+    }
+    if (resource === RETRY) {
+      return acquireImpl();
+    }
     return Ok(makePooledResource(resource));
   };
 
@@ -241,6 +278,10 @@ const createPool = <T>(options: PoolOptions<T>): PoolInstance<T> => {
 
   const drain = async (): Promise<void> => {
     draining = true;
+
+    for (const waiter of waiters.splice(0, waiters.length)) {
+      waiter(DRAINED);
+    }
 
     // Destroy all idle resources
     const idleToDestroy = idleResources.splice(0, idleResources.length);

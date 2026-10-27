@@ -162,16 +162,20 @@ export const StateMachine = <
     }
   }
 
+  // Own-property lookups keep names like "constructor" from resolving to inherited values.
+  const ownTransitions = (state: string) =>
+    Object.hasOwn(normalized, state) ? normalized[state] : undefined;
+
   const resolve = (
     state: string,
     ctx: Ctx,
     event: string,
   ): Result<[string, Ctx], ErrType<"InvalidTransition">> => {
-    const stateTransitions = normalized[state];
+    const stateTransitions = ownTransitions(state);
     if (stateTransitions === undefined) {
       return Err(InvalidTransition(`No transitions for state '${state}'`, { state, event }));
     }
-    const entry = stateTransitions[event];
+    const entry = Object.hasOwn(stateTransitions, event) ? stateTransitions[event] : undefined;
     if (entry === undefined) {
       return Err(
         InvalidTransition(`Event '${event}' not valid in state '${state}'`, { state, event }),
@@ -212,10 +216,10 @@ export const StateMachine = <
     send: resolve,
     states: stateNames,
     initial: config.initial,
-    events: (state: string) => Object.freeze(Object.keys(normalized[state] ?? {})),
+    events: (state: string) => Object.freeze(Object.keys(ownTransitions(state) ?? {})),
     canTransition: (state: string, event: string) => {
-      const stateTransitions = normalized[state];
-      return stateTransitions !== undefined && event in stateTransitions;
+      const stateTransitions = ownTransitions(state);
+      return stateTransitions !== undefined && Object.hasOwn(stateTransitions, event);
     },
   }) as StateMachineInstance<States, Transitions, Ctx>;
 };
