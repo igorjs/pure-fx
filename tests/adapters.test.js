@@ -41,7 +41,7 @@ describe("detect", () => {
   });
 
   it("importNode caches results", async () => {
-    const getFs = importNode("node:fs/promises");
+    const getFs = importNode("fs/promises");
     const fs1 = await getFs();
     const fs2 = await getFs();
     expect(fs1).not.toBe(null);
@@ -49,7 +49,7 @@ describe("detect", () => {
   });
 
   it("importNode returns null for nonexistent module", async () => {
-    const getBad = importNode("node:this-does-not-exist");
+    const getBad = importNode("this-does-not-exist");
     const result = await getBad();
     expect(result).toBe(null);
   });

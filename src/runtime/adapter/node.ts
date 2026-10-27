@@ -15,6 +15,8 @@
 
 import { importNodeBuiltin } from "../adapters/detect.js";
 import { toListenError } from "./listen-error.js";
+import { type NodeResponse, sendInternalError, sendPlain, writeResponse } from "./node-response.js";
+import { buildOrigin } from "./origin.js";
 import { DEFAULT_MAX_BODY_BYTES, type ServerAdapter } from "./types.js";
 
 // ── Structural types for node:http (avoids @types/node) ─────────────────────
@@ -31,21 +33,10 @@ interface NodeRequest {
   resume(): void;
 }
 
-/** Subset of node:http ServerResponse used by this adapter. */
-interface NodeResponse {
-  readonly headersSent: boolean;
-  readonly destroyed?: boolean | undefined;
-  writeHead(status: number, headers: Record<string, string | string[]>): void;
-  write(chunk: Uint8Array): boolean;
-  end(body?: string | Uint8Array): void;
-  destroy(err?: Error): void;
-  once(event: "drain" | "close", cb: () => void): void;
-  removeListener(event: "drain" | "close", cb: () => void): void;
-}
-
 /** Subset of node:http Server used by this adapter. */
 interface NodeServer {
   listen(port: number, hostname: string | undefined, cb: () => void): void;
+  address(): { readonly address: string; readonly port: number } | string | null;
   close(cb?: (err?: Error) => void): void;
   on(event: "error", cb: (err: Error) => void): void;
   on(event: "connection", cb: (socket: NodeSocket) => void): void;
@@ -66,8 +57,6 @@ interface NodeHttpModule {
 
 const STATUS_BAD_REQUEST = 400;
 const STATUS_PAYLOAD_TOO_LARGE = 413;
-const STATUS_INTERNAL_SERVER_ERROR = 500;
-const SET_COOKIE = "set-cookie";
 
 /** Default ms in-flight requests get to finish after shutdown starts. */
 const DEFAULT_DRAIN_TIMEOUT_MS = 10_000;
@@ -168,18 +157,6 @@ const toRequest = (
   return new Request(fullUrl, init);
 };
 
-/** Reply with a plain-text status on a response whose headers have not been sent yet. */
-const sendPlain = (nodeRes: NodeResponse, status: number, message: string): void => {
-  // Closing the connection also drops any unread request body.
-  nodeRes.writeHead(status, { "content-type": "text/plain", connection: "close" });
-  nodeRes.end(message);
-};
-
-/** Reply 500 on a response whose headers have not been sent yet. */
-const sendInternalError = (nodeRes: NodeResponse): void => {
-  sendPlain(nodeRes, STATUS_INTERNAL_SERVER_ERROR, "Internal Server Error");
-};
-
 /** Reply 413 unless the handler already started its response. */
 const sendPayloadTooLarge = (nodeRes: NodeResponse): void => {
   if (nodeRes.headersSent) {
@@ -187,69 +164,6 @@ const sendPayloadTooLarge = (nodeRes: NodeResponse): void => {
     return;
   }
   sendPlain(nodeRes, STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large");
-};
-
-/**
- * Write a WHATWG Response back to Node.js ServerResponse.
- * Chunks are streamed via res.write(), pausing for `drain` when the socket
- * buffer is full. A body read error sends 500 if no header has gone out yet,
- * otherwise destroys the response, then rethrows for the caller to report.
- *
- * @internal
- */
-export const writeResponse = async (response: Response, nodeRes: NodeResponse): Promise<void> => {
-  // Headers are written with the first chunk so a failure before it can still become a 500.
-  const sendHead = (): void => {
-    if (nodeRes.headersSent) return;
-    const headers: Record<string, string | string[]> = {};
-    response.headers.forEach((v, k) => {
-      if (k !== SET_COOKIE) headers[k] = v;
-    });
-    // forEach joins Set-Cookie values into one line, which breaks the cookies.
-    const cookies = response.headers.getSetCookie();
-    if (cookies.length > 0) headers[SET_COOKIE] = cookies;
-    nodeRes.writeHead(response.status, headers);
-  };
-
-  if (response.body === null) {
-    sendHead();
-    nodeRes.end();
-    return;
-  }
-
-  const reader = response.body.getReader();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      sendHead();
-      if (done) {
-        nodeRes.end();
-        return;
-      }
-      if (nodeRes.destroyed === true) {
-        await reader.cancel();
-        return;
-      }
-      if (!nodeRes.write(value)) {
-        await new Promise<void>(resolve => {
-          const settle = (): void => {
-            nodeRes.removeListener("drain", settle);
-            nodeRes.removeListener("close", settle);
-            resolve();
-          };
-          nodeRes.once("drain", settle);
-          nodeRes.once("close", settle);
-        });
-      }
-    }
-  } catch (err: unknown) {
-    if (nodeRes.headersSent) {
-      nodeRes.destroy(err instanceof Error ? err : undefined);
-    } else {
-      sendInternalError(nodeRes);
-    }
-    throw err;
-  }
 };
 
 // ── Adapter ─────────────────────────────────────────────────────────────────
@@ -278,8 +192,9 @@ export const nodeAdapter: ServerAdapter = {
     const http: NodeHttpModule = await importNodeBuiltin<NodeHttpModule>("http");
 
     await new Promise<void>((resolve, reject) => {
-      const hostname = options.hostname ?? "localhost";
-      const origin = options.publicOrigin ?? `http://${hostname}:${options.port}`;
+      // Replaced with the bound port once listening, since port 0 is only resolved then.
+      let origin =
+        options.publicOrigin ?? buildOrigin(options.hostname ?? "localhost", options.port);
       const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
       const drainTimeoutMs = options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS;
       const sockets = new Set<NodeSocket>();
@@ -357,7 +272,16 @@ export const nodeAdapter: ServerAdapter = {
 
       options.signal.addEventListener("abort", onAbort);
       server.listen(options.port, options.hostname, () => {
-        // Server is listening
+        const bound = server.address();
+        if (bound === null || typeof bound === "string") return;
+        if (options.publicOrigin === undefined) {
+          origin = buildOrigin(options.hostname ?? "localhost", bound.port);
+        }
+        try {
+          options.onListen?.({ hostname: bound.address, port: bound.port });
+        } catch {
+          // Runs from the 'listening' event, so a throw would be an uncaught exception that kills the process.
+        }
       });
     });
   },

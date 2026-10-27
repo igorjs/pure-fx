@@ -4,9 +4,14 @@
  * stand-in for Bun.serve so it runs on Node. The real Bun run is covered by
  * the conformance suite.
  */
-import { describe, expect, it } from "@igorjs/pure-test";
+import { it as baseIt, describe, expect } from "@igorjs/pure-test";
 
 const { bunAdapter } = await import("../dist/runtime/adapter/bun.js");
+
+// Bun's global is read-only, so the Bun.serve stand-in only works on other runtimes.
+const runsOnBun = typeof globalThis.Bun?.serve === "function";
+const it = runsOnBun ? baseIt.skip : baseIt;
+const itOnBun = runsOnBun ? baseIt : baseIt.skip;
 
 const LIMIT = 8;
 const STATUS_BAD_REQUEST = 400;
@@ -16,14 +21,23 @@ const STATUS_SERVER_ERROR = 500;
 /** Start the adapter against a fake Bun.serve and hand back the fetch it registered. */
 const withFakeBun = async (handler, options, fn) => {
   const controller = new AbortController();
+  const { boundPort, boundHostname, ...adapterOptions } = options;
   let registered;
   globalThis.Bun = {
     serve: serveOptions => {
       registered = serveOptions;
-      return { stop: () => undefined, port: options.port, hostname: "localhost" };
+      return {
+        stop: () => undefined,
+        port: boundPort ?? adapterOptions.port ?? 3000,
+        hostname: boundHostname ?? "localhost",
+      };
     },
   };
-  const served = bunAdapter.serve(handler, { port: 3000, signal: controller.signal, ...options });
+  const served = bunAdapter.serve(handler, {
+    port: 3000,
+    signal: controller.signal,
+    ...adapterOptions,
+  });
   try {
     return await fn(registered.fetch);
   } finally {
@@ -50,6 +64,24 @@ describe("bunAdapter request bridge", () => {
     const res = await withFakeBun(echoUrl, { hostname: "127.0.0.1" }, fetch => fetch(forged));
     // Assert
     expect(await res.text()).toBe("http://127.0.0.1:3000/a?x=1");
+  });
+
+  it("reports the bound address through onListen and builds request.url from the bound port", async () => {
+    // Arrange
+    const reported = [];
+    const request = new Request("http://x/a");
+    const options = {
+      port: 0,
+      hostname: "127.0.0.1",
+      boundPort: 4321,
+      boundHostname: "127.0.0.1",
+      onListen: address => reported.push(address),
+    };
+    // Act
+    const res = await withFakeBun(echoUrl, options, fetch => fetch(request));
+    // Assert
+    expect(reported).toEqual([{ hostname: "127.0.0.1", port: 4321 }]);
+    expect(await res.text()).toBe("http://127.0.0.1:4321/a");
   });
 
   it("prefers publicOrigin over hostname and port", async () => {
@@ -212,5 +244,32 @@ describe("bunAdapter request bridge", () => {
     // Assert
     expect(immediate).toEqual([false]);
     expect(calls).toEqual([false, true]);
+  });
+});
+
+describe("bunAdapter on a real Bun.serve", () => {
+  itOnBun("reports the real port for port 0 and serves request.url from it", async () => {
+    // Arrange
+    const controller = new AbortController();
+    const listening = Promise.withResolvers();
+    const handler = async req => new Response(req.url);
+
+    // Act
+    const served = bunAdapter.serve(handler, {
+      port: 0,
+      hostname: "127.0.0.1",
+      signal: controller.signal,
+      onListen: listening.resolve,
+    });
+    const address = await listening.promise;
+    const res = await fetch(`http://127.0.0.1:${address.port}/a`);
+    const url = await res.text();
+    controller.abort();
+    await served;
+
+    // Assert
+    expect(address.hostname).toBe("127.0.0.1");
+    expect(address.port > 0).toBe(true);
+    expect(url).toBe(`http://127.0.0.1:${address.port}/a`);
   });
 });

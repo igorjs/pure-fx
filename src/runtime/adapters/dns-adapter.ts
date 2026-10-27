@@ -16,7 +16,7 @@ interface NodeDns {
   resolve(hostname: string, rrtype: string): Promise<string[]>;
 }
 
-const getNodeDns = importNode<NodeDns>("node:dns/promises");
+const getNodeDns = importNode<NodeDns>("dns/promises");
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 

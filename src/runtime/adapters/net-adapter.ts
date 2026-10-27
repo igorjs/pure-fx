@@ -24,7 +24,7 @@ interface NodeNet {
   createConnection(options: { host: string; port: number }): NodeSocket;
 }
 
-const getNodeNet = importNode<NodeNet>("node:net");
+const getNodeNet = importNode<NodeNet>("net");
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 

@@ -82,7 +82,7 @@ interface NodeChild {
   unref?(): void;
 }
 
-const getNodeCp = importNode<NodeChildProcess>("node:child_process");
+const getNodeCp = importNode<NodeChildProcess>("child_process");
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

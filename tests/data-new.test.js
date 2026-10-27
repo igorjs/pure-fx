@@ -1750,6 +1750,29 @@ describe("Record.equals (deepEqual)", () => {
     expect(a.equals(other)).toBe(false);
   });
 
+  it("compares Set object members structurally", () => {
+    // Arrange
+    const a = Record({ s: new Set([{ n: 1 }, { n: 2 }]) });
+    const same = Record({ s: new Set([{ n: 2 }, { n: 1 }]) });
+    const other = Record({ s: new Set([{ n: 1 }, { n: 3 }]) });
+    const nested = Record({ s: new Set([{ a: [{ n: 1 }] }]) });
+    const nestedSame = Record({ s: new Set([{ a: [{ n: 1 }] }]) });
+    // Act / Assert
+    expect(a.equals(same)).toBe(true);
+    expect(a.equals(other)).toBe(false);
+    expect(nested.equals(nestedSame)).toBe(true);
+  });
+
+  it("matches Set members one to one and rejects different sizes", () => {
+    // Arrange
+    const a = Record({ s: new Set([{ n: 1 }, { n: 1 }, { n: 2 }]) });
+    const b = Record({ s: new Set([{ n: 1 }, { n: 2 }, { n: 2 }]) });
+    const smaller = Record({ s: new Set([{ n: 1 }, { n: 2 }]) });
+    // Act / Assert
+    expect(a.equals(b)).toBe(false);
+    expect(a.equals(smaller)).toBe(false);
+  });
+
   it("does not treat a Date as equal to a plain object", () => {
     // Arrange
     const a = Record({ d: new Date(1000) });

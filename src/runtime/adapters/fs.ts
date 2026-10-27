@@ -46,7 +46,7 @@ interface NodeFs {
   readlink(path: string): Promise<string>;
 }
 
-const getNodeFs = importNode<NodeFs>("node:fs/promises");
+const getNodeFs = importNode<NodeFs>("fs/promises");
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 

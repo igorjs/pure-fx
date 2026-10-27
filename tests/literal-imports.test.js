@@ -11,7 +11,7 @@ import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "@igorjs/pure-test";
 import { Miniflare } from "miniflare";
-import { esModules } from "../scripts/miniflare-modules.mjs";
+import { esModules, withTimeout } from "../scripts/miniflare-modules.mjs";
 
 const ROOT = resolve(new URL("../", import.meta.url).pathname);
 const MINIFLARE_TIMEOUT_MS = 20000;
@@ -211,15 +211,14 @@ export default { fetch: () => new Response(String(Object.keys(m).length)) };
     modulesRoot: ROOT,
     compatibilityDate: "2024-01-01",
   });
-  let timer;
   try {
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${key} timed out`)), MINIFLARE_TIMEOUT_MS);
-    });
-    const resp = await Promise.race([mf.dispatchFetch("http://localhost/"), timeout]);
+    const resp = await withTimeout(
+      mf.dispatchFetch("http://localhost/"),
+      MINIFLARE_TIMEOUT_MS,
+      `${key} timed out`,
+    );
     return resp.status;
   } finally {
-    clearTimeout(timer);
     await mf.dispose();
     rmSync(entry, { force: true });
   }

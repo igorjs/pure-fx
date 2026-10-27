@@ -36,6 +36,58 @@ describe("Os without process.getBuiltinModule", () => {
   });
 });
 
+describe("FFI without process.getBuiltinModule", () => {
+  it("reports a retryable loading error first, then recovers once require settles", () => {
+    // Arrange
+    const script = `
+      process.getBuiltinModule = undefined;
+      const { FFI } = await import(${JSON.stringify(distUrl("io/ffi.js"))});
+      const first = FFI.open("missing-lib", {});
+      await new Promise(resolve => setTimeout(resolve, 50));
+      const second = FFI.open("missing-lib", {});
+      console.log(JSON.stringify({ first: first.error.message, second: second.error.message }));
+    `;
+
+    // Act
+    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+
+    // Assert
+    const result = JSON.parse(stdout.trim());
+    expect(result.first).toContain("still loading");
+    expect(result.second).not.toContain("still loading");
+  });
+
+  it("isAvailable settles to the same answer as a runtime with getBuiltinModule", () => {
+    // Arrange
+    const run = strip =>
+      execFileSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "-e",
+          `
+      if (${strip}) process.getBuiltinModule = undefined;
+      const { FFI } = await import(${JSON.stringify(distUrl("io/ffi.js"))});
+      FFI.isAvailable();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      console.log(JSON.stringify(FFI.isAvailable()));
+    `,
+        ],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      ).trim();
+
+    // Act
+    const stripped = run(true);
+    const control = run(false);
+
+    // Assert
+    expect(stripped).toBe(control);
+  });
+});
+
 describe("toWorkersHandler request metadata", () => {
   const capture = async (method, body, mutate) => {
     let seen;

@@ -13,6 +13,7 @@
  * context with {@link workersContext}, both keyed by the incoming request.
  */
 
+import { type BodyLimit, limitBodyStream, payloadTooLarge, plain } from "./body-limit.js";
 import { DEFAULT_MAX_BODY_BYTES } from "./types.js";
 
 // ── Structural types (zero deps, no @cloudflare/workers-types) ──────────────
@@ -43,7 +44,6 @@ export interface WorkersOptions {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const STATUS_PAYLOAD_TOO_LARGE = 413;
 const STATUS_INTERNAL_SERVER_ERROR = 500;
 
 // ── Per-request bindings ────────────────────────────────────────────────────
@@ -74,11 +74,6 @@ export const workersContext = (request: Request): WorkersExecutionContext =>
 
 // ── Body limit ──────────────────────────────────────────────────────────────
 
-/** Tracks whether a request body went over the size limit while streaming. */
-interface BodyLimit {
-  exceeded: boolean;
-}
-
 /** True when a declared Content-Length is already over the limit. */
 const declaresOversizeBody = (request: Request, maxBodyBytes: number): boolean => {
   const declared = request.headers.get("content-length");
@@ -91,30 +86,13 @@ const declaresOversizeBody = (request: Request, maxBodyBytes: number): boolean =
  */
 const limitBody = (request: Request, maxBodyBytes: number, limit: BodyLimit): Request => {
   if (request.body === null) return request;
-  const reader = request.body.getReader();
-  let received = 0;
-  const counted = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) {
-        controller.close();
-        return;
-      }
-      received += value.byteLength;
-      if (received > maxBodyBytes) {
-        limit.exceeded = true;
-        await reader.cancel();
-        controller.error(new Error(`Request body exceeds ${maxBodyBytes} bytes`));
-        return;
-      }
-      controller.enqueue(value);
-    },
-    cancel: reason => reader.cancel(reason),
-  });
-  const cf = (request as Request & { cf?: unknown }).cf;
-  const init: RequestInit & { duplex: "half"; cf?: unknown } = {
+  const counted = limitBodyStream(request.body, maxBodyBytes, limit);
+  // The lib Request type omits `redirect`, though every runtime exposes it.
+  const { cf, redirect } = request as Request & { cf?: unknown; redirect: string };
+  const init: RequestInit & { duplex: "half"; redirect: string; cf?: unknown } = {
     method: request.method,
     headers: request.headers,
+    redirect,
     signal: request.signal,
     body: counted,
     duplex: "half",
@@ -127,9 +105,6 @@ const limitBody = (request: Request, maxBodyBytes: number, limit: BodyLimit): Re
   }
   return rebuilt;
 };
-
-const plain = (status: number, message: string): Response =>
-  new Response(message, { status, headers: { "content-type": "text/plain" } });
 
 // ── Adapter ─────────────────────────────────────────────────────────────────
 
@@ -161,17 +136,17 @@ export const toWorkersHandler = <Env = Record<string, unknown>>(
   return {
     async fetch(request, env, ctx) {
       if (declaresOversizeBody(request, maxBodyBytes)) {
-        return plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large");
+        return payloadTooLarge();
       }
       const limit: BodyLimit = { exceeded: false };
       const limited = limitBody(request, maxBodyBytes, limit);
       bindingsByRequest.set(limited, { env, ctx });
       try {
         const response = await app.fetch(limited);
-        return limit.exceeded ? plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large") : response;
+        return limit.exceeded ? payloadTooLarge() : response;
       } catch {
         return limit.exceeded
-          ? plain(STATUS_PAYLOAD_TOO_LARGE, "Payload Too Large")
+          ? payloadTooLarge()
           : plain(STATUS_INTERNAL_SERVER_ERROR, "Internal Server Error");
       }
     },

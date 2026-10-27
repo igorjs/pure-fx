@@ -24,7 +24,6 @@ const NoteInput = Schema.object({
 /** Turn argv into the raw object the schema validates. */
 const parseArgs = argv => {
   const [command, title, ...rest] = argv;
-  if (command !== "add") return { command, title: undefined };
   const flag = rest.indexOf("--tag");
   return { command, title, tag: flag === -1 ? undefined : rest[flag + 1] };
 };

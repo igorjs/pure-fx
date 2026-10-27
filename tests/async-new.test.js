@@ -1777,6 +1777,40 @@ describe("Stream.merge", () => {
     expect(values.includes(20)).toBe(true);
   });
 
+  it("bounds how far sources are read ahead of a slow consumer", async () => {
+    // Arrange
+    const SOURCE_LENGTH = 1000;
+    const SOURCES = 2;
+    const SETTLE_MS = 20;
+    // One buffered value per source plus one refill per consumed value.
+    const MAX_READ_AHEAD = SOURCES * 2;
+    const reads = [0, 0];
+    const counting = idx =>
+      Stream(() => ({
+        [Symbol.asyncIterator]() {
+          return {
+            async next() {
+              if (reads[idx] >= SOURCE_LENGTH) return { value: undefined, done: true };
+              reads[idx]++;
+              return { value: Ok(reads[idx]), done: false };
+            },
+            async return() {
+              return { value: undefined, done: true };
+            },
+          };
+        },
+      }));
+    const iter = Stream.merge(counting(0), counting(1)).run()[Symbol.asyncIterator]();
+    // Act
+    await iter.next();
+    await iter.next();
+    await new Promise(resolve => setTimeout(resolve, SETTLE_MS));
+    const readsAfterTwo = reads[0] + reads[1];
+    await iter.return();
+    // Assert
+    expect(readsAfterTwo).toBeLessThanOrEqual(MAX_READ_AHEAD);
+  });
+
   it("handles zero streams (no arguments)", async () => {
     const result = await Stream.merge().collect().run();
     expect(result.isOk).toBe(true);
@@ -3083,11 +3117,64 @@ describe("Task combinators with throwing callbacks", () => {
   }
 });
 
+describe("Task never-throws edge cases", () => {
+  it("timeout: resolves to Err when onTimeout throws", async () => {
+    // Arrange
+    const boom = new Error("onTimeout-throw");
+    const slow = Task(() => new Promise(resolve => setTimeout(() => resolve(Ok(1)), 200)));
+    const task = slow.timeout(5, () => {
+      throw boom;
+    });
+    // Act
+    let rejected = false;
+    let result;
+    try {
+      result = await task.run();
+    } catch {
+      rejected = true;
+    }
+    // Assert
+    expect(rejected).toBe(false);
+    expect(result.isErr).toBe(true);
+    expect(result.error).toBe(boom);
+  });
+
+  it("Task(run): resolves to Err when the run thunk throws synchronously", async () => {
+    // Arrange
+    const boom = new Error("run-throw");
+    const task = Task(() => {
+      throw boom;
+    });
+    // Act
+    let rejected = false;
+    let result;
+    try {
+      result = await task.run();
+    } catch {
+      rejected = true;
+    }
+    // Assert
+    expect(rejected).toBe(false);
+    expect(result.isErr).toBe(true);
+    expect(result.error).toBe(boom);
+  });
+});
+
 describe("StateMachine inherited event names", () => {
   const m = StateMachine({
     initial: "idle",
     states: { idle: {}, loading: {} },
     transitions: { idle: { FETCH: "loading" }, loading: {} },
+  });
+
+  it("send: rejects an inherited state name with an inherited event", () => {
+    // Arrange
+    const state = "constructor";
+    // Act
+    const result = m.send(state, undefined, "name");
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(m.canTransition(state, "name")).toBe(false);
   });
 
   for (const event of ["__proto__", "constructor", "toString"]) {
@@ -3122,8 +3209,6 @@ describe("Stream.groupBy prototype keys", () => {
     const groups = result.unwrap();
     expect(Object.getOwnPropertyDescriptor(groups, "__proto__").value).toEqual(["a", "c"]);
     expect(Object.getOwnPropertyDescriptor(groups, "constructor").value).toEqual(["b"]);
-    expect(Object.getPrototypeOf(Object.prototype)).toBe(null);
-    expect({}.a).toBe(undefined);
-    expect({}.length).toBe(undefined);
+    expect(Object.getPrototypeOf(groups)).toBe(null);
   });
 });

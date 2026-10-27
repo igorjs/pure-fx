@@ -17,6 +17,7 @@ import {
   computeNextVersion,
   groupChangelog,
   insertChangelogSection,
+  isNewerParts,
   latestSemverTag,
   renderChangelogSection,
 } from "./release-lib.mjs";
@@ -26,11 +27,7 @@ const NO_CHANGES = "No user-facing changes";
 const API_ROOT = "https://api.github.com";
 
 const parts = (version) => version.split(".").map(Number);
-const isGreater = (a, b) => {
-  const [x, y] = [parts(a), parts(b)];
-  const i = x.findIndex((n, k) => n !== y[k]);
-  return i !== -1 && x[i] > y[i];
-};
+const isGreater = (a, b) => isNewerParts(parts(a), parts(b));
 
 /** Thin wrapper over the Git Data API: one method per operation. */
 export function createGitHubApi({ token, repository, fetch }) {

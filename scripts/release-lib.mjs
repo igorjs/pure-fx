@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Pure release helpers shared by the local flow (release.mjs) and the CI flow
- * (release-ci.mjs): commit parsing, bump rules, changelog rendering.
+ * Release helpers shared by the local flow (release.mjs) and the CI flow
+ * (release-ci.mjs): commit parsing, bump rules, changelog rendering, and the git reads they need.
  */
 
 import { execSync } from "node:child_process";
@@ -11,7 +11,7 @@ export const run = (cmd, opts) => {
   return result ? result.trim() : "";
 };
 
-// -- Pure functions (exported for tests) --------------------------------------
+// -- Helpers (exported for tests); readCommitsSince and reachableTags shell out to git --
 
 const CONVENTIONAL_SUBJECT = /^(\w+)(?:\(([^)]*)\))?(!)?:\s*(.+)$/;
 const BREAKING_FOOTER = /^BREAKING[ -]CHANGE:/m;
@@ -47,11 +47,8 @@ const CHANGELOG_HEADINGS = new Map([
   ["Performance", "Changed"],
 ]);
 
-/** Arguments for `git tag`; refuses to build an unsigned tag. */
-export function tagCommandFor(tag, signingKey) {
-  if (!signingKey) {
-    throw new Error("No git signing key is configured (user.signingkey); releases need a signed tag.");
-  }
+/** Arguments for a signed `git tag`; callers check a signing key is configured first. */
+export function tagCommandFor(tag) {
   return ["tag", "-s", tag, "-m", tag];
 }
 
@@ -172,15 +169,17 @@ export function reachableTags({ cwd } = {}) {
   return run("git tag --merged HEAD", { cwd }).split("\n").filter(Boolean);
 }
 
+/** True when the numeric version parts `a` are greater than `b` (equal is not greater). */
+export const isNewerParts = (a, b) => a.find((n, i) => n !== b[i]) > b.find((n, i) => n !== a[i]);
+
 /** Picks the highest plain `vMAJOR.MINOR.PATCH` tag, or null. */
 export function latestSemverTag(tags) {
   const parse = (tag) => /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag)?.slice(1).map(Number);
-  const isNewer = (a, b) => a.find((n, i) => n !== b[i]) > b.find((n, i) => n !== a[i]);
   let best = null;
   for (const tag of tags) {
     const parts = parse(tag);
     if (!parts) continue;
-    if (best === null || isNewer(parts, parse(best))) best = tag;
+    if (best === null || isNewerParts(parts, parse(best))) best = tag;
   }
   return best;
 }

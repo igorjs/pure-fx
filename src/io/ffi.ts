@@ -41,7 +41,7 @@
 
 import type { Result } from "../core/result.js";
 import { Err, Ok } from "../core/result.js";
-import { getRequire } from "../runtime/adapters/detect.js";
+import { getRequire, isRequireSettled } from "../runtime/adapters/detect.js";
 import { ErrType, type ErrTypeConstructor } from "../types/error.js";
 
 // ── Error type ──────────────────────────────────────────────────────────────
@@ -96,9 +96,13 @@ export interface FfiLibrary<S extends FfiSymbols> {
 
 // ── Runtime detection ───────────────────────────────────────────────────────
 
+const FFI_LOADING_MESSAGE = "FFI runtime is still loading. Retry the call shortly.";
+
 /** Load a runtime-only built-in (bun:ffi, node:ffi) synchronously, throwing where require is missing. */
 const loadBuiltin = (id: string): unknown => {
   const req = getRequire();
+  // Without process.getBuiltinModule, require resolves asynchronously, so the first call must be retried.
+  if (req === null && !isRequireSettled()) throw new Error(FFI_LOADING_MESSAGE);
   if (req === null) throw new Error(`No such built-in module: ${id}`);
   return req(id);
 };
@@ -334,6 +338,10 @@ export const FFI: {
     BUFFER: "buffer" as const,
   }),
 
+  /**
+   * Whether FFI can be used. Where process.getBuiltinModule is missing, a false
+   * result before the async require settles is not final: ask again later.
+   */
   isAvailable: (): boolean => {
     if (isBun()) return true;
     try {

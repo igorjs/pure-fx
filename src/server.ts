@@ -147,8 +147,18 @@ export interface ServerAdapter {
       readonly publicOrigin?: string | undefined;
       /** Called when writing a response fails after the handler returned. */
       readonly onError?: ((error: unknown, request: Request) => void) | undefined;
+      /** Called once the server accepts connections, with the address it bound. */
+      readonly onListen?: ((address: ListenAddress) => void) | undefined;
     },
   ) => Promise<void>;
+}
+
+/** The address a server is bound to, reported by `onListen`. */
+export interface ListenAddress {
+  /** Hostname or IP address the server is bound to. */
+  readonly hostname: string;
+  /** Port the server is bound to, the real one when `port` was 0. */
+  readonly port: number;
 }
 
 /** Options for starting the server with `.listen()`. */
@@ -165,7 +175,15 @@ export interface ListenOptions {
   readonly maxBodyBytes?: number | undefined;
   /** Origin used for `request.url`, for example `https://api.example.com`. The Host header is never trusted. */
   readonly publicOrigin?: string | undefined;
+  /** Called once the server accepts connections, with the bound address. Useful with port 0. */
+  readonly onListen?: ((address: ListenAddress) => void) | undefined;
 }
+
+/** Options for `.serve()`: the listen options without the Program-only teardown, plus a signal. */
+export type ServeOptions = Omit<ListenOptions, "teardownTimeoutMs"> & {
+  /** Aborting this signal shuts the server down. */
+  readonly signal: AbortSignal;
+};
 
 /** A single route definition stored in the builder. */
 export interface RouteDefinition<P extends string = string> {
@@ -545,17 +563,7 @@ export interface ServerBuilder<Ctx extends Record<string, unknown> = Record<stri
    * ])).run();
    * ```
    */
-  serve(
-    options: {
-      readonly port: number;
-      readonly hostname?: string;
-      readonly signal: AbortSignal;
-      readonly drainTimeoutMs?: number;
-      readonly maxBodyBytes?: number;
-      readonly publicOrigin?: string;
-    },
-    adapter?: ServerAdapter,
-  ): Task<void, ServerError>;
+  serve(options: ServeOptions, adapter?: ServerAdapter): Task<void, ServerError>;
 
   /** Start listening, returning a Program for lifecycle management. */
   listen(options: ListenOptions, adapter?: ServerAdapter): Program<void, ServerError>;
@@ -830,29 +838,14 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
       return state.errorHandler(result.unwrapErr(), request);
     },
 
-    serve(
-      serveOpts: {
-        readonly port: number;
-        readonly hostname?: string;
-        readonly signal: AbortSignal;
-        readonly drainTimeoutMs?: number;
-        readonly maxBodyBytes?: number;
-        readonly publicOrigin?: string;
-      },
-      adapter?: ServerAdapter,
-    ): Task<void, ServerError> {
+    serve(serveOpts: ServeOptions, adapter?: ServerAdapter): Task<void, ServerError> {
       const fetchHandler = builder.fetch;
       const resolvedAdapter = resolveAdapter(adapter);
 
       return Task<void, ServerError>(async () => {
         try {
           await resolvedAdapter.serve(fetchHandler, {
-            port: serveOpts.port,
-            hostname: serveOpts.hostname,
-            signal: serveOpts.signal,
-            drainTimeoutMs: serveOpts.drainTimeoutMs,
-            maxBodyBytes: serveOpts.maxBodyBytes,
-            publicOrigin: serveOpts.publicOrigin,
+            ...serveOpts,
             onError: (thrown: unknown, request: Request): void => {
               const message = thrown instanceof Error ? thrown.message : String(thrown);
               state.errorHandler(HandlerError(message), request);
@@ -878,26 +871,8 @@ const createBuilder = <Ctx extends Record<string, unknown>>(
       return Program(
         state.serverName,
         (signal: AbortSignal) => {
-          const serveOpts: {
-            readonly port: number;
-            readonly hostname?: string;
-            readonly signal: AbortSignal;
-            readonly drainTimeoutMs?: number;
-            readonly maxBodyBytes?: number;
-            readonly publicOrigin?: string;
-          } = { port: options.port, signal };
-          if (options.hostname !== undefined) {
-            (serveOpts as { hostname: string }).hostname = options.hostname;
-          }
-          if (options.drainTimeoutMs !== undefined) {
-            (serveOpts as { drainTimeoutMs: number }).drainTimeoutMs = options.drainTimeoutMs;
-          }
-          if (options.maxBodyBytes !== undefined) {
-            (serveOpts as { maxBodyBytes: number }).maxBodyBytes = options.maxBodyBytes;
-          }
-          if (options.publicOrigin !== undefined) {
-            (serveOpts as { publicOrigin: string }).publicOrigin = options.publicOrigin;
-          }
+          const { teardownTimeoutMs: _teardown, ...listenOpts } = options;
+          const serveOpts: ServeOptions = { ...listenOpts, signal };
           return builder.serve(serveOpts, adapter);
         },
         programOptions,
