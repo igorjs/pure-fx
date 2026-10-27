@@ -6,7 +6,7 @@ The maintainer owns the GitHub and registry settings listed here. Nothing in the
 
 Repository scope.
 
-- `BOT_APP_CLIENT_ID`: client id of the bot GitHub App. Read by `.github/workflows/auto-update-pr.yml` (the check step and `actions/create-github-app-token`), and by the release workflows once they land.
+- `BOT_APP_CLIENT_ID`: client id of the bot GitHub App. Read by `.github/workflows/auto-update-pr.yml` (the check step and `actions/create-github-app-token`), and by `.github/workflows/rolling-release.yml` (the App token for the rolling release), and by `.github/workflows/release.yml` (job `publish-gh`, the App token that publishes the release).
 - `BOT_APP_PRIVATE_KEY`: private key of the same App. Same consumers.
 - `BOT_APP_ID`: present today and read by no workflow, because the App token action takes the client id.
 
@@ -26,6 +26,8 @@ A workflow run triggered by Dependabot sees only the Dependabot secret scope. `.
 | `release` | none | tag `v*` | `.github/workflows/release.yml`, job `publish-gh` |
 | `npm-publish` | `igorjs` | tag `v*` | `.github/workflows/publish.yml`, job `publish-npm` |
 | `jsr-publish` | `igorjs` | tag `v*` | `.github/workflows/publish.yml`, job `publish-jsr` |
+
+The `release` environment reads `BOT_APP_CLIENT_ID` and `BOT_APP_PRIVATE_KEY` (repository secrets are visible there) so `publish-gh` can mint the App token. Release flow: a signed tag push runs `release.yml`, which verifies the tag, builds, creates a draft release with provenance, then publishes it with the App token, and that publish event starts `publish.yml`.
 
 The environment URL shown on the release page comes from the `detect` job outputs in `publish.yml`.
 

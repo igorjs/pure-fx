@@ -14,7 +14,6 @@
 
 import {
   CHANGELOG_HEADER,
-  assertAllowedChanges,
   computeNextVersion,
   groupChangelog,
   insertChangelogSection,
@@ -54,6 +53,7 @@ export function createGitHubApi({ token, repository, fetch }) {
   };
   return {
     getRef: (ref) => request("GET", `/git/ref/${ref}`),
+    getTag: (sha) => request("GET", `/git/tags/${sha}`),
     getCommit: (sha) => request("GET", `/git/commits/${sha}`),
     createBlob: (content) => request("POST", "/git/blobs", { content, encoding: "utf-8" }),
     createTree: (body) => request("POST", "/git/trees", body),
@@ -94,13 +94,17 @@ const buildChanges = async ({ fs, version, section, link }) => {
   } catch {
     changelog = CHANGELOG_HEADER;
   }
-  const changes = {
+  if (changelog.includes(`## [${version}]`)) {
+    throw new Error(
+      `CHANGELOG.md already has a section for ${version} but tag v${version} is missing and HEAD is not its release commit. Tag the existing release commit by hand.`,
+    );
+  }
+  // Only these three paths ever reach the tree, which is the release allowlist.
+  return {
     "package.json": withVersion(await fs.readFile("package.json"), version),
     "jsr.json": withVersion(await fs.readFile("jsr.json"), version),
     "CHANGELOG.md": insertChangelogSection(changelog, section, version, link),
   };
-  assertAllowedChanges(Object.keys(changes));
-  return changes;
 };
 
 const createReleaseCommit = async ({ api, head, headCommit, changes, message }) => {

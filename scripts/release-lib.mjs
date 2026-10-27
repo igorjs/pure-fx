@@ -47,6 +47,14 @@ const CHANGELOG_HEADINGS = new Map([
   ["Performance", "Changed"],
 ]);
 
+/** Arguments for `git tag`; refuses to build an unsigned tag. */
+export function tagCommandFor(tag, signingKey) {
+  if (!signingKey) {
+    throw new Error("No git signing key is configured (user.signingkey); releases need a signed tag.");
+  }
+  return ["tag", "-s", tag, "-m", tag];
+}
+
 /** The only files a release commit may change. */
 export const ALLOWED_RELEASE_FILES = ["package.json", "jsr.json", "CHANGELOG.md"];
 
@@ -157,6 +165,11 @@ export function groupChangelog(commits) {
   const known = new Set(NOTE_CATEGORIES.map((cat) => cat.type));
   add(OTHER_LABEL, rest.filter((c) => !known.has(c.type)));
   return sections;
+}
+
+/** Lists the tags reachable from HEAD, so a tag on an unmerged branch is never the base. */
+export function reachableTags({ cwd } = {}) {
+  return run("git tag --merged HEAD", { cwd }).split("\n").filter(Boolean);
 }
 
 /** Picks the highest plain `vMAJOR.MINOR.PATCH` tag, or null. */

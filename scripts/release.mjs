@@ -35,9 +35,11 @@ import {
   describeCommit,
   groupChangelog,
   insertChangelogSection,
+  reachableTags,
   readCommitsSince,
   renderChangelogSection,
   run,
+  tagCommandFor,
 } from "./release-lib.mjs";
 import { createGitHubApi, runCiRelease } from "./release-ci.mjs";
 
@@ -73,7 +75,7 @@ if (args.includes("--ci")) {
     api: createGitHubApi({ token, repository, fetch }),
     git: {
       status: () => git(["status", "--porcelain"]),
-      tags: () => git(["tag", "--list"]).split("\n").filter(Boolean),
+      tags: () => reachableTags(),
       logSince: (tag) => readCommitsSince(tag),
     },
     fs: { readFile: (path) => readFileSync(path, "utf8") },
@@ -109,6 +111,12 @@ const runMut = (cmd, opts) => {
 };
 
 // -- Pre-flight checks --------------------------------------------------------
+
+// Fail before any write: every tag must be signed.
+const signingKey = run("git config user.signingkey || true");
+if (!signingKey) {
+  die("No git signing key is configured (user.signingkey). Releases need a signed tag.");
+}
 
 const status = run("git status --porcelain");
 if (status.length > 0) {
@@ -429,14 +437,12 @@ runMut("git add package.json jsr.json README.md SECURITY.md CHANGELOG.md");
 // Read staged status from real working tree (read-only); in dry-run we skip
 // the add above so this returns "" and the commit-step also short-circuits.
 const stagedChanges = dryRun ? "" : run("git diff --staged --name-only");
-const canSign = !!run("git config user.signingkey || true");
-const signFlag = canSign ? "--gpg-sign" : "";
 
 if (stagedChanges.length > 0 || dryRun) {
   log("Committing release-note changes...");
   const commitMsg = `chore: bump to ${newVersion}\n\n${changelog}`;
   writeMut(".git/.release-msg.tmp", commitMsg);
-  runMut(`git commit --signoff ${signFlag} --file .git/.release-msg.tmp`);
+  runMut(`git commit --signoff --gpg-sign --file .git/.release-msg.tmp`);
   runMut("rm -f .git/.release-msg.tmp");
 } else {
   log("No file changes to commit — tagging current HEAD directly.");
@@ -444,7 +450,12 @@ if (stagedChanges.length > 0 || dryRun) {
 
 if (!localTagExists) {
   log("Tagging...");
-  runMut(canSign ? `git tag -s ${newTag} -m "${newTag}"` : `git tag ${newTag} -m "${newTag}"`);
+  const [, ...tagArgs] = tagCommandFor(newTag, signingKey);
+  if (dryRun) {
+    log(`[dry-run] WOULD run \`git tag ${tagArgs.join(" ")}\``);
+  } else {
+    execFileSync("git", ["tag", ...tagArgs]);
+  }
 } else {
   log(`Skipping tag creation — ${newTag} already exists locally.`);
 }
