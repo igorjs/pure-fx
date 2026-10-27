@@ -43,8 +43,7 @@
     // Internal imports use @/<subpath> instead of ../../<subpath>. The TS
     // compiler resolves them via these paths; tsx resolves them at dev/test
     // runtime; tsc-alias rewrites them in the published dist so consumers
-    // see plain relative paths. Bun reads tsconfig paths natively; Deno
-    // reads its own deno.json import map.
+    // see plain relative paths. Bun reads tsconfig paths natively.
     //
     // Note: modern TS (5.4+, including tsgo) treats `paths` values as
     // relative to this tsconfig - no baseUrl needed, and entries must start

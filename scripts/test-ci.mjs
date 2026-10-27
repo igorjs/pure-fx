@@ -2,8 +2,8 @@
 /**
  * test-ci.mjs - Run the full CI test matrix locally.
  *
- * 1. Native tests: Node 22/23/24/26 (via fnm) + Deno + Bun
- * 2. Docker containers: 4 distros x 3 runtimes (11 containers, parallel)
+ * 1. Native tests: Node 22/23/24/26 (via fnm) + Bun
+ * 2. Docker containers: Node, Bun, browser and Workers images (parallel)
  *
  * Output is quiet locally, verbose in CI or with --verbose.
  *
@@ -90,8 +90,8 @@ if (runNative) {
     }
   }
 
-  // Run Deno, Bun, browser, workers once
-  for (const runtime of ["deno", "bun", "browser", "workers"]) {
+  // Run Bun, browser, workers once
+  for (const runtime of ["bun", "browser", "workers"]) {
     try {
       execSync(`node scripts/test-matrix.mjs --no-summary --runtime ${runtime}`, { stdio: "inherit" });
     } catch {
@@ -108,7 +108,7 @@ if (runDocker) {
   } else {
     log("\n── Docker ──");
 
-    // Ensure dist/ exists for Deno containers (they COPY it from build context)
+    // Ensure dist/ exists for containers (they COPY it from build context)
     try {
       const { statSync } = await import("node:fs");
       statSync("./dist/index.js");

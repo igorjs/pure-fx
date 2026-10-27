@@ -36,7 +36,6 @@
 <!-- How was this tested? Which runtimes? -->
 
 - [ ] Node.js
-- [ ] Deno
 - [ ] Bun
 - [ ] Integration tests pass
 

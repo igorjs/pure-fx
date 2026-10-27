@@ -32,11 +32,11 @@
  *
  * @example CLI tool using execute()
  * ```ts
- * const app = Program('my-cli', (signal) => cli(Deno.args));
+ * const app = Program('my-cli', (signal) => cli(process.argv.slice(2)));
  * const result = await app.execute();
  * result.match({
- *   Ok: (exitCode) => Deno.exit(exitCode),
- *   Err: (msg) => { console.error(`fatal: ${msg}`); Deno.exit(1); },
+ *   Ok: (exitCode) => process.exit(exitCode),
+ *   Err: (msg) => { console.error(`fatal: ${msg}`); process.exit(1); },
  * });
  * ```
  *

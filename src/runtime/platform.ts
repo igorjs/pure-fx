@@ -7,9 +7,9 @@
  *
  * **Why detect at runtime instead of importing node:os?**
  * Importing `node:os` or `node:path` binds the module to Node.js. This
- * module detects the platform from `globalThis.process.platform` (Node/Bun)
- * or `globalThis.Deno.build.os` (Deno), falling back to POSIX defaults
- * for unknown runtimes (browsers, Cloudflare Workers). All access is
+ * module detects the platform from `globalThis.process.platform` (Node/Bun),
+ * falling back to POSIX defaults for unknown runtimes (browsers,
+ * Cloudflare Workers). All access is
  * structural: no `node:` imports, no type declarations.
  */
 
@@ -20,15 +20,12 @@ export type PlatformId = "windows" | "posix";
 
 /**
  * Detect the current platform from available globals.
- * Checks Node/Bun first (process.platform), then Deno (Deno.build.os),
+ * Checks Node/Bun (process.platform),
  * defaults to POSIX for browsers and edge runtimes.
  */
 const detectPlatform = (): PlatformId => {
   const proc = (globalThis as unknown as { process?: { platform?: string } }).process;
   if (proc?.platform === "win32") return "windows";
-
-  const deno = (globalThis as unknown as { Deno?: { build?: { os?: string } } }).Deno;
-  if (deno?.build?.os === "windows") return "windows";
 
   return "posix";
 };
@@ -207,8 +204,7 @@ export const Path: {
     // If still relative, prepend cwd from the runtime
     if (!Path.isAbsolute(resolved)) {
       const proc = (globalThis as unknown as { process?: { cwd(): string } }).process;
-      const deno = (globalThis as unknown as { Deno?: { cwd(): string } }).Deno;
-      const cwd = proc?.cwd?.() ?? deno?.cwd?.() ?? "/";
+      const cwd = proc?.cwd?.() ?? "/";
       resolved = `${cwd}/${resolved}`;
     }
 

@@ -19,20 +19,6 @@ services:
   node-distroless:
     build: { context: ., dockerfile: docker/distroless.Dockerfile }
 
-  # ── Deno (official: denoland/deno:VARIANT) ──────────────────────────────
-  deno-debian:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: debian } }
-    entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
-  deno-alpine:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: alpine } }
-    entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
-  deno-ubuntu:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: ubuntu } }
-    entrypoint: ["sh", "-c", "deno run --allow-all tests/smoke-platform.mjs && deno run --allow-all tests/smoke-core.mjs"]
-  deno-distroless:
-    build: { context: ., dockerfile: docker/deno.Dockerfile, args: { VARIANT: distroless } }
-    entrypoint: ["deno", "run", "--allow-all", "tests/smoke-core.mjs"]
-
   # ── Bun (official: oven/bun:VARIANT) ────────────────────────────────────
   bun-debian:
     build: { context: ., dockerfile: docker/bun.Dockerfile, args: { VARIANT: debian } }

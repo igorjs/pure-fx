@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * remaining.test.js - Tests for the 7 previously untested modules:
- * Dns, Net, nodeAdapter, bunAdapter, denoAdapter, lambdaAdapter, nominal Type.
+ * Dns, Net, nodeAdapter, bunAdapter, lambdaAdapter, nominal Type.
  *
  * Uses @igorjs/pure-test.
  * Tests the compiled dist/ output (black-box).
@@ -159,11 +159,6 @@ describe("Runtime Adapters", () => {
     expect(typeof bunAdapter.serve).toBe("function");
   });
 
-  it("denoAdapter has serve method", async () => {
-    const { denoAdapter } = await import("../dist/runtime/adapter/deno.js");
-    expect(typeof denoAdapter.serve).toBe("function");
-  });
-
   it("lambdaAdapter exports toLambdaHandler", async () => {
     const { toLambdaHandler } = await import("../dist/runtime/adapter/lambda.js");
     expect(typeof toLambdaHandler).toBe("function");
@@ -191,28 +186,6 @@ describe("bunAdapter (no Bun runtime)", () => {
       });
     } catch (err) {
       expect(err.message).toMatch(/Bun/);
-      threw = true;
-    }
-    expect(threw).toBe(true);
-  });
-});
-
-// =============================================================================
-// 5. denoAdapter - throws when Deno is not available
-// =============================================================================
-
-describe("denoAdapter (no Deno runtime)", () => {
-  it("throws when Deno.serve is not available", async () => {
-    const { denoAdapter } = await import("../dist/runtime/adapter/deno.js");
-    const ac = new AbortController();
-    let threw = false;
-    try {
-      await denoAdapter.serve(async () => new Response(""), {
-        port: 0,
-        signal: ac.signal,
-      });
-    } catch (err) {
-      expect(err.message).toMatch(/Deno/);
       threw = true;
     }
     expect(threw).toBe(true);

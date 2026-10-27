@@ -8,7 +8,6 @@
  *
  * Run:
  *   node tests/smoke-core.mjs
- *   deno run --allow-all tests/smoke-core.mjs
  *   bun tests/smoke-core.mjs
  */
 
@@ -917,8 +916,8 @@ export async function runSmokeCore(lib) {
   return { passed, failed, logs };
 }
 
-// Self-execute when run directly (Node/Deno/Bun)
-if (typeof process !== "undefined" || typeof Deno !== "undefined") {
+// Self-execute when run directly (Node/Bun)
+if (typeof process !== "undefined") {
   const lib = await import("../dist/index.js");
   const { passed, failed, logs } = await runSmokeCore(lib);
   for (const line of logs) {

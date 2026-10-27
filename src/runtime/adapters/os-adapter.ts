@@ -3,10 +3,10 @@
 /**
  * @module runtime/adapters/os-adapter
  *
- * OS information adapter implementations for Deno and Node/Bun.
+ * OS information adapter implementations for Node/Bun.
  */
 
-import { getDeno, getNodeProcess, requireNode, requireReady } from "./detect.js";
+import { getNodeProcess, requireNode, requireReady } from "./detect.js";
 import type { NetworkInterface, OsInfo } from "./types.js";
 
 // Ensure requireNode is initialised before adapters run
@@ -42,106 +42,6 @@ interface NavigatorGlobal {
 
 const getNavigator = (): NavigatorGlobal | undefined =>
   (globalThis as unknown as { navigator?: NavigatorGlobal }).navigator;
-
-// ── Deno adapter ────────────────────────────────────────────────────────────
-
-const createDenoOsInfo = (): OsInfo | undefined => {
-  const deno = getDeno();
-  if (deno === undefined) return undefined;
-
-  const nav = getNavigator();
-
-  return {
-    hostname: () => {
-      try {
-        return deno.hostname();
-      } catch {
-        return undefined;
-      }
-    },
-    arch: () => deno.build.arch,
-    platform: () => deno.build.os,
-    cpuCount: () => nav?.hardwareConcurrency,
-    totalMemory: () => {
-      try {
-        return deno.systemMemoryInfo().total;
-      } catch {
-        return undefined;
-      }
-    },
-    freeMemory: () => {
-      try {
-        return deno.systemMemoryInfo().free;
-      } catch {
-        return undefined;
-      }
-    },
-    tmpDir: () => {
-      try {
-        const denoEnv = (deno as unknown as { env?: { get?(key: string): string | undefined } })
-          .env;
-        return denoEnv?.get?.("TMPDIR") ?? denoEnv?.get?.("TMP") ?? "/tmp";
-      } catch {
-        return "/tmp";
-      }
-    },
-    homeDir: () => {
-      try {
-        const denoEnv = (deno as unknown as { env?: { get?(key: string): string | undefined } })
-          .env;
-        return denoEnv?.get?.("HOME") ?? denoEnv?.get?.("USERPROFILE");
-      } catch {
-        return undefined;
-      }
-    },
-    uptime: () => {
-      try {
-        return deno.osUptime?.();
-      } catch {
-        return undefined;
-      }
-    },
-    ...(deno.osRelease
-      ? {
-          osRelease: (): string | undefined => {
-            try {
-              return deno.osRelease!();
-            } catch {
-              return undefined;
-            }
-          },
-        }
-      : {}),
-    ...(deno.loadavg
-      ? {
-          loadavg: (): readonly [number, number, number] | undefined => {
-            try {
-              return deno.loadavg!();
-            } catch {
-              return undefined;
-            }
-          },
-        }
-      : {}),
-    ...(deno.networkInterfaces
-      ? {
-          networkInterfaces: (): readonly NetworkInterface[] => {
-            try {
-              return deno.networkInterfaces!().map(iface => ({
-                name: iface.name,
-                address: iface.address,
-                family: iface.family,
-                mac: iface.mac,
-                internal: iface.address === "127.0.0.1" || iface.address === "::1",
-              }));
-            } catch {
-              return [];
-            }
-          },
-        }
-      : {}),
-  };
-};
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 
@@ -286,5 +186,4 @@ const createFallbackOsInfo = (): OsInfo | undefined => {
 // ── Resolve ─────────────────────────────────────────────────────────────────
 
 /** Resolve the OS info adapter for the current runtime. */
-export const resolveOsInfo = (): OsInfo | undefined =>
-  createDenoOsInfo() ?? createNodeOsInfo() ?? createFallbackOsInfo();
+export const resolveOsInfo = (): OsInfo | undefined => createNodeOsInfo() ?? createFallbackOsInfo();

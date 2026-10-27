@@ -7,11 +7,10 @@
  *
  * **Why wrap os info instead of importing node:os?**
  * Importing `node:os` binds the module to Node.js. This module uses the
- * OsInfo adapter from runtime/adapters which normalises Deno and Node/Bun
+ * OsInfo adapter from runtime/adapters which normalises Node/Bun
  * OS APIs behind a single interface.
  *
  * **Troubleshooting:**
- * - `hostname()` returns `None` on Deno without `--allow-sys`.
  * - `loadavg()` returns `None` on Windows (not supported by the OS).
  * - `networkInterfaces()` returns `[]` if the runtime can't access
  *   network info (permissions or environment restrictions).

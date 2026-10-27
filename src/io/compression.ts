@@ -9,17 +9,14 @@
  * The web standard Compression Streams API is async and stream-based,
  * requiring boilerplate to collect the output into a single Uint8Array.
  * These wrappers handle the piping and collection, returning Task for
- * lazy, composable async operations. Available in Node 22.15+, Deno 1.38+,
+ * lazy, composable async operations. Available in Node 22.15+
  * and Bun with no imports required.
  *
  * **Implementation note:** Uses `Blob.stream().pipeThrough()` to pipe data
  * through the transform stream. This is the web standard approach and handles
- * backpressure correctly across all runtimes. Earlier versions used manual
- * writer/reader coordination which deadlocked on Deno.
+ * backpressure correctly across all runtimes.
  *
  * **Troubleshooting:**
- * - If compression hangs, ensure Deno >= 1.38 (older versions have buggy
- *   CompressionStream).
  * - Workers/Browser: CompressionStream may not be available in all
  *   environments. Operations return `Err(CompressionError(...))` if missing.
  */
@@ -82,7 +79,7 @@ const getDecompressionStream = (): DecompressionStreamConstructor =>
  * Pipe data through a transform stream and collect the output.
  *
  * Uses the web standard Blob.stream().pipeThrough() pattern which
- * handles backpressure correctly across all runtimes (Node, Deno, Bun).
+ * handles backpressure correctly across all runtimes (Node, Bun).
  */
 const pipeThrough = async (
   data: Uint8Array,
@@ -145,7 +142,7 @@ const decompressWithFormat = (
  * Type-safe compression and decompression using web standard streams.
  *
  * Uses CompressionStream and DecompressionStream available in
- * Node 22.15+, Deno, and Bun.
+ * Node 22.15+ and Bun.
  *
  * @example
  * ```ts

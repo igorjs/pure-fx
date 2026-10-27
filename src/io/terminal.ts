@@ -7,8 +7,8 @@
  *
  * **Why wrap stdin/readline?**
  * Each runtime handles stdin differently. This module uses the Stdin
- * and Stdout adapters from runtime/adapters which normalise Deno and
- * Node/Bun APIs behind a single interface.
+ * and Stdout adapters from runtime/adapters which normalise Node
+ * and Bun APIs behind a single interface.
  *
  * **Edge cases handled:**
  * - TTY vs piped stdin (isInteractive detection)

@@ -87,7 +87,7 @@ export const Config: {
   readonly from: <T extends ConfigShape>(
     shape: T,
   ) => {
-    /** Load config from the runtime environment (process.env or Deno.env). */
+    /** Load config from the runtime environment (process.env). */
     readonly load: () => Result<InferConfig<T>, SchemaError>;
     /** Load config from a custom env record (useful for testing). */
     readonly loadFrom: (
@@ -106,19 +106,11 @@ export const Config: {
         ).process?.env;
         if (processEnv !== undefined) return loadConfig(shape, processEnv);
 
-        // Try Deno.env (Deno)
-        const denoEnv = (
-          globalThis as unknown as {
-            Deno?: { env?: { toObject?(): Record<string, string> } };
-          }
-        ).Deno?.env?.toObject?.();
-        if (denoEnv !== undefined) return loadConfig(shape, denoEnv);
-
         // No env available
         return Err({
           path: [],
           expected: "environment variables",
-          received: "unavailable (no process or Deno.env global)",
+          received: "unavailable (no process global)",
         });
       },
       loadFrom: (env: Record<string, string | undefined>): Result<InferConfig<T>, SchemaError> =>

@@ -3,10 +3,10 @@
 /**
  * @module runtime/adapters/net-adapter
  *
- * TCP client adapter implementations for Deno and Node/Bun.
+ * TCP client adapter implementations for Node/Bun.
  */
 
-import { getDeno, importNode } from "./detect.js";
+import { importNode } from "./detect.js";
 import type { TcpClient, TcpSocket } from "./types.js";
 
 // ── Node structural types ───────────────────────────────────────────────────
@@ -25,33 +25,6 @@ interface NodeNet {
 }
 
 const getNodeNet = importNode<NodeNet>("node:net");
-
-// ── Deno adapter ────────────────────────────────────────────────────────────
-
-const createDenoTcpClient = (): TcpClient | undefined => {
-  const deno = getDeno();
-  if (deno?.connect === undefined) return undefined;
-
-  return {
-    connect: async options => {
-      const conn = await deno.connect!({ hostname: options.host, port: options.port });
-      const socket: TcpSocket = {
-        send: async data => {
-          const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-          await conn.write(bytes);
-        },
-        receive: async () => {
-          const buf = new Uint8Array(4096);
-          const n = await conn.read(buf);
-          if (n === null) throw new Error("Connection closed");
-          return buf.subarray(0, n);
-        },
-        close: () => conn.close(),
-      };
-      return socket;
-    },
-  };
-};
 
 // ── Node/Bun adapter ────────────────────────────────────────────────────────
 
@@ -90,8 +63,4 @@ const createNodeTcpClient = async (): Promise<TcpClient | null> => {
 // ── Resolve ─────────────────────────────────────────────────────────────────
 
 /** Resolve the TCP client adapter for the current runtime. */
-export const resolveTcpClient = async (): Promise<TcpClient | null> => {
-  const deno = createDenoTcpClient();
-  if (deno !== undefined) return deno;
-  return createNodeTcpClient();
-};
+export const resolveTcpClient = (): Promise<TcpClient | null> => createNodeTcpClient();

@@ -8,7 +8,7 @@
  * **Why wrap DNS?**
  * DNS resolution is inherently platform-specific with no web standard
  * equivalent. This module uses the Dns adapter from runtime/adapters
- * which normalises Deno and Node/Bun DNS APIs behind a single interface.
+ * which normalises Node/Bun DNS APIs behind a single interface.
  */
 
 import { makeTask, type TaskLike } from "../async/task-like.js";

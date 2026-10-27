@@ -95,18 +95,6 @@ if (runtimeFilter && runtimeFilter !== "node") {
   skipTest("node", "not installed");
 }
 
-// -- Deno ---------------------------------------------------------------------
-
-if (runtimeFilter && runtimeFilter !== "deno") {
-  // skip
-} else if (hasCommand("deno")) {
-  const v = getVersion("deno");
-  runTest(`${v} / smoke-platform`, "deno", ["run", "--allow-all", "tests/smoke-platform.mjs"]);
-  runTest(`${v} / smoke-core`, "deno", ["run", "--allow-all", "tests/smoke-core.mjs"]);
-} else {
-  skipTest("deno", "not installed");
-}
-
 // -- Bun ----------------------------------------------------------------------
 
 if (runtimeFilter && runtimeFilter !== "bun") {

@@ -22,10 +22,10 @@ const app = Server('api')
   });
 
 // Start with runtime adapter
-await app.listen({ port: 3000 }, nodeAdapter);
+await app.listen({ port: 3000 }, nodeAdapter).run();
 ```
 
-Adapters: `nodeAdapter`, `denoAdapter`, `bunAdapter`, `lambdaAdapter`
+Adapters: `nodeAdapter`, `bunAdapter`. For AWS Lambda, use `toLambdaHandler` and `toLambdaStreamHandler` from `@igorjs/pure-fx/runtime/adapter/lambda`.
 
 ## Program
 
@@ -79,7 +79,7 @@ const AppConfig = Config.from({
   DEBUG: Schema.boolean.default(false),
 });
 
-// Load from process.env / Deno.env (auto-detected)
+// Load from process.env (auto-detected)
 const config = AppConfig.load();
 // Result<{ PORT: number, DATABASE_URL: string, DEBUG: boolean }, SchemaError>
 
@@ -92,13 +92,13 @@ const testConfig = AppConfig.loadFrom({
 
 ## Platform
 
-Runtime platform detection and OS-aware constants. Works everywhere (Node, Deno, Bun, browsers, edge runtimes) without importing `node:os` or `node:path`.
+Runtime platform detection and OS-aware constants. Works everywhere (Node, Bun, browsers, edge runtimes) without importing `node:os` or `node:path`.
 
 ```ts
 import { Platform } from '@igorjs/pure-fx'
 
 Platform.isWindows; // true on Windows, false elsewhere
-Platform.isPosix;   // true on macOS/Linux/Deno/browsers
+Platform.isPosix;   // true on macOS/Linux/browsers
 ```
 
 ## Os / Process / Path
@@ -137,16 +137,16 @@ Cross-runtime modules (File, Command, Terminal, Os, Process, Dns, Net) are backe
 ```
 Public module          Adapter interface       Implementations
 ─────────────          ─────────────────       ───────────────
-File                   Fs                      Deno, Node/Bun
-Command                Subprocess              Deno, Bun, Node
-Terminal               Stdin / Stdout          Deno, Node/Bun
-Os                     OsInfo                  Deno, Node/Bun
-Process                ProcessInfo             Deno, Node/Bun
-Dns                    Dns                     Deno, Node/Bun
-Net                    TcpClient               Deno, Node/Bun
+File                   Fs                      Node/Bun
+Command                Subprocess              Bun, Node
+Terminal               Stdin / Stdout          Node/Bun
+Os                     OsInfo                  Node/Bun
+Process                ProcessInfo             Node/Bun
+Dns                    Dns                     Node/Bun
+Net                    TcpClient               Node/Bun
 ```
 
-Each adapter has a `resolve*()` function that auto-detects the runtime via `globalThis` structural typing (no `node:` imports). Detection order: Deno first, then Node/Bun, returning `null` when neither is available. Public modules convert `null` into typed `Err` values so consumers never see raw failures.
+Each adapter has a `resolve*()` function that auto-detects the runtime via `globalThis` structural typing (no `node:` imports). Detection targets Node/Bun, returning `null` when neither is available. Public modules convert `null` into typed `Err` values so consumers never see raw failures.
 
 ---
 

@@ -75,14 +75,14 @@ The repository has git hooks that run automatically:
 - Follow existing patterns: public interfaces, private impl classes, const/type merge for namespaces
 - Use `Result` and `Option` instead of exceptions
 - Zero runtime dependencies. Always.
-- All new modules must work on Node, Deno, and Bun. Runtime-specific code goes in adapters.
+- All new modules must work on Node and Bun. Runtime-specific code goes in adapters.
 
 ### Tests
 
 - Unit tests use `node:test` and live in `tests/`
-- Integration tests are runtime-agnostic `.mjs` files that run on Node, Deno, Bun, Workers, and Browser
+- Integration tests are runtime-agnostic `.mjs` files that run on Node, Bun, Workers, and Browser
 - New features need both unit tests and integration test coverage
-- Run `node tests/integration-web.mjs` and `deno run --allow-all tests/integration-web.mjs` to verify cross-runtime compatibility
+- Run `node tests/smoke-all.mjs` and `bun tests/smoke-all.mjs` to verify cross-runtime compatibility
 
 ### Commits
 
@@ -90,7 +90,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
 feat(core): add Validation module
-fix(runtime): wire up Deno memoryUsage
+fix(runtime): wire up Bun memoryUsage
 docs: update FFI troubleshooting guide
 test: add HashMap integration tests
 ```
@@ -109,7 +109,7 @@ Always sign commits: `git commit --signoff --gpg-sign`
 ## Reporting Bugs
 
 Open a GitHub issue with:
-- Runtime and version (Node 24, Deno 2.7, etc.)
+- Runtime and version (Node 24, Bun 1.3, etc.)
 - Minimal reproduction code
 - Expected vs actual behavior
 - Error messages (full stack trace)

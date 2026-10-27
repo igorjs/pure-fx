@@ -5,11 +5,10 @@
  * Validates File, Command, Process, Os, Path, Platform, Eol, Logger, Config,
  * Terminal, Dns, and Net on every supported runtime.
  * Uses only console.log for output and throws on failure (no node:test,
- * no node:assert) so it runs identically on Node, Deno, Bun, and QuickJS.
+ * no node:assert) so it runs identically on Node, Bun, and QuickJS.
  *
  * Run:
  *   node tests/smoke-platform.mjs
- *   deno run --allow-all tests/smoke-platform.mjs
  *   bun tests/smoke-platform.mjs
  */
 
@@ -222,7 +221,7 @@ section("Process");
   assert(Array.isArray(argv), "argv returns an array");
 
   const mem = Process.memoryUsage();
-  // memoryUsage may return None on some runtimes (e.g. Deno)
+  // memoryUsage may return None on some runtimes (e.g. some edge runtimes)
   if (mem.isSome) {
     assert(mem.unwrap().heapUsed > 0, "memoryUsage.heapUsed > 0");
   } else {
@@ -408,7 +407,7 @@ section("FFI");
     `FFI.systemLib('c') (got: "${libcPath}")`,
   );
 
-  // Try to open libc and call getpid (Deno/Bun only, Node 24 will get Err)
+  // Try to open libc and call getpid (Bun only, Node 24 will get Err)
   const lib = FFI.open(libcPath, {
     getpid: { parameters: [], result: "i32" },
   });
