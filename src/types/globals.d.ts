@@ -219,3 +219,8 @@ declare class TextDecoder {
  */
 declare function atob(data: string): string;
 declare function btoa(data: string): string;
+
+/** The module URL, available in every ES module host. */
+interface ImportMeta {
+  readonly url: string;
+}

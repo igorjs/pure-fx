@@ -6,11 +6,8 @@
  * OS information adapter implementations for Node/Bun.
  */
 
-import { getNodeProcess, requireNode, requireReady } from "./detect.js";
+import { getNodeProcess, requireNode } from "./detect.js";
 import type { NetworkInterface, OsInfo } from "./types.js";
-
-// Ensure requireNode is initialised before adapters run
-await requireReady;
 
 // ── Node structural types ───────────────────────────────────────────────────
 

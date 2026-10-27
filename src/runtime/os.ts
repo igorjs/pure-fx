@@ -19,15 +19,30 @@
  */
 
 import { None, type Option, Some } from "../core/option.js";
+import { isRequireSettled } from "./adapters/detect.js";
 import { resolveOsInfo } from "./adapters/os-adapter.js";
+import type { OsInfo } from "./adapters/types.js";
 
 // ── Cached adapter ──────────────────────────────────────────────────────────
 
-const adapter = resolveOsInfo();
+let resolved = false;
+let resolvedAdapter: OsInfo | undefined;
 
-const tryOpt = <T>(fn: () => T | undefined): Option<T> => {
+/** Resolved on first use so importing this module never loads Node built-ins. */
+const getAdapter = (): OsInfo | undefined => {
+  if (!resolved) {
+    resolvedAdapter = resolveOsInfo();
+    // Runtimes without a synchronous require resolve it asynchronously; keep
+    // retrying until it settles instead of caching the fallback forever.
+    resolved = isRequireSettled();
+  }
+  return resolvedAdapter;
+};
+
+const tryOpt = <T>(fn: (adapter: OsInfo) => T | undefined): Option<T> => {
+  const adapter = getAdapter();
   if (adapter === undefined) return None;
-  const val = fn();
+  const val = fn(adapter);
   return val !== undefined ? Some(val) : None;
 };
 
@@ -70,16 +85,16 @@ export const Os: {
   /** Get network interface addresses. */
   readonly networkInterfaces: () => readonly import("./adapters/types.js").NetworkInterface[];
 } = {
-  hostname: () => tryOpt(() => adapter!.hostname()),
-  arch: () => adapter?.arch() ?? "unknown",
-  platform: () => adapter?.platform() ?? "unknown",
-  cpuCount: () => tryOpt(() => adapter!.cpuCount()),
-  totalMemory: () => tryOpt(() => adapter!.totalMemory()),
-  freeMemory: () => tryOpt(() => adapter!.freeMemory()),
-  tmpDir: () => adapter?.tmpDir() ?? "/tmp",
-  homeDir: () => tryOpt(() => adapter!.homeDir()),
-  uptime: () => tryOpt(() => adapter!.uptime()),
-  osRelease: () => tryOpt(() => adapter!.osRelease?.()),
-  loadavg: () => tryOpt(() => adapter!.loadavg?.()),
-  networkInterfaces: () => adapter?.networkInterfaces?.() ?? [],
+  hostname: () => tryOpt(a => a.hostname()),
+  arch: () => getAdapter()?.arch() ?? "unknown",
+  platform: () => getAdapter()?.platform() ?? "unknown",
+  cpuCount: () => tryOpt(a => a.cpuCount()),
+  totalMemory: () => tryOpt(a => a.totalMemory()),
+  freeMemory: () => tryOpt(a => a.freeMemory()),
+  tmpDir: () => getAdapter()?.tmpDir() ?? "/tmp",
+  homeDir: () => tryOpt(a => a.homeDir()),
+  uptime: () => tryOpt(a => a.uptime()),
+  osRelease: () => tryOpt(a => a.osRelease?.()),
+  loadavg: () => tryOpt(a => a.loadavg?.()),
+  networkInterfaces: () => getAdapter()?.networkInterfaces?.() ?? [],
 };
