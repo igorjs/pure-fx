@@ -275,7 +275,7 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Publish to JSR
-        run: npx jsr publish
+        run: npx jsr publish --provenance
 
   # ── Post-release smoke test of the published package ───────────────
   # Waits for the version to appear on npm, installs it into a fresh

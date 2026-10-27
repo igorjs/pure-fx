@@ -20,7 +20,7 @@ import { IMMUTABLE, type Immutable } from "../../data/immutable.js";
 import { Schema, type SchemaType } from "../../data/schema.js";
 import { Duration } from "../duration.js";
 import type { Type } from "../nominal.js";
-import { TypeDef } from "../type-def.js";
+import { TypeDef, type TypeDefClass } from "../type-def.js";
 
 const NS_PER_MS = 1_000_000n;
 
@@ -210,6 +210,9 @@ const dateTimeSchema: SchemaType<DateTimeValue> = Schema.union(
 /** Branded value type produced by parsing {@link DateTime}. */
 type DateTimeBrand = Type<"DateTime", DateTimeValue>;
 
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const DateTimeBase: TypeDefClass<"DateTime", DateTimeValue> = TypeDef("DateTime", dateTimeSchema);
+
 /**
  * Temporal-aware instant {@link TypeDef}. Extend it to create domain instants:
  * `class CreatedAt extends DateTime {}`.
@@ -220,7 +223,7 @@ type DateTimeBrand = Type<"DateTime", DateTimeValue>;
  * CreatedAt.parse('2026-05-22T10:00:00Z'); // Result<Type<'DateTime', DateTimeValue>, SchemaError>
  * ```
  */
-export class DateTime extends TypeDef("DateTime", dateTimeSchema) {
+export class DateTime extends DateTimeBase {
   /** Current instant as a branded value. */
   static now(): DateTimeBrand {
     return DateTimeValue.now() as DateTimeBrand;

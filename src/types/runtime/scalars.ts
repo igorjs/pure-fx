@@ -21,7 +21,10 @@
  */
 
 import { Schema } from "../../data/schema.js";
-import { TypeDef } from "../type-def.js";
+import { TypeDef, type TypeDefClass } from "../type-def.js";
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const StrBase: TypeDefClass<"Str", string> = TypeDef("Str", Schema.string);
 
 /**
  * Any JS `string` value.
@@ -33,7 +36,10 @@ import { TypeDef } from "../type-def.js";
  * Title.parse(42);       // Err
  * ```
  */
-export class Str extends TypeDef("Str", Schema.string) {}
+export class Str extends StrBase {}
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const NumBase: TypeDefClass<"Num", number> = TypeDef("Num", Schema.number);
 
 /**
  * Any JS `number` value (excluding `NaN`). Permits non-integers and
@@ -45,7 +51,10 @@ export class Str extends TypeDef("Str", Schema.string) {}
  * Num.parse(NaN);    // Err
  * ```
  */
-export class Num extends TypeDef("Num", Schema.number) {}
+export class Num extends NumBase {}
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const IntBase: TypeDefClass<"Int", number> = TypeDef("Int", Schema.int);
 
 /**
  * An integer `number` (no fractional part). Backed by `Schema.int`, so
@@ -57,7 +66,13 @@ export class Num extends TypeDef("Num", Schema.number) {}
  * Int.parse(1.5);    // Err
  * ```
  */
-export class Int extends TypeDef("Int", Schema.int) {}
+export class Int extends IntBase {}
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const UIntBase: TypeDefClass<"UInt", number> = TypeDef(
+  "UInt",
+  Schema.int.refine(n => n >= 0, "non-negative"),
+);
 
 /**
  * A non-negative integer (`>= 0`). Combines `Schema.int` with a
@@ -69,10 +84,10 @@ export class Int extends TypeDef("Int", Schema.int) {}
  * UInt.parse(-1);    // Err
  * ```
  */
-export class UInt extends TypeDef(
-  "UInt",
-  Schema.int.refine(n => n >= 0, "non-negative"),
-) {}
+export class UInt extends UIntBase {}
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const BoolBase: TypeDefClass<"Bool", boolean> = TypeDef("Bool", Schema.boolean);
 
 /**
  * Any JS `boolean` value.
@@ -83,7 +98,13 @@ export class UInt extends TypeDef(
  * Bool.parse(1);     // Err  (not coerced)
  * ```
  */
-export class Bool extends TypeDef("Bool", Schema.boolean) {}
+export class Bool extends BoolBase {}
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const BytesBase: TypeDefClass<"Bytes", Uint8Array> = TypeDef(
+  "Bytes",
+  Schema.guard((v): v is Uint8Array => v instanceof Uint8Array, "Uint8Array"),
+);
 
 /**
  * A `Uint8Array` instance. Node `Buffer` is accepted because it extends
@@ -95,10 +116,13 @@ export class Bool extends TypeDef("Bool", Schema.boolean) {}
  * Bytes.parse(new ArrayBuffer(8));           // Err
  * ```
  */
-export class Bytes extends TypeDef(
-  "Bytes",
-  Schema.guard((v): v is Uint8Array => v instanceof Uint8Array, "Uint8Array"),
-) {}
+export class Bytes extends BytesBase {}
+
+// Why: JSR requires the superclass to be a typed variable, not a call.
+const NilBase: TypeDefClass<"Nil", null> = TypeDef(
+  "Nil",
+  Schema.guard((v): v is null => v === null, "null"),
+);
 
 /**
  * Strictly the literal value `null`. Use this when a field must be `null`
@@ -112,7 +136,4 @@ export class Bytes extends TypeDef(
  * Nil.parse(0);          // Err
  * ```
  */
-export class Nil extends TypeDef(
-  "Nil",
-  Schema.guard((v): v is null => v === null, "null"),
-) {}
+export class Nil extends NilBase {}

@@ -47,9 +47,12 @@ const PIN_ALLOWLIST = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+// GitHub runs both extensions.
+const isWorkflowFile = name => /\.ya?ml$/.test(name);
+
 function readWorkflows() {
   return readdirSync(workflowsDir)
-    .filter(name => name.endsWith(".yml"))
+    .filter(isWorkflowFile)
     .sort()
     .map(name => ({
       path: `.github/workflows/${name}`,
@@ -86,7 +89,11 @@ function missingBacktickedNames(section, names) {
   return names.filter(name => !section.includes(`\`${name}\``));
 }
 
-function jobsWithoutPermissions(text) {
+function playwrightImageVersion(text) {
+  return /image:\s*mcr\.microsoft\.com\/playwright:v(\d+\.\d+\.\d+)-/.exec(text)?.[1] ?? null;
+}
+
+function parseJobs(text) {
   const jobs = [];
   let inJobs = false;
   for (const line of text.split("\n")) {
@@ -104,7 +111,13 @@ function jobsWithoutPermissions(text) {
       jobs[jobs.length - 1].hasPermissions = true;
     }
   }
-  return jobs.filter(job => !job.hasPermissions).map(job => job.id);
+  return jobs;
+}
+
+function jobsWithoutPermissions(text) {
+  return parseJobs(text)
+    .filter(job => !job.hasPermissions)
+    .map(job => job.id);
 }
 
 function unpinnedUses(text) {
@@ -124,6 +137,9 @@ function unpinnedUses(text) {
 // ── Rolling release helpers ─────────────────────────────────────────────────
 
 const ROLLING_RELEASE = ".github/workflows/rolling-release.yml";
+const DRY_RUN_GUARD = '[[ "$DRY_RUN" == "true" ]]';
+const VERSION_GUARD = '[[ -n "$RELEASE_VERSION" ]]';
+const SCHEDULE_GATE = "github.event_name != 'schedule' || vars.ROLLING_RELEASE_ENABLED == 'true'";
 const VERSION_PATTERN = "^[0-9]+\\.[0-9]+\\.[0-9]+$";
 const IF_THEN = /^\s*if\s+(.*?);\s*then\b/;
 const FI = /^\s*fi\b/;
@@ -241,6 +257,17 @@ describe("workflow syntax", () => {
     expect(hits).toEqual([]);
   });
 
+  it("both .yml and .yaml files count as workflows", () => {
+    // Arrange
+    const names = ["a.yml", "b.yaml", "c.txt", "d.yml.bak"];
+
+    // Act
+    const picked = names.filter(isWorkflowFile);
+
+    // Assert
+    expect(picked).toEqual(["a.yml", "b.yaml"]);
+  });
+
   it("a secret missing from the Actions section is reported", () => {
     // Arrange
     const markdown = `${ACTIONS_HEADING}\n\n- \`A_ONE\`\n`;
@@ -289,6 +316,7 @@ describe("workflow syntax", () => {
     const missing = missingBacktickedNames(sectionOf(doc, ACTIONS_HEADING), names);
 
     // Assert
+    expect(names).toContain("BOT_APP_CLIENT_ID");
     expect(missing).toEqual([]);
   });
 
@@ -303,6 +331,7 @@ describe("workflow syntax", () => {
     const missing = missingBacktickedNames(sectionOf(doc, DEPENDABOT_HEADING), names);
 
     // Assert
+    expect(names).toContain("BOT_APP_CLIENT_ID");
     expect(missing).toEqual([]);
   });
 
@@ -327,6 +356,20 @@ describe("workflow syntax", () => {
     expect(missing).toEqual(["without-perms"]);
   });
 
+  it("a layout the job parser cannot read yields no jobs", () => {
+    // Arrange
+    const fourSpace = "jobs:\n    build:\n      runs-on: ubuntu-latest\n";
+    const commented = "jobs: # all jobs\n  build:\n    runs-on: ubuntu-latest\n";
+
+    // Act
+    const fourSpaceJobs = parseJobs(fourSpace);
+    const commentedJobs = parseJobs(commented);
+
+    // Assert
+    expect(fourSpaceJobs).toEqual([]);
+    expect(commentedJobs).toEqual([]);
+  });
+
   it("a tag-pinned action is reported and the SLSA generator is allowed", () => {
     // Arrange
     const text = [
@@ -348,11 +391,13 @@ describe("workflow syntax", () => {
     const workflows = readWorkflows();
 
     // Act
+    const unparsed = workflows.filter(({ text }) => parseJobs(text).length === 0);
     const missing = workflows.flatMap(({ path, text }) =>
       jobsWithoutPermissions(text).map(job => `${path}: ${job}`),
     );
 
     // Assert
+    expect(unparsed.map(({ path }) => path)).toEqual([]);
     expect(missing).toEqual([]);
   });
 
@@ -402,12 +447,30 @@ describe("workflow syntax", () => {
     const good = ['if [[ "$DRY_RUN" == "true" ]]; then', "  args+=(--dry-run)", "fi"].join("\n");
 
     // Act
-    const badHits = ungatedFlagLines(bad, "--dry-run", "DRY_RUN");
-    const goodHits = ungatedFlagLines(good, "--dry-run", "DRY_RUN");
+    const badHits = ungatedFlagLines(bad, "--dry-run", DRY_RUN_GUARD);
+    const goodHits = ungatedFlagLines(good, "--dry-run", DRY_RUN_GUARD);
 
     // Assert
     expect(badHits.length).toBe(2);
     expect(goodHits).toEqual([]);
+  });
+
+  it("an inverted flag condition is reported", () => {
+    // Arrange
+    const inverted = ['if [[ "$DRY_RUN" != "true" ]]; then', "  args+=(--dry-run)", "fi"].join(
+      "\n",
+    );
+    const emptyCheck = ['if [[ -z "$RELEASE_VERSION" ]]; then', "  args+=(--version)", "fi"].join(
+      "\n",
+    );
+
+    // Act
+    const dryRunHits = ungatedFlagLines(inverted, "--dry-run", DRY_RUN_GUARD);
+    const versionHits = ungatedFlagLines(emptyCheck, "--version", VERSION_GUARD);
+
+    // Assert
+    expect(dryRunHits.length).toBe(1);
+    expect(versionHits.length).toBe(1);
   });
 
   it("an uncommented schedule line is reported", () => {
@@ -466,25 +529,14 @@ describe("workflow syntax", () => {
     const text = activeLines(readRollingRelease()).join("\n");
 
     // Act
-    const dryRunHits = ungatedFlagLines(text, "--dry-run", "DRY_RUN");
-    const versionHits = ungatedFlagLines(text, "--version", "RELEASE_VERSION");
+    const dryRunHits = ungatedFlagLines(text, "--dry-run", DRY_RUN_GUARD);
+    const versionHits = ungatedFlagLines(text, "--version", VERSION_GUARD);
 
     // Assert
     expect(text).toContain("--dry-run");
     expect(text).toContain("--version");
     expect(dryRunHits).toEqual([]);
     expect(versionHits).toEqual([]);
-  });
-
-  it("rolling release schedule stays commented out", () => {
-    // Arrange
-    const text = readRollingRelease();
-
-    // Act
-    const hits = uncommentedScheduleLines(text);
-
-    // Assert
-    expect(hits).toEqual([]);
   });
 
   it("release verifies every resolved tag except dev builds", () => {
@@ -562,5 +614,82 @@ describe("workflow syntax", () => {
 
     // Act and Assert
     expect(job).not.toContain("waits with it");
+  });
+
+  it("publish passes the provenance flag to the JSR publish step", () => {
+    // Arrange
+    const job = jobBlock(readWorkflow("publish.yml"), "publish-jsr");
+
+    // Act
+    const step = stepContaining(job, "jsr publish");
+
+    // Assert
+    expect(step).toContain("jsr publish --provenance");
+  });
+
+  it("rolling release has an enabled weekly schedule", () => {
+    // Arrange
+    const text = readWorkflow("rolling-release.yml");
+
+    // Act
+    const schedule = /^ {2}schedule:\s*\n\s+- cron:\s*"([^"]+)"/m.exec(text);
+    const fields = schedule?.[1].split(/\s+/) ?? [];
+
+    // Assert
+    expect(schedule).not.toBe(null);
+    expect(fields.length).toBe(5);
+    expect(/^\d+$/.test(fields[4] ?? "")).toBe(true);
+    expect(fields[2]).toBe("*");
+    expect(fields[3]).toBe("*");
+  });
+
+  it("rolling release schedule is gated on ROLLING_RELEASE_ENABLED", () => {
+    // Arrange
+    const job = jobBlock(readWorkflow("rolling-release.yml"), "release");
+
+    // Act
+    const condition = /^ {4}if:\s*(.*)$/m.exec(job)?.[1] ?? "";
+
+    // Assert
+    expect(condition).toBe(SCHEDULE_GATE);
+  });
+
+  it("a schedule gate that drops the opt-in variable is reported", () => {
+    // Arrange
+    const ungated = "  release:\n    if: github.event_name != 'schedule'\n    runs-on: x\n";
+    const wrongOp = `  release:\n    if: github.event_name != 'schedule' && vars.ROLLING_RELEASE_ENABLED == 'true'\n`;
+
+    // Act
+    const ungatedCondition = /^ {4}if:\s*(.*)$/m.exec(jobBlock(ungated, "release"))?.[1];
+    const wrongOpCondition = /^ {4}if:\s*(.*)$/m.exec(jobBlock(wrongOp, "release"))?.[1];
+
+    // Assert
+    expect(ungatedCondition).not.toBe(SCHEDULE_GATE);
+    expect(wrongOpCondition).not.toBe(SCHEDULE_GATE);
+  });
+
+  it("the CI Playwright image tag matches the playwright devDependency", () => {
+    // Arrange
+    const pkg = JSON.parse(readFileSync(join(projectRoot, "package.json"), "utf8"));
+    const ci = readWorkflow("ci.yml");
+
+    // Act
+    const tag = playwrightImageVersion(ci);
+
+    // Assert
+    expect(tag).toBe(pkg.devDependencies.playwright);
+  });
+
+  it("a Playwright image tag that differs from the package version is reported", () => {
+    // Arrange
+    const stale = "      image: mcr.microsoft.com/playwright:v1.60.0-noble";
+
+    // Act
+    const tag = playwrightImageVersion(stale);
+
+    // Assert
+    expect(tag).toBe("1.60.0");
+    expect(tag).not.toBe("1.61.0");
+    expect(playwrightImageVersion("image: node:22")).toBe(null);
   });
 });
