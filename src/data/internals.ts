@@ -201,17 +201,19 @@ export const getByPath = (obj: unknown, path: readonly string[]): unknown => {
 export const setByPath = <T>(obj: T, path: readonly string[], value: unknown, depth = 0): T => {
   if (depth === path.length) return value as T;
   const key = path[depth]!;
-  const current = obj as Record<string, unknown>;
-  const child = current[key];
-  if (Array.isArray(child) && depth + 1 < path.length) {
-    const idx = Number(path[depth + 1]);
-    if (!Number.isNaN(idx)) {
-      const copy = child.slice();
-      copy[idx] = depth + 2 === path.length ? value : setByPath(copy[idx], path, value, depth + 2);
-      return { ...current, [key]: copy } as T;
-    }
+  if (Array.isArray(obj) && key === "length" && depth + 1 === path.length) {
+    const resized = obj.slice();
+    resized.length = value as number;
+    return resized as T;
   }
-  return { ...current, [key]: setByPath(child, path, value, depth + 1) } as T;
+  if (Array.isArray(obj)) {
+    const copy = obj.slice() as unknown[];
+    const idx = key as unknown as number;
+    copy[idx] = setByPath(copy[idx], path, value, depth + 1);
+    return copy as T;
+  }
+  const current = obj as Record<string, unknown>;
+  return { ...current, [key]: setByPath(current[key], path, value, depth + 1) } as T;
 };
 
 // ── Draft proxy ─────────────────────────────────────────────────────────────
@@ -266,6 +268,22 @@ const findMutationValue = (
   return DRAFT_UNSET;
 };
 
+/** Resolve the draft's current value at `currentPath` by replaying the mutations recorded beneath it. */
+const currentValueAt = <T>(
+  base: T,
+  mutations: readonly Mutation[],
+  currentPath: readonly string[],
+): T => {
+  const depth = currentPath.length;
+  const beneath: Mutation[] = [];
+  for (const m of mutations) {
+    if (m.path.length >= depth && currentPath.every((seg, i) => m.path[i] === seg)) {
+      beneath.push({ path: m.path.slice(depth), value: m.value });
+    }
+  }
+  return applyMutations(base, beneath);
+};
+
 /** Build a new path array by appending `prop` to `currentPath`. */
 const appendPath = (currentPath: readonly string[], prop: string): string[] => {
   const depth = currentPath.length;
@@ -299,9 +317,23 @@ export const createDraft = <T extends object>(
       if (typeof prop !== "string") return Reflect.get(tgt, prop, receiver);
 
       if (Array.isArray(tgt) && MUTATING_ARRAY_METHODS.has(prop)) {
-        throw new TypeError(
-          `Cannot call '${prop}()' on array inside produce(). Use reassignment instead: draft.prop = [...draft.prop, value]`,
-        );
+        // Run the method on a copy of the current value and record the whole array as one mutation.
+        return (...args: unknown[]) => {
+          const copy = (currentValueAt(tgt, mutations, currentPath) as unknown[]).slice();
+          const result = (copy as unknown as Record<string, (...a: unknown[]) => unknown>)[prop]!(
+            ...args,
+          );
+          mutations.push({ path: currentPath.slice(), value: copy });
+          return result;
+        };
+      }
+      if (Array.isArray(tgt)) {
+        // Every array read resolves against the replayed value so it sees earlier index writes and methods.
+        const current = currentValueAt(tgt, mutations, currentPath) as unknown[];
+        const val = Reflect.get(current, prop, receiver);
+        return isObjectLike(val)
+          ? createDraft(val as object, mutations, appendPath(currentPath, prop))
+          : val;
       }
 
       const mutated = findMutationValue(mutations, currentPath, prop);
@@ -312,6 +344,12 @@ export const createDraft = <T extends object>(
         return createDraft(val as object, mutations, appendPath(currentPath, prop));
       }
       return val;
+    },
+    has(tgt, prop) {
+      if (Array.isArray(tgt) && typeof prop === "string") {
+        return Reflect.has(currentValueAt(tgt, mutations, currentPath) as object, prop);
+      }
+      return Reflect.has(tgt, prop);
     },
     set(_, prop, value) {
       if (typeof prop === "string") mutations.push({ path: appendPath(currentPath, prop), value });
@@ -344,6 +382,41 @@ const deepEqualArrays = (a: readonly unknown[], b: readonly unknown[]): boolean 
   return true;
 };
 
+/** Map deep equality: same keys, deep-equal values. */
+const deepEqualMaps = (
+  a: ReadonlyMap<unknown, unknown>,
+  b: ReadonlyMap<unknown, unknown>,
+): boolean => {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) {
+    if (!b.has(k) || !deepEqual(v, b.get(k))) return false;
+  }
+  return true;
+};
+
+/** Set equality: same size, every member of `a` present in `b`. */
+const deepEqualSets = (a: ReadonlySet<unknown>, b: ReadonlySet<unknown>): boolean => {
+  if (a.size !== b.size) return false;
+  for (const v of a) {
+    if (!b.has(v)) return false;
+  }
+  return true;
+};
+
+/** Compare Date/Map/Set operands; `undefined` when neither side is one of them. */
+const deepEqualBuiltins = (a: object, b: object): boolean | undefined => {
+  if (a instanceof Date || b instanceof Date) {
+    return a instanceof Date && b instanceof Date && Object.is(a.getTime(), b.getTime());
+  }
+  if (a instanceof Map || b instanceof Map) {
+    return a instanceof Map && b instanceof Map && deepEqualMaps(a, b);
+  }
+  if (a instanceof Set || b instanceof Set) {
+    return a instanceof Set && b instanceof Set && deepEqualSets(a, b);
+  }
+  return undefined;
+};
+
 /**
  * Structural deep equality for plain objects and arrays.
  *
@@ -355,6 +428,8 @@ export const deepEqual = (a: unknown, b: unknown): boolean => {
   if (Object.is(a, b)) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
   if (Array.isArray(a)) return Array.isArray(b) && deepEqualArrays(a, b);
+  const builtin = deepEqualBuiltins(a, b);
+  if (builtin !== undefined) return builtin;
   const aObj = a as Record<string, unknown>;
   const bObj = b as Record<string, unknown>;
   const aKeys = Object.keys(aObj);

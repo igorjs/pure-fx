@@ -132,7 +132,7 @@ const getCachedChild = (parentRaw: object, key: string, childRaw: object): Immut
 /**
  * Shape class cache.
  *
- * Key: property keys sorted and joined with NUL byte. Objects with
+ * Key: the sorted property keys JSON-encoded, so no key can collide with a separator. Objects with
  * the same keys (regardless of insertion order) share a class.
  *
  * Value: a constructor whose prototype has getters/setters for data
@@ -149,7 +149,7 @@ const SHAPE_CACHE = new Map<string, new (raw: object) => any>();
  */
 const buildShapeClass = (keys: readonly string[]): (new (raw: object) => any) => {
   const sorted = keys.slice().sort();
-  const shapeKey = sorted.join("\0");
+  const shapeKey = JSON.stringify(sorted);
 
   const existing = SHAPE_CACHE.get(shapeKey);
   if (existing !== undefined) return existing;

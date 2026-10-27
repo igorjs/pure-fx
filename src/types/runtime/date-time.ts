@@ -180,6 +180,10 @@ export class DateTimeValue implements Immutable<Date> {
 
 // ── DateTime TypeDef ──────────────────────────────────────────────────────────
 
+/** Max magnitude of a `Date` in milliseconds; beyond it `toISOString` throws. */
+const MAX_EPOCH_MILLIS = 8.64e15;
+const isValidEpochMillis = (ms: number): boolean => Math.abs(ms) <= MAX_EPOCH_MILLIS;
+
 const isDate = Schema.guard((v): v is Date => v instanceof Date, "Date");
 const isTemporalInstant = Schema.guard(
   (v): v is TemporalInstant =>
@@ -201,10 +205,14 @@ const isDateTimeValue = Schema.guard(
  */
 const dateTimeSchema: SchemaType<DateTimeValue> = Schema.union(
   isDateTimeValue,
-  isDate.transform(d => DateTimeValue.fromDate(d)),
+  isDate
+    .refine(d => isValidEpochMillis(d.getTime()), "valid Date")
+    .transform(d => DateTimeValue.fromDate(d)),
   isTemporalInstant.transform(t => DateTimeValue.fromTemporal(t)),
   Schema.isoDate.transform(s => DateTimeValue.fromISO(s)),
-  Schema.number.transform(n => DateTimeValue.fromEpochMillis(n)),
+  Schema.number
+    .refine(isValidEpochMillis, "epoch milliseconds in range")
+    .transform(n => DateTimeValue.fromEpochMillis(n)),
 );
 
 /** Branded value type produced by parsing {@link DateTime}. */

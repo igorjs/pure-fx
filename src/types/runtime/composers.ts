@@ -178,8 +178,8 @@ export const Tuple = <Items extends readonly TypeDefStatic<string, unknown>[]>(
  *
  * The key TypeDef must be backed by a string-based schema (the JS runtime
  * coerces all object keys to strings); the value TypeDef validates each
- * value. Keys are NOT validated against the key TypeDef's schema in v0; the
- * key brand is phantom-only.
+ * value. Each key is also validated against the key TypeDef's schema, and a
+ * failing key is named in the error path.
  *
  * @example
  * ```ts
@@ -199,8 +199,8 @@ export const Dict = <KTag extends string, K extends string, VTag extends string,
     TypeDef(
       `Dict<${key.tag},${value.tag}>` as const,
       // Why: Schema.record yields a plain record structurally; deep-freeze it
-      // into a snapshot. Keys are string-coerced; the key brand is phantom-only.
-      Schema.record(value.schema).transform(obj =>
+      // into a snapshot. Keys are validated by the key schema.
+      Schema.record(value.schema, key.schema as unknown as SchemaType<string>).transform(obj =>
         deepFreezeT(obj as Readonly<Record<Type<KTag, K> & string, Type<VTag, V>>>),
       ),
     ),
@@ -249,7 +249,7 @@ export const MapOf = <KTag extends string, K extends string, VTag extends string
   mapOfMemo(key as unknown as object, value as unknown as object, () =>
     TypeDef(
       `MapOf<${key.tag},${value.tag}>` as const,
-      Schema.record(value.schema).transform(obj =>
+      Schema.record(value.schema, key.schema as unknown as SchemaType<string>).transform(obj =>
         HashMap.fromObject(obj as Readonly<Record<string, Type<VTag, V>>>),
       ),
     ),

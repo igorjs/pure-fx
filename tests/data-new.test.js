@@ -16,6 +16,8 @@ import { describe, expect, it } from "@igorjs/pure-test";
 const {
   ADT,
   NonEmptyList,
+  Record,
+  List,
   Immutable,
   Codec,
   Schema,
@@ -39,6 +41,12 @@ const {
   Some,
   None,
   Match,
+  TypeDef,
+  Dict,
+  MapOf,
+  DateTime,
+  Str,
+  Num,
 } = await import("../dist/index.js");
 
 // =============================================================================
@@ -1702,5 +1710,332 @@ describe("ADT", () => {
     expect(r.tag).toBe("Rect");
     expect(r.width).toBe(3);
     expect(r.height).toBe(4);
+  });
+});
+
+// =============================================================================
+// deepEqual, produce on arrays, Record shape cache
+// =============================================================================
+
+describe("Record.equals (deepEqual)", () => {
+  it("compares Date by time value", () => {
+    // Arrange
+    const a = Record({ d: new Date(1000) });
+    const same = Record({ d: new Date(1000) });
+    const other = Record({ d: new Date(2000) });
+    // Act / Assert
+    expect(a.equals(same)).toBe(true);
+    expect(a.equals(other)).toBe(false);
+  });
+
+  it("compares Map by contents, deep-comparing values", () => {
+    // Arrange
+    const a = Record({ m: new Map([["k", { n: 1 }]]) });
+    const same = Record({ m: new Map([["k", { n: 1 }]]) });
+    const otherValue = Record({ m: new Map([["k", { n: 2 }]]) });
+    const otherKey = Record({ m: new Map([["j", { n: 1 }]]) });
+    // Act / Assert
+    expect(a.equals(same)).toBe(true);
+    expect(a.equals(otherValue)).toBe(false);
+    expect(a.equals(otherKey)).toBe(false);
+  });
+
+  it("compares Set by contents", () => {
+    // Arrange
+    const a = Record({ s: new Set([1, 2]) });
+    const same = Record({ s: new Set([2, 1]) });
+    const other = Record({ s: new Set([1, 3]) });
+    // Act / Assert
+    expect(a.equals(same)).toBe(true);
+    expect(a.equals(other)).toBe(false);
+  });
+
+  it("does not treat a Date as equal to a plain object", () => {
+    // Arrange
+    const a = Record({ d: new Date(1000) });
+    const b = Record({ d: {} });
+    // Act / Assert
+    expect(a.equals(b)).toBe(false);
+    expect(b.equals(a)).toBe(false);
+  });
+});
+
+describe("produce on arrays", () => {
+  it("List.produce honours length truncation", () => {
+    // Arrange
+    const list = List([1, 2, 3]);
+    // Act
+    const out = list.produce(draft => {
+      draft.length = 1;
+    });
+    // Assert
+    expect(out.toJSON()).toEqual([1]);
+  });
+
+  it("List.produce honours push", () => {
+    // Arrange
+    const list = List([1]);
+    // Act
+    const out = list.produce(draft => {
+      draft.push(2);
+    });
+    // Assert
+    expect(out.toJSON()).toEqual([1, 2]);
+  });
+
+  it("Record.produce honours length truncation on a nested array", () => {
+    // Arrange
+    const rec = Record({ items: [1, 2, 3] });
+    // Act
+    const out = rec.produce(draft => {
+      draft.items.length = 1;
+    });
+    // Assert
+    expect(out.toJSON()).toEqual({ items: [1] });
+    expect(rec.toJSON()).toEqual({ items: [1, 2, 3] });
+  });
+
+  it("Record.produce honours push on a nested array", () => {
+    // Arrange
+    const rec = Record({ items: [1] });
+    // Act
+    const out = rec.produce(draft => {
+      draft.items.push(2);
+    });
+    // Assert
+    expect(out.toJSON()).toEqual({ items: [1, 2] });
+    expect(rec.toJSON()).toEqual({ items: [1] });
+  });
+});
+
+describe("Record shape cache", () => {
+  it("distinguishes keys containing NUL from separate keys", () => {
+    // Arrange
+    const a = Record({ "a\0b": 1 });
+    // Act
+    const b = Record({ a: 1, b: 2 });
+    // Assert
+    expect(b.a).toBe(1);
+    expect(b.b).toBe(2);
+    expect(a["a\0b"]).toBe(1);
+    expect(a.a).toBe(undefined);
+  });
+});
+
+describe("Prototype-named keys", () => {
+  it.each([
+    "__proto__",
+    "constructor",
+    "toString",
+  ])("discriminatedUnion rejects inherited tag %s", tag => {
+    // Arrange
+    const schema = Schema.discriminatedUnion("type", {
+      a: Schema.object({ type: Schema.literal("a") }),
+    });
+    // Act
+    const result = schema.parse({ type: tag });
+    // Assert
+    expect(result.isErr).toBe(true);
+  });
+
+  it.each([
+    "__proto__",
+    "constructor",
+    "toString",
+  ])("discriminatedUnion matches own mapping key %s", tag => {
+    // Arrange
+    const mapping = Object.create(null);
+    mapping[tag] = Schema.object({ type: Schema.literal(tag) });
+    const schema = Schema.discriminatedUnion("type", mapping);
+    // Act
+    const result = schema.parse(JSON.parse(`{"type":"${tag}"}`));
+    // Assert
+    expect(result.isOk).toBe(true);
+  });
+
+  it("Schema.record keeps an own __proto__ key as data", () => {
+    // Arrange
+    const schema = Schema.record(Schema.number);
+    // Act
+    const result = schema.parse(JSON.parse('{"__proto__":1}'));
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(Object.hasOwn(result.value, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(result.value)).toBe(Object.prototype);
+  });
+});
+
+describe("List of a frozen array", () => {
+  it("List accepts a frozen array", () => {
+    // Arrange
+    const frozen = Object.freeze([1, 2]);
+    // Act
+    const list = List(frozen);
+    // Assert
+    expect(list.length).toBe(2);
+    expect(list.toJSON()).toEqual([1, 2]);
+  });
+
+  it("NonEmptyList accepts a frozen array", () => {
+    // Arrange
+    const frozen = Object.freeze([1, 2]);
+    // Act
+    const nel = NonEmptyList(frozen);
+    const from = NonEmptyList.from(frozen);
+    // Assert
+    expect(nel.head).toBe(1);
+    expect(nel.length).toBe(2);
+    expect(from.isSome).toBe(true);
+  });
+});
+
+describe("DateTime never throws on parse", () => {
+  it.each([
+    ["Infinity", Infinity],
+    ["-Infinity", -Infinity],
+    ["out-of-range number", 1e20],
+    ["invalid Date", new Date(Number.NaN)],
+    ["NaN", Number.NaN],
+    ["invalid string", "nope"],
+    ["null", null],
+    ["object", {}],
+    ["bigint", 1n],
+  ])("returns Err for %s", (_label, input) => {
+    // Arrange
+    let result;
+    // Act
+    const act = () => {
+      result = DateTime.parse(input);
+    };
+    // Assert
+    expect(act).not.toThrow();
+    expect(result.isErr).toBe(true);
+  });
+
+  it("still parses a valid ISO string", () => {
+    // Arrange / Act
+    const result = DateTime.parse("2026-05-22T10:00:00Z");
+    // Assert
+    expect(result.isOk).toBe(true);
+  });
+});
+
+describe("Dict and MapOf key validation", () => {
+  const Key = TypeDef("Key", Schema.regex(/^[a-z]+$/));
+
+  it("Dict fails on an invalid key and names it in the path", () => {
+    // Arrange
+    const D = Dict(Key, Num);
+    // Act
+    const result = D.parse({ ok: 1, BAD: 2 });
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(result.error.path).toEqual(["BAD"]);
+  });
+
+  it("MapOf fails on an invalid key and names it in the path", () => {
+    // Arrange
+    const M = MapOf(Key, Num);
+    // Act
+    const result = M.parse({ ok: 1, BAD: 2 });
+    // Assert
+    expect(result.isErr).toBe(true);
+    expect(result.error.path).toEqual(["BAD"]);
+  });
+
+  it("Dict accepts valid keys", () => {
+    // Arrange / Act
+    const result = Dict(Key, Num).parse({ ok: 1 });
+    // Assert
+    expect(result.isOk).toBe(true);
+  });
+
+  it("Dict treats prototype-named keys as data", () => {
+    // Arrange
+    const D = Dict(Str, Num);
+    // Act
+    const result = D.parse(JSON.parse('{"__proto__":1,"constructor":2}'));
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(Object.keys(result.value).sort()).toEqual(["__proto__", "constructor"]);
+  });
+
+  it("MapOf treats prototype-named keys as data", () => {
+    // Arrange
+    const M = MapOf(Str, Num);
+    // Act
+    const result = M.parse(JSON.parse('{"__proto__":1,"constructor":2}'));
+    // Assert
+    expect(result.isOk).toBe(true);
+    expect(result.value.size).toBe(2);
+    expect(result.value.get("__proto__").isSome).toBe(true);
+  });
+});
+
+describe("produce on array drafts mixing writes and methods", () => {
+  it("push after an index write keeps the write", () => {
+    // Arrange
+    const rec = Record({ items: [3, 1, 2] });
+    // Act
+    const out = rec.produce(d => {
+      d.items[0] = 9;
+      d.items.push(4);
+    });
+    // Assert
+    expect(out.toJSON().items).toEqual([9, 1, 2, 4]);
+  });
+
+  it("length reflects an earlier index write beyond the end", () => {
+    // Arrange
+    const rec = Record({ items: [1, 2] });
+    let len = -1;
+    // Act
+    rec.produce(d => {
+      d.items[3] = 7;
+      len = d.items.length;
+    });
+    // Assert
+    expect(len).toBe(4);
+  });
+
+  it("nested field write then sort keeps both", () => {
+    // Arrange
+    const rec = Record({ items: [{ n: 2 }, { n: 1 }] });
+    // Act
+    const out = rec.produce(d => {
+      d.items[0].n = 5;
+      d.items.reverse();
+    });
+    // Assert
+    expect(out.toJSON().items).toEqual([{ n: 1 }, { n: 5 }]);
+  });
+
+  it("reads an element back through a held draft after sort", () => {
+    // Arrange
+    const rec = Record({ items: [3, 1, 2] });
+    let first;
+    // Act
+    rec.produce(d => {
+      const items = d.items;
+      items.sort();
+      first = items[0];
+    });
+    // Assert
+    expect(first).toBe(1);
+  });
+
+  it("iterates a held draft after push", () => {
+    // Arrange
+    const rec = Record({ items: [1] });
+    const seen = [];
+    // Act
+    rec.produce(d => {
+      const items = d.items;
+      items.push(2);
+      for (const x of items) seen.push(x);
+      seen.push(0 in items, 5 in items);
+    });
+    // Assert
+    expect(seen).toEqual([1, 2, true, false]);
   });
 });

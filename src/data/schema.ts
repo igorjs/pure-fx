@@ -190,17 +190,30 @@ const tupleSchema = <T extends readonly SchemaType<any>[]>(
     >;
   });
 
-const recordValuesSchema = <V>(value: SchemaType<V>): SchemaType<Readonly<Record<string, V>>> =>
+const recordValuesSchema = <V>(
+  value: SchemaType<V>,
+  key?: SchemaType<string>,
+): SchemaType<Readonly<Record<string, V>>> =>
   createSchema(input => {
     if (input === null || typeof input !== "object" || Array.isArray(input)) {
       return schemaErr([], "record", input);
     }
     const result: Record<string, unknown> = {};
     const keys = Object.keys(input);
-    for (const key of keys) {
-      const r = value.parse((input as Record<string, unknown>)[key]);
-      if (r.isErr) return Err(prependPath(r.error, key));
-      result[key] = r.value;
+    for (const k of keys) {
+      if (key !== undefined) {
+        const kr = key.parse(k);
+        if (kr.isErr) return Err(prependPath(kr.error, k));
+      }
+      const r = value.parse((input as Record<string, unknown>)[k]);
+      if (r.isErr) return Err(prependPath(r.error, k));
+      // Why: plain assignment of "__proto__" would hit the setter and drop the key.
+      Object.defineProperty(result, k, {
+        value: r.value,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     }
     return Ok(result as Readonly<Record<string, V>>);
   });
@@ -276,7 +289,10 @@ export const Schema: {
     readonly [K in keyof T]: T[K] extends SchemaType<infer U> ? U : never;
   }>;
   /** Validate a string-keyed record with uniform value type. */
-  readonly record: <V>(value: SchemaType<V>) => SchemaType<Readonly<Record<string, V>>>;
+  readonly record: <V>(
+    value: SchemaType<V>,
+    key?: SchemaType<string>,
+  ) => SchemaType<Readonly<Record<string, V>>>;
   /** Match an exact literal value. */
   readonly literal: <const T extends string | number | boolean>(value: T) => SchemaType<T>;
   /** Match any one of the given schemas (first match wins). */
@@ -388,7 +404,9 @@ export const Schema: {
       if (typeof tag !== "string") {
         return schemaErr([discriminant], "string discriminant", tag);
       }
-      const schema = (mapping as Record<string, SchemaType<any>>)[tag];
+      const schema = Object.hasOwn(mapping, tag)
+        ? (mapping as Record<string, SchemaType<any>>)[tag]
+        : undefined;
       if (schema === undefined) {
         const expected = Object.keys(mapping).join(" | ");
         return schemaErr([discriminant], expected, tag);
